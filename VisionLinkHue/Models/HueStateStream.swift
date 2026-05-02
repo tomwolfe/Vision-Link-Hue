@@ -57,6 +57,10 @@ final class HueStateStream: ObservableObject {
     /// Active error queue for toast/banner display.
     @Published var activeErrors: [AppError] = []
     
+    func setIsConnected(_ connected: Bool) {
+        isConnected = connected
+    }
+    
     /// Deprecated: use `activeErrors` instead.
     @Published var errorMessage: String?
     

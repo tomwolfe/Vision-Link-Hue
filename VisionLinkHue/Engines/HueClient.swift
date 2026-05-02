@@ -67,7 +67,6 @@ final class HueClient: ObservableObject, Sendable {
     
     // MARK: - Published State
     
-    @Published var is_connected: Bool = false
     @Published var bridgeIP: String?
     @Published var bridgePort: Int = 80
     @Published var apiKey: String?
@@ -307,7 +306,7 @@ final class HueClient: ObservableObject, Sendable {
     
     // MARK: - SSE Event Stream
     
-    /// Start the SSE connection to the bridge event stream.
+    /// Start the SSE connection to the bridge event stream using incremental streaming.
     func startEventStream() {
         guard let username = apiKey else {
             lastError = "No API key configured"
@@ -336,61 +335,66 @@ final class HueClient: ObservableObject, Sendable {
         
         let session = URLSession(configuration: .default, delegate: sessionDelegate, delegateQueue: nil)
         
-        sseTask = session.dataTask(with: request) { [weak self] data, response, error in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
+        Task { [weak self] in
+            do {
+                let (bytes, response) = try await session.bytes(for: request)
                 
-                if let error {
-                    self.logger.error("SSE stream error: \(error.localizedDescription)")
-                    self.lastError = "Stream error: \(error.localizedDescription)"
-                    await self.stateStream?.reportError(error, severity: .error, source: "HueClient.sse")
-                    self.scheduleReconnection()
+                guard let httpResponse = response as? HTTPURLResponse,
+                      (200...299).contains(httpResponse.statusCode) else {
+                    await self?.handleSSEDisconnect(error: HueError.invalidResponse)
                     return
                 }
                 
-                guard let data = data, let text = String(data: data, encoding: .utf8) else {
-                    self.scheduleReconnection()
-                    return
+                await self?.streamSSEEvents(from: bytes)
+                
+            } catch {
+                await self?.handleSSEDisconnect(error: error)
+            }
+        }
+        
+        sseTask = nil
+        stateStream?.setIsConnected(true)
+        logger.info("SSE event stream started (streaming)")
+    }
+    
+    /// Stream SSE events incrementally from AsyncBytes.
+    /// Buffers incomplete JSON objects across network chunk boundaries.
+    private func streamSSEEvents(from bytes: AsyncBytes) async {
+        var lineBuffer = ""
+        var jsonBuffer = ""
+        
+        for await result in bytes.chunks(ofType: UInt8.self) {
+            guard let chunk = String(data: Data(result), encoding: .utf8) else { continue }
+            lineBuffer.append(chunk)
+            
+            let lines = lineBuffer.split(separator: "\n", omittingEmptySubsequences: false)
+            
+            for line in lines.dropLast() {
+                let trimmed = String(line).trimmingCharacters(in: .whitespaces)
+                
+                if trimmed.isEmpty {
+                    processSSEEvent(buffer: &jsonBuffer)
+                    continue
                 }
                 
-                self.processSSEData(text)
+                if trimmed.hasPrefix("data: ") {
+                    let jsonFragment = String(trimmed.dropFirst(6))
+                    jsonBuffer.append(jsonFragment)
+                }
             }
+            
+            lineBuffer = String(lines.last ?? "")
         }
         
-        sseTask?.resume()
-        is_connected = true
-        logger.info("SSE event stream started")
+        processSSEEvent(buffer: &jsonBuffer)
     }
     
-    /// Process incoming SSE data. Handles reconnection events and JSON fragments.
-    private func processSSEData(_ data: String) {
-        let lines = data.components(separatedBy: "\n")
+    /// Process a complete SSE event from the JSON buffer.
+    private func processSSEEvent(buffer: inout String) {
+        guard !buffer.isEmpty else { return }
         
-        for line in lines {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            
-            if trimmed.isEmpty {
-                processSSEEvent()
-                continue
-            }
-            
-            if trimmed.hasPrefix("event:") {
-                continue
-            }
-            
-            if trimmed.hasPrefix("data: ") {
-                let jsonFragment = String(trimmed.dropFirst(6))
-                sseBuffer.append(jsonFragment)
-            }
-        }
-    }
-    
-    /// Process a complete SSE event from the buffer.
-    private func processSSEEvent() {
-        guard !sseBuffer.isEmpty else { return }
-        
-        let json = sseBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
-        sseBuffer = ""
+        let json = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
+        buffer = ""
         
         if json == "ping" || json.isEmpty {
             return
@@ -411,6 +415,18 @@ final class HueClient: ObservableObject, Sendable {
         } catch {
             logger.warning("Failed to parse SSE event: \(error.localizedDescription)")
             logger.debug("Raw event: \(json.prefix(200))")
+        }
+    }
+    
+    /// Handle SSE stream disconnection with reconnection logic.
+    private func handleSSEDisconnect(error: any Error) async {
+        await MainActor.run { [weak self] in
+            guard let self else { return }
+            
+            self.logger.error("SSE stream error: \(error.localizedDescription)")
+            self.lastError = "Stream error: \(error.localizedDescription)"
+            await self.stateStream?.reportError(error, severity: .error, source: "HueClient.sse")
+            self.scheduleReconnection()
         }
     }
     
@@ -450,7 +466,7 @@ final class HueClient: ObservableObject, Sendable {
         reconnectionTimer = nil
         sseBuffer = ""
         reconnectDelay = minReconnectDelay
-        is_connected = false
+        stateStream?.setIsConnected(false)
         logger.info("Disconnected from bridge")
     }
     

@@ -24,6 +24,9 @@ final class DetectionEngine: ObservableObject {
     /// Request ID for Vision requests.
     private let requestID = UUID()
     
+    /// Heuristic classifier for fixture type and confidence.
+    private let classifier = FixtureHeuristicClassifier()
+    
     /// Timestamp of the last inference pass.
     private var lastInferenceTime: CFAbsoluteTime = 0
     
@@ -82,9 +85,10 @@ final class DetectionEngine: ObservableObject {
     private func runVisionDetection(_ pixelBuffer: CVPixelBuffer) async throws -> [FixtureDetection] {
         let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
         
-        let request = VNDetectObjectsRequest()
-        request.minimumConfidence = 0.3
-        request.featureLevel = .v1
+        let request = VNDetectRectanglesRequest()
+        request.minimumConfidence = 0.2
+        request.maximumOutputCount = 20
+        request.quadTolerance = 0.1
         
         return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<[FixtureDetection], Error>) in
             Task.detached(priority: .userInitiated) {
@@ -121,8 +125,8 @@ final class DetectionEngine: ObservableObject {
                 bottomRight: SIMD2<Float>(Float(observation.boundingBox.maxX), Float(observation.boundingBox.maxY))
             )
             
-            let type = classifyFixtureType(from: observation)
-            let confidence = calculateConfidence(from: observation)
+            let type = classifier.classify(typeFrom: observation)
+            let confidence = classifier.calculateConfidence(from: observation)
             
             detections.append(FixtureDetection(type: type, region: region, confidence: confidence))
         }
@@ -130,99 +134,7 @@ final class DetectionEngine: ObservableObject {
         return nonMaxSuppression(detections, iouThreshold: 0.3)
     }
     
-    /// Classify the fixture type using a weighted scoring system across
-    /// aspect ratio, vertical position, and bounding box area.
-    private func classifyFixtureType(from observation: VNRectangleObservation) -> FixtureType {
-        let aspectRatio = observation.boundingBox.width / max(observation.boundingBox.height, 0.001)
-        let normalizedY = observation.boundingBox.midpoint.y
-        let area = observation.boundingBox.width * observation.boundingBox.height
-        
-        var scores: [FixtureType: Double] = [:]
-        
-        // Aspect ratio scoring
-        switch aspectRatio {
-        case 0.2...0.8:
-            scores[.ceiling] += 3.0
-            scores[.recessed] += 2.5
-            scores[.pendant] += 1.0
-        case 0.5...1.5:
-            scores[.pendant] += 3.0
-            scores[.lamp] += 2.5
-            scores[.ceiling] += 1.0
-        case 1.2...3.0:
-            scores[.lamp] += 2.0
-            scores[.pendant] += 1.5
-        case 2.0...8.0:
-            scores[.strip] += 4.0
-            scores[.lamp] += 0.5
-        default:
-            scores[.lamp] += 1.0
-        }
-        
-        // Vertical position scoring
-        if normalizedY < 0.25 {
-            scores[.ceiling] += 3.0
-            scores[.pendant] += 2.0
-            scores[.recessed] += 1.5
-        } else if normalizedY < 0.5 {
-            scores[.pendant] += 2.0
-            scores[.recessed] += 2.0
-            scores[.lamp] += 1.0
-        } else if normalizedY < 0.75 {
-            scores[.lamp] += 2.5
-            scores[.recessed] += 2.0
-            scores[.strip] += 0.5
-        } else {
-            scores[.lamp] += 3.0
-            scores[.strip] += 1.5
-        }
-        
-        // Area-based scoring
-        if area > 0.15 {
-            scores[.ceiling] += 1.5
-            scores[.strip] += 1.0
-        } else if area > 0.05 {
-            scores[.pendant] += 1.0
-            scores[.lamp] += 1.0
-            scores[.recessed] += 1.0
-        } else {
-            scores[.recessed] += 1.5
-            scores[.lamp] += 0.5
-        }
-        
-        let sorted = scores.sorted { a, b in
-            if a.value == b.value {
-                let specificity: [FixtureType: Int] = [.ceiling: 4, .recessed: 3, .pendant: 2, .strip: 1, .lamp: 0]
-                return specificity[a.key, default: 0] > specificity[b.key, default: 0]
-            }
-            return a.value > b.value
-        }
-        
-        return sorted.first?.key ?? .lamp
-    }
-    
-    /// Calculate detection confidence from observation quality.
-    private func calculateConfidence(from observation: VNRectangleObservation) -> Double {
-        var confidence: Double = 0.7
-        
-        let area = observation.boundingBox.width * observation.boundingBox.height
-        if area > 0.01 && area < 0.5 {
-            confidence += 0.15
-        }
-        if area > 0.05 && area < 0.3 {
-            confidence += 0.05
-        }
-        
-        let center = observation.boundingBox.midpoint
-        let distanceFromCenter = sqrt(
-            pow(center.x - 0.5, 2) + pow(center.y - 0.5, 2)
-        )
-        if distanceFromCenter < 0.3 {
-            confidence += 0.05
-        }
-        
-        return min(confidence, 0.99)
-    }
+
     
     /// Non-maximum suppression to remove overlapping detections.
     private func nonMaxSuppression(

@@ -245,8 +245,8 @@ TrackedFixture(
         anchor: AnchorEntity.World
     ) -> ProjectionResult? {
         
-        guard let depthData = frame.worldMap?.depthData,
-              let depthMap = depthData.depthMap else {
+        guard let sceneDepth = frame.sceneDepth,
+              let depthMap = sceneDepth.depthMap else {
             return nil
         }
         
@@ -274,6 +274,16 @@ TrackedFixture(
         guard depthMeters >= configuration.minDepthMeters,
               depthMeters <= configuration.maxDepthMeters else {
             return nil
+        }
+        
+        if let confidenceMap = sceneDepth.confidenceMap {
+            let confidenceIndex = py * pixelWidth + px
+            if confidenceIndex >= 0, confidenceIndex < confidenceMap.data.count {
+                let confidenceByte = confidenceMap.data[confidenceIndex]
+                if confidenceByte == 0 {
+                    return nil
+                }
+            }
         }
         
         guard let position = SpatialMath.depthUnproject(

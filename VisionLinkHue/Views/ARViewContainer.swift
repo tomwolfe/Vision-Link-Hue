@@ -108,10 +108,10 @@ struct HUDOverlay: View {
                 // Connection status
                 HStack(spacing: 6) {
                     Circle()
-                        .fill(hueClient.is_connected ? .green : .red)
+                        .fill(stateStream.isConnected ? .green : .red)
                         .frame(width: 8, height: 8)
                     
-                    Text(hueClient.is_connected ? "Bridge Connected" : "No Bridge")
+                    Text(stateStream.isConnected ? "Bridge Connected" : "No Bridge")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }

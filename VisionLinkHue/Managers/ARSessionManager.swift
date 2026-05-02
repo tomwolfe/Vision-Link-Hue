@@ -5,6 +5,7 @@ import os
 
 /// Manages the AR session lifecycle and bridges ARKit frames to
 /// the RealityKit scene and DetectionEngine.
+@MainActor
 final class ARSessionManager: ObservableObject {
     
     @Published var isSessionActive: Bool = false
@@ -133,21 +134,28 @@ final class ARSessionManager: ObservableObject {
         guard now - lastInferenceTime >= inferenceInterval else { return }
         lastInferenceTime = now
         
-        // Run detection on the frame
-        do {
-            let detections = try await detectionEngine.processFrame(
-                frame.capturedImage,
-                timestamp: frame.timestamp
-            )
-            
-            // Process each detection
-            for detection in detections {
-                await processDetection(detection, in: frame)
+        // Offload heavy Vision/Projection work to background task
+        Task.detached { [detectionEngine = self.detectionEngine, spatialProjector = self.spatialProjector, anchorEntity = self.anchorEntity] in
+            do {
+                let detections = try await detectionEngine.processFrame(
+                    frame.capturedImage,
+                    timestamp: frame.timestamp
+                )
+                
+                for detection in detections {
+                    if let anchor = anchorEntity {
+                        await self.processDetection(detection, in: frame)
+                    }
+                }
+                
+                await MainActor.run {
+                    self.anchorCount = self.trackedFixtures.count
+                }
+            } catch {
+                await MainActor.run {
+                    self.logger.warning("Frame processing failed: \(error.localizedDescription)")
+                }
             }
-            
-            anchorCount = trackedFixtures.count
-        } catch {
-            logger.warning("Frame processing failed: \(error.localizedDescription)")
         }
     }
     

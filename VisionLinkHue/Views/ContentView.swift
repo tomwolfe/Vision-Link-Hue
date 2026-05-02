@@ -38,32 +38,34 @@ struct ContentView: View {
     @State private var arViewRef: ARView?
     
     var body: some View {
-        ZStack {
-            // AR session view
-            ARViewContainer(
-                sessionManager: arSessionManager,
-                onFrameUpdate: { frame in
-                    Task {
-                        await arSessionManager.didUpdateFrame(frame)
+        GeometryReader { geometry in
+            ZStack {
+                // AR session view
+                ARViewContainer(
+                    sessionManager: arSessionManager,
+                    onFrameUpdate: { frame in
+                        Task {
+                            await arSessionManager.didUpdateFrame(frame)
+                        }
+                    },
+                    onARViewReady: { arView in
+                        arViewRef = arView
+                        Task {
+                            await arSessionManager.configureAndStart(in: arView)
+                        }
                     }
-                },
-                onARViewReady: { arView in
-                    arViewRef = arView
-                    Task {
-                        await arSessionManager.configureAndStart(in: arView)
-                    }
-                }
-            )
-            .ignoresSafeArea()
-            
-            // HUD overlay
-            HUDOverlay(
-                sessionManager: arSessionManager,
-                detectionEngine: detectionEngine,
-                hueClient: hueClient,
-                stateStream: stateStream,
-                frameSize: .zero
-            )
+                )
+                .ignoresSafeArea()
+                
+                // HUD overlay
+                HUDOverlay(
+                    sessionManager: arSessionManager,
+                    detectionEngine: detectionEngine,
+                    hueClient: hueClient,
+                    stateStream: stateStream,
+                    frameSize: geometry.size
+                )
+            }
         }
         .sheet(isPresented: $showSettings) {
             SettingsView(
@@ -128,9 +130,9 @@ struct SettingsView: View {
                         Text("Status")
                         Spacer()
                         Circle()
-                            .fill(hueClient.is_connected ? .green : .red)
+                            .fill(stateStream.isConnected ? .green : .red)
                             .frame(width: 10, height: 10)
-                        Text(hueClient.is_connected ? "Connected" : "Disconnected")
+                        Text(stateStream.isConnected ? "Connected" : "Disconnected")
                     }
                     
                     if let ip = hueClient.bridgeIP {
