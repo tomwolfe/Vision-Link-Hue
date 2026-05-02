@@ -44,50 +44,6 @@ struct ARViewContainer: UIViewRepresentable {
     }
 }
 
-/// Main AR view that combines RealityKit rendering with SwiftUI overlays.
-struct ARViewContainerView: View {
-    
-    @ObservedObject var sessionManager: ARSessionManager
-    @ObservedObject var hueClient: HueClient
-    @ObservedObject var stateStream: HueStateStream
-    @StateObject private var detectionEngine = DetectionEngine()
-    
-    @State private var arViewRef: ARView?
-    
-    var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                // AR background via ARView
-                ARViewContainer(
-                    sessionManager: sessionManager,
-                    onFrameUpdate: { frame in
-                        Task {
-                            await sessionManager.didUpdateFrame(frame)
-                        }
-                    },
-                    onARViewReady: { arView in
-                        arViewRef = arView
-                        Task {
-                            await sessionManager.configureAndStart(in: arView)
-                        }
-                    }
-                )
-                .ignoresSafeArea()
-                
-                // 2D HUD overlay (always faces camera)
-                HUDOverlay(
-                    sessionManager: sessionManager,
-                    detectionEngine: detectionEngine,
-                    hueClient: hueClient,
-                    stateStream: stateStream,
-                    frameSize: geometry.size
-                )
-                .allowsHitTesting(true)
-            }
-        }
-    }
-}
-
 /// 2D HUD overlay with detection status and controls.
 struct HUDOverlay: View {
     
@@ -154,7 +110,7 @@ struct HUDOverlay: View {
             Spacer()
             
             // Bottom bar: bridge setup + instructions
-            if !hueClient.is_connected {
+            if !stateStream.isConnected {
                 VStack(spacing: 12) {
                     Text("Connect to Hue Bridge")
                         .font(.headline)

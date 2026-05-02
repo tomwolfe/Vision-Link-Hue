@@ -16,21 +16,6 @@ extension simd_float4x4 {
     }
 }
 
-// MARK: - ARSession Configuration
-
-extension ARWorldTrackingConfiguration {
-    /// Create a configuration optimized for lighting fixture detection.
-    static func fixtureDetectionConfiguration() -> ARWorldTrackingConfiguration {
-        var config = ARWorldTrackingConfiguration()
-        config.worldReconstructionMode = .automatic
-        config.planeDetection = [.horizontal, .vertical]
-        config.lightEstimation = .automatic
-        config.isLightEstimationEnabled = true
-        config.isWorldSensingEnabled = true
-        return config
-    }
-}
-
 // MARK: - ARFrame Extensions
 
 extension ARFrame {

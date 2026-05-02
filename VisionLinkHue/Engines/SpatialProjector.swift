@@ -174,10 +174,6 @@ TrackedFixture(
         anchor: AnchorEntity.World
     ) async throws -> TrackedFixture {
         
-        guard let worldMap = frame.worldMap else {
-            throw ProjectionError.noWorldMap
-        }
-        
         guard let intrinsics = frame.camera.intrinsics else {
             throw ProjectionError.invalidIntrinsics
         }
@@ -204,7 +200,7 @@ TrackedFixture(
             filter: .mesh
         )
         
-        let results = activeSession.raycast(raycastQuery, using: worldMap)
+        let results = activeSession.raycast(raycastQuery)
         
         guard let hit = results.first else {
             throw ProjectionError.raycastMiss

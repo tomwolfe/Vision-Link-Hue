@@ -30,7 +30,6 @@ final class ARSessionManager: ObservableObject {
     private var fixtureEntities: [UUID: ModelEntity] = [:]
     
     private var lastInferenceTime: TimeInterval = 0
-    private let inferenceInterval: TimeInterval = 0.5
     
     /// Root anchor for all AR content.
     var rootAnchor: AnchorEntity.World? { anchorEntity }
@@ -121,34 +120,45 @@ final class ARSessionManager: ObservableObject {
     
     /// Called from ARView's session delegate when a new frame is available.
     func didUpdateFrame(_ frame: ARFrame) async {
-        frameTimestamp = frame.timestamp
-        worldMapAvailable = frame.worldMap != nil
-        
-        // Update tracking state
-        if let state = frame.trackingState {
-            trackingState = state == .limited ? .limited : .tracking
+        await MainActor.run {
+            self.frameTimestamp = frame.timestamp
+            self.worldMapAvailable = frame.worldMap != nil
+            
+            if let state = frame.trackingState {
+                self.trackingState = state == .limited ? .limited : .tracking
+            }
         }
         
-        // Throttle inference to inferenceInterval
+        // Throttle inference to DetectionConstants.inferenceInterval
         let now = CFAbsoluteTimeGetCurrent()
-        guard now - lastInferenceTime >= inferenceInterval else { return }
+        guard now - lastInferenceTime >= DetectionConstants.inferenceInterval else { return }
         lastInferenceTime = now
         
         // Offload heavy Vision/Projection work to background task
-        Task.detached { [detectionEngine = self.detectionEngine, spatialProjector = self.spatialProjector, anchorEntity = self.anchorEntity] in
+        Task.detached { [detectionEngine = self.detectionEngine, spatialProjector = self.spatialProjector, anchor = self.anchorEntity] in
             do {
                 let detections = try await detectionEngine.processFrame(
                     frame.capturedImage,
                     timestamp: frame.timestamp
                 )
                 
+                var newFixtures: [TrackedFixture] = []
+                
                 for detection in detections {
-                    if let anchor = anchorEntity {
-                        await self.processDetection(detection, in: frame)
+                    if let anchor {
+                        let fixture = await self.processDetectionOffMain(detection, in: frame, anchor: anchor)
+                        if let fixture {
+                            newFixtures.append(fixture)
+                        }
                     }
                 }
                 
-                await MainActor.run {
+                await MainActor.run { [newFixtures] in
+                    for fixture in newFixtures {
+                        if !self.trackedFixtures.contains(where: { $0.id == fixture.id }) {
+                            self.trackedFixtures.append(fixture)
+                        }
+                    }
                     self.anchorCount = self.trackedFixtures.count
                 }
             } catch {
@@ -161,15 +171,14 @@ final class ARSessionManager: ObservableObject {
     
     // MARK: - Detection Processing
     
-    private func processDetection(
+    func processDetectionOffMain(
         _ detection: FixtureDetection,
-        in frame: ARFrame
-    ) async {
-        guard let anchor = anchorEntity else { return }
-        
+        in frame: ARFrame,
+        anchor: AnchorEntity.World
+    ) async -> TrackedFixture? {
         // Check if we already have this detection
         if trackedFixtures.first(where: { $0.id == detection.id }) != nil {
-            return
+            return nil
         }
         
         // Project 2D detection to 3D world coordinates
@@ -181,17 +190,28 @@ final class ARSessionManager: ObservableObject {
         
         guard case .anchored(let fixture) = result else {
             logger.warning("Projection failed: \(result.errorMessage ?? "unknown")")
-            return
+            return nil
         }
         
-        // Store the tracked fixture
-        let trackedFixture = TrackedFixture(
+        return TrackedFixture(
             id: fixture.id,
             detection: fixture.detection,
             position: fixture.position,
             orientation: fixture.orientation,
             distanceMeters: fixture.distanceMeters
         )
+    }
+    
+    @MainActor
+    func processDetection(
+        _ detection: FixtureDetection,
+        in frame: ARFrame
+    ) async {
+        guard let anchor = anchorEntity else { return }
+        
+        let fixture = await processDetectionOffMain(detection, in: frame, anchor: anchor)
+        
+        guard let trackedFixture = fixture else { return }
         
         trackedFixtures.append(trackedFixture)
         

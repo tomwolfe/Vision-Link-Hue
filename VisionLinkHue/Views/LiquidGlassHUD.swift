@@ -115,21 +115,13 @@ struct FixtureReticle: View {
                 .easeInOut(duration: 1.5).repeatForever(autoreverses: true)
             }
         }
-        .simultaneousGesture(
-            SpatialTapGesture()
-                .onEnded { _ in
-                    onSelect()
-                }
-        )
-        .transform3D { transform in
-            // Always face the camera
-            let cameraLook = simd_float3x3(
-                simd_make_float3(1, 0, 0),
-                simd_make_float3(0, 1, 0),
-                simd_make_float3(0, 0, 1)
-            )
-            // Billboard effect via RealityKit's built-in orientation
+        .onTapGesture(count: 1) {
+            onSelect()
         }
+        .rotation3DEffect(
+            .degrees(0),
+            axis: (x: 0, y: 1, z: 0)
+        )
         .glassEffect(.liquid, alignment: .center)
     }
     

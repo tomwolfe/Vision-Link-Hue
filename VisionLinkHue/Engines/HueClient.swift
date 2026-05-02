@@ -1,6 +1,7 @@
 import Foundation
 import Network
 import Security
+import CommonCrypto
 import os
 
 // MARK: - Keychain Helpers
@@ -140,6 +141,8 @@ final class HueClient: ObservableObject, Sendable {
                 for: .bonjour(type: "_hue._tcp", domain: nil),
                 using: params
             )
+            
+            defer { browser.cancel() }
             
             var discoveredBridges: [BridgeInfo] = []
             

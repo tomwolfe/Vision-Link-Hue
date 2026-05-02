@@ -15,11 +15,8 @@ final class DetectionEngine: ObservableObject {
     
     private let logger = Logger(subsystem: "com.tomwolfe.visionlinkhue", category: "DetectionEngine")
     
-    /// Time between inference passes (500ms to avoid ANE backpressure).
-    private let inferenceInterval: TimeInterval = 0.5
-    
     /// Minimum confidence threshold for returning detections.
-    private let minConfidence: Double = 0.6
+    private let minConfidence: Double = DetectionConstants.minConfidence
     
     /// Request ID for Vision requests.
     private let requestID = UUID()
@@ -54,7 +51,7 @@ final class DetectionEngine: ObservableObject {
         guard isRunning else { return [] }
         
         let now = CFAbsoluteTimeGetCurrent()
-        guard now - lastInferenceTime >= inferenceInterval else {
+        guard now - lastInferenceTime >= DetectionConstants.inferenceInterval else {
             return []
         }
         lastInferenceTime = now

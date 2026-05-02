@@ -65,7 +65,7 @@ struct NormalizedRect: Sendable {
 }
 
 /// Result of an AI-driven fixture detection pass.
-struct FixtureDetection: Identifiable, @unchecked Sendable {
+struct FixtureDetection: Identifiable, Sendable {
     let id: UUID
     let type: FixtureType
     let region: NormalizedRect
