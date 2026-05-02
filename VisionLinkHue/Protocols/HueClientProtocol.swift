@@ -2,7 +2,7 @@ import Foundation
 
 /// Protocol abstraction for Hue bridge communication.
 /// Enables mocking in unit tests and decouples networking from UI layers.
-protocol HueClientProtocol: AnyObject, Sendable {
+protocol HueClientProtocol: AnyObject {
     
     /// The IP address of the connected bridge.
     var bridgeIP: String? { get }

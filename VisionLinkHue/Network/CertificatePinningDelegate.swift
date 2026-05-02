@@ -13,14 +13,17 @@ final class CertificatePinningDelegate: NSObject, @unchecked Sendable, URLSessio
     )
     
     let pinnedHash: Data?
+    let keychainKey: String?
     let tofuCallback: (Data) async -> Void
     
     /// Create a certificate pinning delegate.
     /// - Parameters:
     ///   - pinnedHash: Previously stored hash for enforcement mode. `nil` for TOFU mode.
+    ///   - keychainKey: The Keychain account key for TOFU pin persistence.
     ///   - tofuCallback: Called with the trusted hash on first connection (TOFU mode).
-    init(pinnedHash: Data?, tofuCallback: @escaping (Data) async -> Void) {
+    init(pinnedHash: Data?, keychainKey: String? = nil, tofuCallback: @escaping (Data) async -> Void) {
         self.pinnedHash = pinnedHash
+        self.keychainKey = keychainKey
         self.tofuCallback = tofuCallback
         super.init()
     }
@@ -63,11 +66,29 @@ final class CertificatePinningDelegate: NSObject, @unchecked Sendable, URLSessio
                 completionHandler(.cancelAuthenticationChallenge, nil)
             }
         } else {
-            // TOFU mode: trust on first use, cache the hash.
+            // TOFU mode: trust on first use, cache the hash synchronously.
+            // completionHandler must be invoked synchronously within this delegate method.
+            completionHandler(.useCredential, nil)
+            
+            // Save the pin asynchronously without blocking the delegate callback.
             Task {
-                await tofuCallback(hash)
-                completionHandler(.useCredential, nil)
+                await self.savePinnedHash(hash)
             }
         }
+    }
+    
+    private func savePinnedHash(_ hash: Data) async {
+        guard let keychainKey else { return }
+        
+        // Try synchronous Keychain save first.
+        do {
+            try KeychainManager.saveCertPin(to: keychainKey, hash: hash)
+            logger.info("Certificate pinned via TOFU for key \(keychainKey)")
+        } catch {
+            logger.error("Failed to save certificate pin to Keychain: \(error.localizedDescription)")
+        }
+        
+        // Invoke async callback for state updates.
+        await tofuCallback(hash)
     }
 }

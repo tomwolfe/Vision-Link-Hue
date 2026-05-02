@@ -60,7 +60,7 @@ final class ARSessionManager: ObservableObject, ARSessionManagerProtocol {
         self.arView = arView
         
         // Update spatial projector with the active session
-        await spatialProjector.configure(with: arView.session)
+        spatialProjector.configure(with: arView.session)
         
         let configuration = ARWorldTrackingConfiguration()
         
@@ -182,16 +182,13 @@ final class ARSessionManager: ObservableObject, ARSessionManagerProtocol {
         }
         
         // Project 2D detection to 3D world coordinates.
-        // SpatialProjector.project is @MainActor; ARKit raycast APIs are
-        // strictly main-thread bound, so we marshal the call onto the MainActor
-        // even though this method itself runs on a background task.
-        let result = await MainActor.run {
-            spatialProjector.project(
-                region: detection.region,
-                inFrame: frame,
-                anchor: anchor
-            )
-        }
+        // SpatialProjector is @MainActor isolated; calling from background
+        // task automatically crosses the actor boundary.
+        let result = await spatialProjector.project(
+            region: detection.region,
+            inFrame: frame,
+            anchor: anchor
+        )
         
         guard case .anchored(let fixture) = result else {
             logger.warning("Projection failed: \(result.errorMessage ?? "unknown")")

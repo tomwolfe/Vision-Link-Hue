@@ -5,7 +5,8 @@ import os
 /// Network client that manages all communication with the Philips Hue Bridge
 /// using CLIP v2 API, mDNS discovery, mTLS with Trust-On-First-Use certificate
 /// pinning, and Server-Sent Events (SSE) for real-time state updates.
-final class HueClient: ObservableObject, Sendable, HueClientProtocol {
+@MainActor
+final class HueClient: ObservableObject, HueClientProtocol {
     
     // MARK: - Published State
     
@@ -34,8 +35,8 @@ final class HueClient: ObservableObject, Sendable, HueClientProtocol {
     /// Network connection for REST API calls.
     private var urlSession: URLSession?
     
-    /// SSE connection task.
-    private var sseTask: URLSessionDataTask?
+    /// SSE connection task (holds the parsing task for cancellation).
+    private var sseTask: Task<Void, Never>?
     
     /// SSE reconnection timer.
     private var reconnectionTimer: Timer?
@@ -313,7 +314,9 @@ final class HueClient: ObservableObject, Sendable, HueClientProtocol {
         request.setValue("keep-alive", forHTTPHeaderField: "Connection")
         request.timeoutInterval = 300
         
-        let sessionDelegate = CertificatePinningDelegate(pinnedHash: pinnedHash) { [weak self] trustedHash in
+        let keychainKey = bridgeIP.map { KeychainKeys.key(for: $0) }
+        
+        let sessionDelegate = CertificatePinningDelegate(pinnedHash: pinnedHash, keychainKey: keychainKey) { [weak self] trustedHash in
             Task { @MainActor [weak self] in
                 await self?.handleTOFUPin(for: trustedHash)
             }
@@ -321,7 +324,7 @@ final class HueClient: ObservableObject, Sendable, HueClientProtocol {
         
         let session = URLSession(configuration: .default, delegate: sessionDelegate, delegateQueue: nil)
         
-        Task { [weak self] in
+        sseTask = Task { [weak self] in
             do {
                 let (bytes, response) = try await session.bytes(for: request)
                 
@@ -331,98 +334,57 @@ final class HueClient: ObservableObject, Sendable, HueClientProtocol {
                     return
                 }
                 
-                await self?.streamSSEEvents(from: bytes)
+                await self?.streamSSEEvents(from: bytes, session: session)
                 
             } catch {
                 await self?.handleSSEDisconnect(error: error)
             }
         }
         
-        sseTask = nil
         stateStream?.setIsConnected(true)
         logger.info("SSE event stream started (streaming)")
     }
     
     /// Stream SSE events incrementally from AsyncBytes.
-    /// Treats the input as a byte stream, not a line stream, to handle
-    /// TCP fragmentation where a single network chunk may split mid-event
-    /// or multiple events may arrive in one chunk.
-    private func streamSSEEvents(from bytes: AsyncBytes) async {
+    /// Uses a line-based parser that safely handles UTF-8 fragmentation
+    /// by accumulating raw bytes and scanning for \n before decoding.
+    private func streamSSEEvents(from bytes: AsyncBytes<UInt8>, session: URLSession) async {
         var dataBuffer = Data()
+        var lineBuffer = Data()
         
-        for await result in bytes.chunks(ofType: UInt8.self) {
-            dataBuffer.append(contentsOf: result)
+        for await chunk in bytes.chunks(ofType: UInt8.self) {
+            dataBuffer.append(contentsOf: chunk)
             
-            // Scan for complete SSE events delimited by \n\n.
-            // An SSE event consists of one or more lines ending with \n,
-            // followed by a blank line (\n). We look for the "data: " line
-            // followed by a \n\n separator.
-            while let endIndex = findEventEnd(in: dataBuffer) {
-                let eventBytes = dataBuffer[..<endIndex]
-                dataBuffer = dataBuffer[eventBytes.count...]
+            // Process complete lines from the buffer.
+            while let newlineIndex = dataBuffer.firstIndex(of: UInt8(ascii: "\n")) {
+                let lineData = dataBuffer[..<newlineIndex]
+                dataBuffer = dataBuffer[dataBuffer.index(newlineIndex, offsetBy: 1)...]
                 
-                guard let eventText = String(bytes: eventBytes, encoding: .utf8) else {
-                    continue
+                // Strip trailing \r if present.
+                var line = lineData
+                if line.last == UInt8(ascii: "\r") {
+                    line.removeLast()
                 }
                 
-                processSSEEvent(text: eventText)
-            }
-        }
-        
-        // Process any remaining data in the buffer after stream ends.
-        if !dataBuffer.isEmpty {
-            if let remaining = String(bytes: dataBuffer, encoding: .utf8) {
-                processSSEEvent(text: remaining)
-            }
-        }
-    }
-    
-    /// Find the end index of the next complete SSE event in the data buffer.
-    /// Returns the index after the terminating \n\n, or nil if no complete
-    /// event is available yet. An SSE event is identified by the presence
-    /// of a "data: " line followed by a blank line.
-    private func findEventEnd(in data: Data) -> Int? {
-        // Convert to a string slice for pattern matching.
-        // We scan for the "data: \n\n" pattern which marks a complete event.
-        // If we find "data: " but not the terminating \n\n, we wait for more data.
-        
-        let text = String(bytes: data, encoding: .utf8) ?? ""
-        let lines = text.split(separator: "\n")
-        
-        // Find the index of "data: " line and the following blank line.
-        var i = 0
-        while i < lines.count {
-            let line = String(lines[i]).trimmingCharacters(in: .whitespaces)
-            
-            // Accumulate data lines until we hit a blank line.
-            if line.hasPrefix("data: ") {
-                var jsonAccumulator = ""
-                var j = i
-                while j < lines.count {
-                    let currentLine = String(lines[j]).trimmingCharacters(in: .whitespaces)
-                    if currentLine.hasPrefix("data: ") {
-                        jsonAccumulator.append(String(currentLine.dropFirst(6)))
-                    } else if currentLine.isEmpty {
-                        // Blank line marks end of event - process it.
-                        // Compute the byte offset to the end of this blank line.
-                        var byteOffset = 0
-                        for k in 0...j {
-                            byteOffset += lines[k].count + 1 // +1 for \n
-                        }
-                        return byteOffset
-                    } else {
-                        // Non-data, non-blank line after data - skip this event.
-                        break
+                let lineText = String(bytes: line, encoding: .utf8) ?? ""
+                
+                // Accumulate data lines for multi-line SSE events.
+                if lineText.hasPrefix("data: ") {
+                    lineBuffer.append(contentsOf: lineText.dropFirst(6))
+                } else if lineText.isEmpty {
+                    // Empty line marks end of event.
+                    if !lineBuffer.isEmpty {
+                        processSSEEvent(text: String(bytes: lineBuffer, encoding: .utf8) ?? "")
+                        lineBuffer.removeAll()
                     }
-                    j += 1
                 }
-                // No blank line found yet; more data needed.
-                return nil
             }
-            i += 1
         }
         
-        return nil
+        // Process any remaining buffered data after stream ends.
+        if !lineBuffer.isEmpty {
+            processSSEEvent(text: String(bytes: lineBuffer, encoding: .utf8) ?? "")
+        }
     }
     
     /// Process a complete SSE event text string.
@@ -541,7 +503,9 @@ final class HueClient: ObservableObject, Sendable, HueClientProtocol {
             pinnedHash = hash
         }
         
-        let sessionDelegate = CertificatePinningDelegate(pinnedHash: pinnedHash) { [weak self] trustedHash in
+        let keychainKey = bridgeIP.map { KeychainKeys.key(for: $0) }
+        
+        let sessionDelegate = CertificatePinningDelegate(pinnedHash: pinnedHash, keychainKey: keychainKey) { [weak self] trustedHash in
             Task { @MainActor [weak self] in
                 await self?.handleTOFUPin(for: trustedHash)
             }

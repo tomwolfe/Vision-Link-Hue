@@ -11,6 +11,11 @@ let package = Package(
         .target(
             name: "VisionLinkHue",
             path: "VisionLinkHue"
+        ),
+        .testTarget(
+            name: "VisionLinkHueTests",
+            dependencies: ["VisionLinkHue"],
+            path: "Tests/VisionLinkHueTests"
         )
     ]
 )

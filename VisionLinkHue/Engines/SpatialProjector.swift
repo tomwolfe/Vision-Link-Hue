@@ -3,9 +3,11 @@ import ARKit
 import RealityKit
 import simd
 
-/// Actor responsible for projecting 2D normalized coordinates from AI
+/// Class responsible for projecting 2D normalized coordinates from AI
 /// detection into 3D world coordinates using ARKit raycasting and depth.
-actor SpatialProjector {
+/// All methods execute on the MainActor since ARKit raycast APIs are
+/// strictly main-thread bound.
+final class SpatialProjector @MainActor {
     
     /// Configuration for the projector.
     struct Configuration {
@@ -39,7 +41,6 @@ actor SpatialProjector {
     // MARK: - Coordinate Projection
     
     /// Project a normalized 2D point to a 3D world position.
-    @MainActor
     func project(
         normalizedPoint: SIMD2<Float>,
         inFrame frame: ARFrame,
@@ -102,7 +103,6 @@ actor SpatialProjector {
     }
     
     /// Project a normalized bounding box center to a 3D position with orientation.
-    @MainActor
     func project(
         region: NormalizedRect,
         inFrame frame: ARFrame,
@@ -143,7 +143,7 @@ actor SpatialProjector {
             let adjustedPosition = meshResult.position + configuration.hudOffset
             
             return .anchored(
-TrackedFixture(
+                TrackedFixture(
                     id: UUID(),
                     detection: FixtureDetection(
                         type: .lamp,
@@ -171,10 +171,7 @@ TrackedFixture(
     // MARK: - Raycast on Scene Reconstruction Mesh
     
     /// Perform a synchronous raycast against the scene reconstruction mesh.
-    /// ARKit raycast APIs are strictly main-thread bound; callers must ensure
-    /// this is invoked on the MainActor (which the project() methods do via
-    /// their @MainActor annotation).
-    @MainActor
+    /// ARKit raycast APIs are strictly main-thread bound.
     private func raycastOnMesh(
         from normalizedPoint: SIMD2<Float>,
         in frame: ARFrame,

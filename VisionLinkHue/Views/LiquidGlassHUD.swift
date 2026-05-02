@@ -285,11 +285,19 @@ struct HueControlPanel: View {
     private func controlLight(_ operation: @escaping (String) async throws -> Void) {
         if let lightId = fixture.mappedHueLightId {
             Task {
-                try? await operation(lightId)
+                do {
+                    try await operation(lightId)
+                } catch {
+                    await stateStream.reportError(error, severity: .error, source: "HueControlPanel")
+                }
             }
         } else if let groupId = stateStream.selectedGroupId {
             Task {
-                try? await operation(groupId)
+                do {
+                    try await operation(groupId)
+                } catch {
+                    await stateStream.reportError(error, severity: .error, source: "HueControlPanel")
+                }
             }
         }
     }
@@ -301,6 +309,7 @@ struct SceneRecallButton: View {
     let scenes: [HueSceneResource]
     let groupId: String
     let hueClient: HueClient
+    let stateStream: HueStateStream
     let onRecall: (String) -> Void
     
     var body: some View {
@@ -308,10 +317,14 @@ struct SceneRecallButton: View {
             ForEach(scenes) { scene in
                 Button {
                     Task {
-                        try await hueClient.recallScene(
-                            groupId: groupId,
-                            sceneId: scene.id
-                        )
+                        do {
+                            try await hueClient.recallScene(
+                                groupId: groupId,
+                                sceneId: scene.id
+                            )
+                        } catch {
+                            await stateStream.reportError(error, severity: .error, source: "SceneRecallButton")
+                        }
                         onRecall(scene.id)
                     }
                 } label: {
