@@ -8,6 +8,7 @@ struct ARViewContainer: UIViewRepresentable {
     
     let sessionManager: ARSessionManager
     let onFrameUpdate: (ARFrame) -> Void
+    let onARViewReady: (ARView) -> Void
     
     func makeUIView(context: Context) -> ARView {
         let arView = ARView(frame: .zero)
@@ -20,6 +21,8 @@ struct ARViewContainer: UIViewRepresentable {
         // Configure for best performance on A18 chip
         arView.preferredFramesPerSecond = 60
         arView.preferredStereoRenderingMode = .mono
+        
+        onARViewReady(arView)
         
         return arView
     }
@@ -53,6 +56,8 @@ struct ARViewContainerView: View {
     @ObservedObject var stateStream: HueStateStream
     @StateObject private var detectionEngine = DetectionEngine()
     
+    @State private var arViewRef: ARView?
+    
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -62,6 +67,12 @@ struct ARViewContainerView: View {
                     onFrameUpdate: { frame in
                         Task {
                             await sessionManager.didUpdateFrame(frame)
+                        }
+                    },
+                    onARViewReady: { arView in
+                        arViewRef = arView
+                        Task {
+                            await sessionManager.configureAndStart(in: arView)
                         }
                     }
                 )
@@ -100,11 +111,6 @@ struct ARViewContainerView: View {
                     frameSize: geometry.size
                 )
                 .allowsHitTesting(true)
-            }
-        }
-        .onAppear {
-            Task {
-                await sessionManager.configureAndStart(in: /* need ARView */)
             }
         }
     }

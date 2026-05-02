@@ -24,9 +24,6 @@ final class DetectionEngine: ObservableObject {
     /// Request ID for Vision requests.
     private let requestID = UUID()
     
-    /// Cached pixel buffer reference count for manual deallocation.
-    private var pixelBufferRefs: [CVPixelBuffer] = []
-    
     // MARK: - Public API
     
     /// Start continuous detection. Call from the AR session observer.
@@ -41,7 +38,6 @@ final class DetectionEngine: ObservableObject {
     func stop() {
         isRunning = false
         lastDetections = []
-        clearPixelBuffers()
         logger.info("DetectionEngine stopped")
     }
     
@@ -56,16 +52,7 @@ final class DetectionEngine: ObservableObject {
         // Throttle to inference interval
         try await Task.sleep(nanoseconds: UInt64((inferenceInterval * 1000_000_000)))
         
-        // Acquire a strong reference to prevent premature deallocation
-        CVPixelBufferRetain(pixelBuffer)
-        pixelBufferRefs.append(pixelBuffer)
-        
         let detections = try await runVisionDetection(pixelBuffer)
-        
-        // Immediately release the pixel buffer reference
-        if let last = pixelBufferRefs.popLast() {
-            CVPixelBufferRelease(last)
-        }
         
         let elapsed = (CFAbsoluteTimeGetCurrent() - start) * 1000
         inferenceLatencyMs = elapsed
@@ -180,32 +167,77 @@ final class DetectionEngine: ObservableObject {
         return nonMaxSuppression(detections, iouThreshold: 0.3)
     }
     
-    /// Classify the fixture type based on bounding box aspect ratio and visual features.
+    /// Classify the fixture type using a weighted scoring system across
+    /// aspect ratio, vertical position, and bounding box area.
     private func classifyFixtureType(from boundingBox: VNRectangleObservation, _ pixelBuffer: CVPixelBuffer) -> FixtureType {
         let aspectRatio = boundingBox.width / max(boundingBox.height, 0.001)
+        let normalizedY = boundingBox.midpoint.y
+        let area = boundingBox.width * boundingBox.height
         
-        // Heuristic classification based on aspect ratio and position
+        var scores: [FixtureType: Double] = [:]
+        
+        // Aspect ratio scoring
         switch aspectRatio {
-        case 0.3...0.7:
-            // Roughly square - likely a recessed or ceiling fixture
-            if boundingBox.minY < 0.3 {
-                return .ceiling
-            } else {
-                return .recessed
-            }
-        case 0.7...1.5:
-            // Near-square - could be pendant or lamp
-            if boundingBox.minY < 0.4 {
-                return .pendant
-            } else {
-                return .lamp
-            }
-        case 1.5...5.0:
-            // Wide and thin - likely a strip light
-            return .strip
+        case 0.2...0.8:
+            scores[.ceiling] += 3.0
+            scores[.recessed] += 2.5
+            scores[.pendant] += 1.0
+        case 0.5...1.5:
+            scores[.pendant] += 3.0
+            scores[.lamp] += 2.5
+            scores[.ceiling] += 1.0
+        case 1.2...3.0:
+            scores[.lamp] += 2.0
+            scores[.pendant] += 1.5
+        case 2.0...8.0:
+            scores[.strip] += 4.0
+            scores[.lamp] += 0.5
         default:
-            return .lamp
+            scores[.lamp] += 1.0
         }
+        
+        // Vertical position scoring (fixtures are typically on walls/ceilings)
+        if normalizedY < 0.25 {
+            scores[.ceiling] += 3.0
+            scores[.pendant] += 2.0
+            scores[.recessed] += 1.5
+        } else if normalizedY < 0.5 {
+            scores[.pendant] += 2.0
+            scores[.recessed] += 2.0
+            scores[.lamp] += 1.0
+        } else if normalizedY < 0.75 {
+            scores[.lamp] += 2.5
+            scores[.recessed] += 2.0
+            scores[.strip] += 0.5
+        } else {
+            scores[.lamp] += 3.0
+            scores[.strip] += 1.5
+        }
+        
+        // Area-based scoring (larger detections are more likely to be ceiling fixtures)
+        if area > 0.15 {
+            scores[.ceiling] += 1.5
+            scores[.strip] += 1.0
+        } else if area > 0.05 {
+            scores[.pendant] += 1.0
+            scores[.lamp] += 1.0
+            scores[.recessed] += 1.0
+        } else {
+            scores[.recessed] += 1.5
+            scores[.lamp] += 0.5
+        }
+        
+        // Return the type with the highest score, with tie-breaking
+        let sorted = scores.sorted { a, b in
+            if a.value == b.value {
+                // Tie-break: prefer more specific types
+                let specificity: [FixtureType: Int] = [.ceiling: 4, .recessed: 3, .pendant: 2, .strip: 1, .lamp: 0]
+                return specificity[a.key, default: 0] > specificity[b.key, default: 0]
+            }
+            return a.value > b.value
+        }
+        
+        return sorted.first?.key ?? .lamp
     }
     
     /// Calculate detection confidence from observation quality.
@@ -281,18 +313,5 @@ final class DetectionEngine: ObservableObject {
         let union = areaA + areaB - intersection
         
         return union > 0 ? intersection / Float(union) : 0
-    }
-    
-    // MARK: - Memory Management
-    
-    private func clearPixelBuffers() {
-        for buffer in pixelBufferRefs {
-            CVPixelBufferRelease(buffer)
-        }
-        pixelBufferRefs.removeAll()
-    }
-    
-    deinit {
-        clearPixelBuffers()
     }
 }

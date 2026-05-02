@@ -93,6 +93,7 @@ final class HueClient: ObservableObject {
                     case .failed(let error):
                         self.logger.error("mDNS browser failed: \(error.localizedDescription)")
                         self.lastError = "Discovery failed: \(error.localizedDescription)"
+                        self.stateStream?.reportError(error, severity: .warning, source: "HueClient.discover")
                     case .cancelled:
                         self.logger.info("mDNS browser cancelled")
                     default:
@@ -130,6 +131,7 @@ final class HueClient: ObservableObject {
                     if bridges.isEmpty {
                         self.logger.warning("No Hue bridges discovered")
                         self.lastError = "No Hue bridges found on the network"
+                        self.stateStream?.reportError(HueError.noBridgeConfigured, severity: .warning, source: "HueClient.discover")
                     }
                     
                     continuation.resume(returning: bridges)
@@ -343,6 +345,7 @@ final class HueClient: ObservableObject {
                 if let error {
                     self.logger.error("SSE stream error: \(error.localizedDescription)")
                     self.lastError = "Stream error: \(error.localizedDescription)"
+                    self.stateStream?.reportError(error, severity: .error, source: "HueClient.sse")
                     self.scheduleReconnection()
                     return
                 }
@@ -468,6 +471,7 @@ final class HueClient: ObservableObject {
                 await connect(to: first)
             } else {
                 lastError = "No bridge found for reconnection"
+                stateStream?.reportError(HueError.noBridgeConfigured, severity: .error, source: "HueClient.reconnect")
                 return
             }
         }
@@ -514,14 +518,17 @@ final class HueClient: ObservableObject {
                     challenge.cancelAuthenticationChallenge(challenge)
                     logger.error("Certificate pinning failed - hash mismatch")
                     lastError = "Bridge certificate pinning failed"
+                    stateStream?.reportError(HueError.certificatePinningFailed, severity: .critical, source: "HueClient.pinning")
                 }
             } else {
                 challenge.cancelAuthenticationChallenge(challenge)
                 lastError = "Could not extract public key from certificate"
+                stateStream?.reportError(HueError.certificatePinningFailed, severity: .critical, source: "HueClient.pinning")
             }
         } else {
             challenge.cancelAuthenticationChallenge(challenge)
             lastError = "Server trust evaluation failed: \(error?.localizedDescription ?? "unknown")"
+            stateStream?.reportError(NSError(domain: "HueClient", code: -1, userInfo: [NSLocalizedDescriptionKey: error?.localizedDescription ?? "unknown"]), severity: .critical, source: "HueClient.pinning")
         }
     }
     

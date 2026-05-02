@@ -12,6 +12,7 @@ struct ContentView: View {
     @StateObject private var arSessionManager: ARSessionManager
     
     @State private var showSettings: Bool = false
+    @State private var dismissedErrorId: UUID?
     
     init() {
         _stateStream = StateObject(wrappedValue: HueStateStream())
@@ -34,6 +35,8 @@ struct ContentView: View {
         _arSessionManager = StateObject(wrappedValue: manager)
     }
     
+    @State private var arViewRef: ARView?
+    
     var body: some View {
         ZStack {
             // AR session view
@@ -42,6 +45,12 @@ struct ContentView: View {
                 onFrameUpdate: { frame in
                     Task {
                         await arSessionManager.didUpdateFrame(frame)
+                    }
+                },
+                onARViewReady: { arView in
+                    arViewRef = arView
+                    Task {
+                        await arSessionManager.configureAndStart(in: arView)
                     }
                 }
             )
@@ -62,6 +71,12 @@ struct ContentView: View {
                 stateStream: stateStream
             )
         }
+        .overlay(alignment: .top) {
+            if let error = stateStream.activeErrors.first(where: { $0.id != dismissedErrorId }) {
+                errorToast(error)
+                    .padding(.top, 60)
+            }
+        }
         .task {
             // Auto-discover bridge on launch
             let bridges = await hueClient.discoverBridges()
@@ -69,6 +84,31 @@ struct ContentView: View {
                 await hueClient.connect(to: first)
             }
         }
+    }
+    
+    @ViewBuilder
+    private func errorToast(_ error: AppError) -> some View {
+        HStack {
+            Text(error.displayMessage)
+                .font(.caption)
+                .foregroundStyle(.primary)
+            
+            Spacer()
+            
+            Button {
+                dismissedErrorId = error.id
+                stateStream.dismissError(error)
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial, in: Rectangle())
+        .glassEffect(.liquid, alignment: .center)
+        .shadow(radius: 5)
     }
 }
 
