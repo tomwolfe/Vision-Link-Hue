@@ -92,6 +92,12 @@ struct TrackedFixture: Identifiable, Sendable {
     /// The RealityKit entity ID that represents this fixture's HUD.
     var hudEntityID: Entity.ID?
     
+    /// The Philips Hue light ID (CLIP v2 UUID) that this fixture controls.
+    /// Set via tap-to-link in the HUD or auto-matched by proximity to a
+    /// known bridge light. This is distinct from `id`, which is a
+    /// locally-generated UUID for the detection tracking.
+    var mappedHueLightId: String?
+    
     /// Convenience accessor for fixture type.
     var type: FixtureType { detection.type }
     

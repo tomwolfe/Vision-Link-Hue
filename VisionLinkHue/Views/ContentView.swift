@@ -8,7 +8,7 @@ struct ContentView: View {
     @StateObject private var stateStream = HueStateStream()
     @StateObject private var hueClient: HueClient
     @StateObject private var detectionEngine = DetectionEngine()
-    @StateObject private var spatialProjector: SpatialProjector
+    private let spatialProjector: SpatialProjector
     @StateObject private var arSessionManager: ARSessionManager
     
     @State private var showSettings: Bool = false
@@ -22,6 +22,7 @@ struct ContentView: View {
         
         let detector = DetectionEngine()
         let projector = SpatialProjector()
+        spatialProjector = projector
         
         let manager = ARSessionManager(
             detectionEngine: detector,
@@ -31,7 +32,6 @@ struct ContentView: View {
         )
         
         _detectionEngine = StateObject(wrappedValue: detector)
-        _spatialProjector = StateObject(wrappedValue: projector)
         _arSessionManager = StateObject(wrappedValue: manager)
     }
     
@@ -117,8 +117,8 @@ struct ContentView: View {
 /// Settings view for bridge configuration.
 struct SettingsView: View {
     
-    @ObservedObject var hueClient: HueClient
-    @ObservedObject var stateStream: HueStateStream
+    let hueClient: HueClient
+    let stateStream: HueStateStream
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {

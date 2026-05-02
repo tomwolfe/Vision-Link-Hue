@@ -141,7 +141,10 @@ struct FixtureReticle: View {
 }
 
 /// Control panel with sliders for brightness and color temperature.
-/// Anchored to a detected fixture via ViewAttachmentComponent.
+/// Anchored to a detected fixture via `ViewAttachmentComponent`.
+///
+/// Uses the fixture's `mappedHueLightId` (set via tap-to-link) to control
+/// individual Hue lights, falling back to the selected light group.
 struct HueControlPanel: View {
     
     let fixture: TrackedFixture
@@ -152,13 +155,10 @@ struct HueControlPanel: View {
     @State private var colorTempValue: Double = 4000
     @State private var isOn: Bool = true
     
-    /// Current light state from the stream.
+    /// Current light state from the stream, resolved via the fixture-to-light mapping.
     private var currentLight: HueLightResource? {
-        if let lightId = fixture.hudEntityID {
-            // Find the corresponding light
-            return stateStream.lights.first { light in
-                light.id == fixture.id.uuidString
-            }
+        if let lightId = fixture.mappedHueLightId {
+            return stateStream.light(by: lightId)
         }
         return nil
     }
@@ -198,10 +198,8 @@ struct HueControlPanel: View {
                     .labelsHidden()
                     .tint(.blue)
                     .onChange(of: isOn) { _, newValue in
-                        if let groupId = stateStream.selectedGroupId {
-                            Task {
-                                try await hueClient.togglePower(groupId: groupId, on: newValue)
-                            }
+                        controlLight { lightId in
+                            try await hueClient.togglePower(resourceId: lightId, on: newValue)
                         }
                     }
             }
@@ -224,12 +222,9 @@ struct HueControlPanel: View {
                     value: $brightnessValue,
                     in: 0...100,
                     onEditingChanged: { changed in
-                        if !changed, let groupId = stateStream.selectedGroupId {
-                            Task {
-                                try await hueClient.setBrightness(
-                                    groupId: groupId,
-                                    brightness: Int(brightnessValue)
-                                )
+                        if !changed {
+                            controlLight { lightId in
+                                try await hueClient.setBrightness(resourceId: lightId, brightness: Int(brightnessValue))
                             }
                         }
                     }
@@ -255,13 +250,10 @@ struct HueControlPanel: View {
                     value: $colorTempValue,
                     in: 2000...6500,
                     onEditingChanged: { changed in
-                        if !changed, let groupId = stateStream.selectedGroupId {
-                            let mireds = Int(1000000.0 / colorTempValue)
-                            Task {
-                                try await hueClient.setColorTemperature(
-                                    groupId: groupId,
-                                    mireds: mireds
-                                )
+                        if !changed {
+                            controlLight { lightId in
+                                let mireds = Int(1000000.0 / colorTempValue)
+                                try await hueClient.setColorTemperature(resourceId: lightId, mireds: mireds)
                             }
                         }
                     }
@@ -285,6 +277,20 @@ struct HueControlPanel: View {
             return .yellow
         default:
             return .red
+        }
+    }
+    
+    /// Execute a light control operation, preferring the fixture's mapped Hue
+    /// light ID, falling back to the selected group.
+    private func controlLight(_ operation: @escaping (String) async throws -> Void) {
+        if let lightId = fixture.mappedHueLightId {
+            Task {
+                try? await operation(lightId)
+            }
+        } else if let groupId = stateStream.selectedGroupId {
+            Task {
+                try? await operation(groupId)
+            }
         }
     }
 }

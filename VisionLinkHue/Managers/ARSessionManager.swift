@@ -6,7 +6,7 @@ import os
 /// Manages the AR session lifecycle and bridges ARKit frames to
 /// the RealityKit scene and DetectionEngine.
 @MainActor
-final class ARSessionManager: ObservableObject {
+final class ARSessionManager: ObservableObject, ARSessionManagerProtocol {
     
     @Published var isSessionActive: Bool = false
     @Published var anchorCount: Int = 0
@@ -181,12 +181,17 @@ final class ARSessionManager: ObservableObject {
             return nil
         }
         
-        // Project 2D detection to 3D world coordinates
-        let result = await spatialProjector.project(
-            region: detection.region,
-            inFrame: frame,
-            anchor: anchor
-        )
+        // Project 2D detection to 3D world coordinates.
+        // SpatialProjector.project is @MainActor; ARKit raycast APIs are
+        // strictly main-thread bound, so we marshal the call onto the MainActor
+        // even though this method itself runs on a background task.
+        let result = await MainActor.run {
+            spatialProjector.project(
+                region: detection.region,
+                inFrame: frame,
+                anchor: anchor
+            )
+        }
         
         guard case .anchored(let fixture) = result else {
             logger.warning("Projection failed: \(result.errorMessage ?? "unknown")")
@@ -242,10 +247,11 @@ final class ARSessionManager: ObservableObject {
         // Add to scene
         anchor.addChild(entity)
         
-        // Update tracked fixture with entity ID
+        // Update tracked fixture with entity ID and mapped Hue light ID.
         if let idx = trackedFixtures.firstIndex(where: { $0.id == fixture.id }) {
             var updated = trackedFixtures[idx]
             updated.hudEntityID = entity.id
+            updated.mappedHueLightId = stateStream.fixtureLightMapping[fixture.id]
             trackedFixtures[idx] = updated
         }
         

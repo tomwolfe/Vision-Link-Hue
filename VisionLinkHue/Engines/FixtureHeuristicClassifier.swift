@@ -1,69 +1,57 @@
 import Vision
 import Foundation
 
+// MARK: - Scoring Rules
+
+/// A single declarative scoring rule that assigns points to a fixture type
+/// when an observation matches the rule's aspect ratio, vertical position,
+/// and area ranges.
+struct ScoringRule: Sendable {
+    /// The fixture type this rule scores.
+    let type: FixtureType
+    
+    /// Aspect ratio range that triggers this rule. `nil` matches any aspect ratio.
+    let aspectRange: ClosedRange<Float>?
+    
+    /// Normalized Y position range (0=top, 1=bottom) that triggers this rule.
+    /// `nil` matches any vertical position.
+    let yRange: ClosedRange<Double>?
+    
+    /// Bounding box area range that triggers this rule. `nil` matches any area.
+    let areaRange: ClosedRange<Double>?
+    
+    /// Weight to add to the fixture type's score when all active ranges match.
+    let weight: Double
+}
+
 /// Configuration presets for heuristic fixture classification scoring.
 struct ScoringConfig {
     
-    // MARK: - Aspect Ratio Scoring
+    // MARK: - Aspect Ratio Ranges
     
     struct AspectRatio {
         static let squareRange = 0.2...0.8
-        static let squareCeilingWeight: Double = 3.0
-        static let squareRecessedWeight: Double = 2.5
-        static let squarePendantWeight: Double = 1.0
-        
         static let moderateRange = 0.5...1.5
-        static let moderatePendantWeight: Double = 3.0
-        static let moderateLampWeight: Double = 2.5
-        static let moderateCeilingWeight: Double = 1.0
-        
         static let wideRange = 1.2...3.0
-        static let wideLampWeight: Double = 2.0
-        static let widePendantWeight: Double = 1.5
-        
         static let stripRange = 2.0...8.0
-        static let stripWeight: Double = 4.0
-        static let stripLampWeight: Double = 0.5
-        
-        static let defaultLampWeight: Double = 1.0
     }
     
-    // MARK: - Vertical Position Scoring
+    // MARK: - Vertical Position Ranges
     
     struct VerticalPosition {
-        static let ceilingRangeEnd: Double = 0.25
-        static let ceilingCeilingWeight: Double = 3.0
-        static let ceilingPendantWeight: Double = 2.0
-        static let ceilingRecessedWeight: Double = 1.5
-        
-        static let midCeilingRangeEnd: Double = 0.5
-        static let midCeilingPendantWeight: Double = 2.0
-        static let midCeilingRecessedWeight: Double = 2.0
-        static let midCeilingLampWeight: Double = 1.0
-        
-        static let midRangeEnd: Double = 0.75
-        static let midLampWeight: Double = 2.5
-        static let midRecessedWeight: Double = 2.0
-        static let midStripWeight: Double = 0.5
-        
-        static let defaultLampWeight: Double = 3.0
-        static let defaultStripWeight: Double = 1.5
+        static let ceilingRange = 0.0...0.25
+        static let midCeilingRange = 0.25...0.5
+        static let midRange = 0.5...0.75
     }
     
-    // MARK: - Area Scoring
+    // MARK: - Area Ranges
     
     struct Area {
         static let largeThreshold: Double = 0.15
-        static let largeCeilingWeight: Double = 1.5
-        static let largeStripWeight: Double = 1.0
-        
         static let mediumThreshold: Double = 0.05
-        static let mediumPendantWeight: Double = 1.0
-        static let mediumLampWeight: Double = 1.0
-        static let mediumRecessedWeight: Double = 1.0
-        
-        static let smallRecessedWeight: Double = 1.5
-        static let smallLampWeight: Double = 0.5
+        static let largeAreaRange: ClosedRange<Double> = 0.15...Double.infinity
+        static let mediumAreaRange: ClosedRange<Double> = 0.05..<0.15
+        static let smallAreaRange: ClosedRange<Double> = 0.0..<0.05
     }
     
     // MARK: - Specificity Tiebreaker
@@ -79,74 +67,114 @@ struct ScoringConfig {
     }
 }
 
+/// Declarative scoring rules for fixture classification.
+/// Organized by aspect ratio category, then vertical position, then area.
+/// The classifier iterates these rules to compute scores for each fixture type.
+let classificationRules: [ScoringRule] = [
+    // Square aspect ratio (0.2-0.8)
+    ScoringRule(type: .ceiling, aspectRange: ScoringConfig.AspectRatio.squareRange, yRange: nil, areaRange: nil, weight: 3.0),
+    ScoringRule(type: .recessed, aspectRange: ScoringConfig.AspectRatio.squareRange, yRange: nil, areaRange: nil, weight: 2.5),
+    ScoringRule(type: .pendant, aspectRange: ScoringConfig.AspectRatio.squareRange, yRange: nil, areaRange: nil, weight: 1.0),
+    
+    // Moderate aspect ratio (0.5-1.5)
+    ScoringRule(type: .pendant, aspectRange: ScoringConfig.AspectRatio.moderateRange, yRange: nil, areaRange: nil, weight: 3.0),
+    ScoringRule(type: .lamp, aspectRange: ScoringConfig.AspectRatio.moderateRange, yRange: nil, areaRange: nil, weight: 2.5),
+    ScoringRule(type: .ceiling, aspectRange: ScoringConfig.AspectRatio.moderateRange, yRange: nil, areaRange: nil, weight: 1.0),
+    
+    // Wide aspect ratio (1.2-3.0)
+    ScoringRule(type: .lamp, aspectRange: ScoringConfig.AspectRatio.wideRange, yRange: nil, areaRange: nil, weight: 2.0),
+    ScoringRule(type: .pendant, aspectRange: ScoringConfig.AspectRatio.wideRange, yRange: nil, areaRange: nil, weight: 1.5),
+    
+    // Strip aspect ratio (2.0-8.0)
+    ScoringRule(type: .strip, aspectRange: ScoringConfig.AspectRatio.stripRange, yRange: nil, areaRange: nil, weight: 4.0),
+    ScoringRule(type: .lamp, aspectRange: ScoringConfig.AspectRatio.stripRange, yRange: nil, areaRange: nil, weight: 0.5),
+    
+    // Default lamp weight for unmatched aspect ratios
+    ScoringRule(type: .lamp, aspectRange: nil, yRange: nil, areaRange: nil, weight: 1.0),
+    
+    // Vertical position: ceiling (top of frame, 0.0-0.25)
+    ScoringRule(type: .ceiling, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.ceilingRange, areaRange: nil, weight: 3.0),
+    ScoringRule(type: .pendant, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.ceilingRange, areaRange: nil, weight: 2.0),
+    ScoringRule(type: .recessed, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.ceilingRange, areaRange: nil, weight: 1.5),
+    
+    // Vertical position: mid-ceiling (0.25-0.5)
+    ScoringRule(type: .pendant, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.midCeilingRange, areaRange: nil, weight: 2.0),
+    ScoringRule(type: .recessed, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.midCeilingRange, areaRange: nil, weight: 2.0),
+    ScoringRule(type: .lamp, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.midCeilingRange, areaRange: nil, weight: 1.0),
+    
+    // Vertical position: mid (0.5-0.75)
+    ScoringRule(type: .lamp, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.midRange, areaRange: nil, weight: 2.5),
+    ScoringRule(type: .recessed, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.midRange, areaRange: nil, weight: 2.0),
+    ScoringRule(type: .strip, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.midRange, areaRange: nil, weight: 0.5),
+    
+    // Default weights for bottom-of-frame (y > 0.75)
+    ScoringRule(type: .lamp, aspectRange: nil, yRange: 0.75...1.0, areaRange: nil, weight: 3.0),
+    ScoringRule(type: .strip, aspectRange: nil, yRange: 0.75...1.0, areaRange: nil, weight: 1.5),
+    
+    // Area: large (> 0.15)
+    ScoringRule(type: .ceiling, aspectRange: nil, yRange: nil, areaRange: ScoringConfig.Area.largeAreaRange, weight: 1.5),
+    ScoringRule(type: .strip, aspectRange: nil, yRange: nil, areaRange: ScoringConfig.Area.largeAreaRange, weight: 1.0),
+    
+    // Area: medium (0.05-0.15)
+    ScoringRule(type: .pendant, aspectRange: nil, yRange: nil, areaRange: ScoringConfig.Area.mediumAreaRange, weight: 1.0),
+    ScoringRule(type: .lamp, aspectRange: nil, yRange: nil, areaRange: ScoringConfig.Area.mediumAreaRange, weight: 1.0),
+    ScoringRule(type: .recessed, aspectRange: nil, yRange: nil, areaRange: ScoringConfig.Area.mediumAreaRange, weight: 1.0),
+    
+    // Area: small (< 0.05)
+    ScoringRule(type: .recessed, aspectRange: nil, yRange: nil, areaRange: ScoringConfig.Area.smallAreaRange, weight: 1.5),
+    ScoringRule(type: .lamp, aspectRange: nil, yRange: nil, areaRange: ScoringConfig.Area.smallAreaRange, weight: 0.5),
+]
+
+// MARK: - Classifier
+
 /// Heuristic classifier that determines lighting fixture type and detection
 /// confidence from Vision framework rectangle observations.
 ///
-/// Extracted from DetectionEngine to reduce cyclomatic complexity and enable
-/// isolated unit testing of classification boundaries.
+/// Uses a declarative array of `ScoringRule` instances to compute weighted
+/// scores for each fixture type based on aspect ratio, vertical position,
+/// and bounding box area. This reduces cyclomatic complexity compared to
+/// nested if/else chains and makes the scoring logic easily extensible.
 struct FixtureHeuristicClassifier {
     
     /// Classify a rectangle observation into a fixture type using weighted
     /// scoring across aspect ratio, vertical position, and bounding box area.
+    ///
+    /// Iterates the global `classificationRules` array, accumulating weights
+    /// for each fixture type whose rule ranges match the observation's
+    /// aspect ratio, normalized Y position, and area. The type with the
+    /// highest total weight wins, with specificity as a tiebreaker.
     func classify(typeFrom observation: VNRectangleObservation) -> FixtureType {
         let aspectRatio = observation.boundingBox.width / max(observation.boundingBox.height, 0.001)
         let normalizedY = observation.boundingBox.midY
         let area = observation.boundingBox.width * observation.boundingBox.height
         
         var scores: [FixtureType: Double] = [:]
-        
         for fixture in FixtureType.allCases {
             scores[fixture] = 0.0
         }
         
-        switch aspectRatio {
-        case ScoringConfig.AspectRatio.squareRange:
-            scores[.ceiling]! += ScoringConfig.AspectRatio.squareCeilingWeight
-            scores[.recessed]! += ScoringConfig.AspectRatio.squareRecessedWeight
-            scores[.pendant]! += ScoringConfig.AspectRatio.squarePendantWeight
-        case ScoringConfig.AspectRatio.moderateRange:
-            scores[.pendant]! += ScoringConfig.AspectRatio.moderatePendantWeight
-            scores[.lamp]! += ScoringConfig.AspectRatio.moderateLampWeight
-            scores[.ceiling]! += ScoringConfig.AspectRatio.moderateCeilingWeight
-        case ScoringConfig.AspectRatio.wideRange:
-            scores[.lamp]! += ScoringConfig.AspectRatio.wideLampWeight
-            scores[.pendant]! += ScoringConfig.AspectRatio.widePendantWeight
-        case ScoringConfig.AspectRatio.stripRange:
-            scores[.strip]! += ScoringConfig.AspectRatio.stripWeight
-            scores[.lamp]! += ScoringConfig.AspectRatio.stripLampWeight
-        default:
-            scores[.lamp]! += ScoringConfig.AspectRatio.defaultLampWeight
+        // Iterate declarative rules and accumulate weights.
+        for rule in classificationRules {
+            var matches = true
+            
+            if let aspectRange = rule.aspectRange {
+                guard aspectRange.contains(aspectRatio) else { matches = false }
+            }
+            
+            if matches, let yRange = rule.yRange {
+                guard yRange.contains(normalizedY) else { matches = false }
+            }
+            
+            if matches, let areaRange = rule.areaRange {
+                guard areaRange.contains(area) else { matches = false }
+            }
+            
+            if matches {
+                scores[rule.type]! += rule.weight
+            }
         }
         
-        if normalizedY < ScoringConfig.VerticalPosition.ceilingRangeEnd {
-            scores[.ceiling]! += ScoringConfig.VerticalPosition.ceilingCeilingWeight
-            scores[.pendant]! += ScoringConfig.VerticalPosition.ceilingPendantWeight
-            scores[.recessed]! += ScoringConfig.VerticalPosition.ceilingRecessedWeight
-        } else if normalizedY < ScoringConfig.VerticalPosition.midCeilingRangeEnd {
-            scores[.pendant]! += ScoringConfig.VerticalPosition.midCeilingPendantWeight
-            scores[.recessed]! += ScoringConfig.VerticalPosition.midCeilingRecessedWeight
-            scores[.lamp]! += ScoringConfig.VerticalPosition.midCeilingLampWeight
-        } else if normalizedY < ScoringConfig.VerticalPosition.midRangeEnd {
-            scores[.lamp]! += ScoringConfig.VerticalPosition.midLampWeight
-            scores[.recessed]! += ScoringConfig.VerticalPosition.midRecessedWeight
-            scores[.strip]! += ScoringConfig.VerticalPosition.midStripWeight
-        } else {
-            scores[.lamp]! += ScoringConfig.VerticalPosition.defaultLampWeight
-            scores[.strip]! += ScoringConfig.VerticalPosition.defaultStripWeight
-        }
-        
-        if area > ScoringConfig.Area.largeThreshold {
-            scores[.ceiling]! += ScoringConfig.Area.largeCeilingWeight
-            scores[.strip]! += ScoringConfig.Area.largeStripWeight
-        } else if area > ScoringConfig.Area.mediumThreshold {
-            scores[.pendant]! += ScoringConfig.Area.mediumPendantWeight
-            scores[.lamp]! += ScoringConfig.Area.mediumLampWeight
-            scores[.recessed]! += ScoringConfig.Area.mediumRecessedWeight
-        } else {
-            scores[.recessed]! += ScoringConfig.Area.smallRecessedWeight
-            scores[.lamp]! += ScoringConfig.Area.smallLampWeight
-        }
-        
+        // Sort by score descending, then by specificity as tiebreaker.
         let sorted = scores.sorted { a, b in
             if a.value == b.value {
                 return ScoringConfig.Specificity.values[a.key, default: 0] > ScoringConfig.Specificity.values[b.key, default: 0]
@@ -158,6 +186,13 @@ struct FixtureHeuristicClassifier {
     }
     
     /// Calculate detection confidence from observation quality metrics.
+    ///
+    /// Base confidence is 0.7. Bonuses are added for:
+    /// - Reasonable area (0.01-0.5): +0.15
+    /// - Good area (0.05-0.3): +0.05
+    /// - Near image center: +0.05
+    ///
+    /// Result is capped at 0.99.
     func calculateConfidence(from observation: VNRectangleObservation) -> Double {
         var confidence: Double = 0.7
         

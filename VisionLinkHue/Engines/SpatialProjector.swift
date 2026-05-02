@@ -39,11 +39,12 @@ actor SpatialProjector {
     // MARK: - Coordinate Projection
     
     /// Project a normalized 2D point to a 3D world position.
+    @MainActor
     func project(
         normalizedPoint: SIMD2<Float>,
         inFrame frame: ARFrame,
         anchor: AnchorEntity.World
-    ) async -> ProjectionResult {
+    ) -> ProjectionResult {
         
         guard let intrinsics = frame.camera.intrinsics else {
             return .failure("Failed to compute camera direction vector")
@@ -57,7 +58,7 @@ actor SpatialProjector {
             return .failure("Failed to compute camera direction vector")
         }
         
-        if let meshResult = try? await raycastOnMesh(
+        if let meshResult = raycastOnMesh(
             from: normalizedPoint,
             in: frame,
             anchor: anchor
@@ -101,11 +102,12 @@ actor SpatialProjector {
     }
     
     /// Project a normalized bounding box center to a 3D position with orientation.
+    @MainActor
     func project(
         region: NormalizedRect,
         inFrame frame: ARFrame,
         anchor: AnchorEntity.World
-    ) async -> ProjectionResult {
+    ) -> ProjectionResult {
         
         let center = region.center
         
@@ -119,7 +121,7 @@ actor SpatialProjector {
             cameraTransform: frame.camera.transform
         ) ?? SIMD3<Float>(0, 0, -1)
         
-        if let meshResult = try? await raycastOnMesh(
+        if let meshResult = raycastOnMesh(
             from: center,
             in: frame,
             anchor: anchor
@@ -168,14 +170,19 @@ TrackedFixture(
     
     // MARK: - Raycast on Scene Reconstruction Mesh
     
+    /// Perform a synchronous raycast against the scene reconstruction mesh.
+    /// ARKit raycast APIs are strictly main-thread bound; callers must ensure
+    /// this is invoked on the MainActor (which the project() methods do via
+    /// their @MainActor annotation).
+    @MainActor
     private func raycastOnMesh(
         from normalizedPoint: SIMD2<Float>,
         in frame: ARFrame,
         anchor: AnchorEntity.World
-    ) async throws -> TrackedFixture {
+    ) -> TrackedFixture? {
         
         guard let intrinsics = frame.camera.intrinsics else {
-            throw ProjectionError.invalidIntrinsics
+            return nil
         }
         
         guard let ray = SpatialMath.cameraRay(
@@ -184,18 +191,18 @@ TrackedFixture(
             cameraTransform: frame.camera.transform,
             imageSize: frame.capturedImageSize
         ) else {
-            throw ProjectionError.invalidNormalizedPoint
+            return nil
         }
         
         guard let activeSession = session else {
-            throw ProjectionError.noSession
+            return nil
         }
         
         let raycastQuery = RaycastQuery(
             origin: ray.origin,
             direction: ray.direction,
             length: configuration.maxRaycastDistance,
-            originalAnchor: anchor,
+            originalAnchor: .none,
             type: .existingPlaneExtent,
             filter: .mesh
         )
@@ -203,7 +210,7 @@ TrackedFixture(
         let results = activeSession.raycast(raycastQuery)
         
         guard let hit = results.first else {
-            throw ProjectionError.raycastMiss
+            return nil
         }
         
         let position = SIMD3<Float>(

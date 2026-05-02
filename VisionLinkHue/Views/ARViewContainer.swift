@@ -47,10 +47,10 @@ struct ARViewContainer: UIViewRepresentable {
 /// 2D HUD overlay with detection status and controls.
 struct HUDOverlay: View {
     
-    @ObservedObject var sessionManager: ARSessionManager
-    @ObservedObject var detectionEngine: DetectionEngine
-    @ObservedObject var hueClient: HueClient
-    @ObservedObject var stateStream: HueStateStream
+    let sessionManager: ARSessionManager
+    let detectionEngine: DetectionEngine
+    let hueClient: HueClient
+    let stateStream: HueStateStream
     let frameSize: CGSize
     
     @State private var showBridgeSetup: Bool = false
@@ -174,8 +174,8 @@ struct HUDOverlay: View {
 /// Bridge discovery and connection sheet.
 struct BridgeDiscoveryView: View {
     
-    @ObservedObject var hueClient: HueClient
-    @ObservedObject var stateStream: HueStateStream
+    let hueClient: HueClient
+    let stateStream: HueStateStream
     @Environment(\.dismiss) private var dismiss
     
     @State private var bridges: [BridgeInfo] = []

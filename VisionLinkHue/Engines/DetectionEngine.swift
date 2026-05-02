@@ -6,6 +6,9 @@ import os
 /// Engine that performs on-device lighting fixture detection using
 /// the Vision framework for bounding box detection and heuristic
 /// classification based on aspect ratio, vertical position, and area.
+///
+/// Throttles inference to `DetectionConstants.inferenceInterval` (500ms)
+/// and applies non-maximum suppression to remove overlapping detections.
 final class DetectionEngine: ObservableObject {
     
     @Published var lastDetections: [FixtureDetection] = []
@@ -88,7 +91,9 @@ final class DetectionEngine: ObservableObject {
         request.quadTolerance = 0.1
         
         return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<[FixtureDetection], Error>) in
-            Task.detached(priority: .userInitiated) {
+            // Dispatch Vision work to a background thread to avoid blocking
+            // the caller (which may be the main thread).
+            DispatchQueue.global(qos: .userInitiated).async {
                 do {
                     try handler.perform([request])
                     

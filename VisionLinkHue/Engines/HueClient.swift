@@ -1,70 +1,11 @@
 import Foundation
 import Network
-import Security
-import CommonCrypto
 import os
-
-// MARK: - Keychain Helpers
-
-private enum KeychainKeys {
-    static let service = "com.tomwolfe.visionlinkhue.certpins"
-    static func key(for bridgeIP: String) -> String { "certpin_\(bridgeIP)" }
-}
-
-private enum KeychainError: Error, LocalizedError {
-    case addFailed, queryFailed, accessFailed
-    
-    var errorDescription: String? {
-        switch self {
-        case .addFailed: return "Failed to add item to Keychain"
-        case .queryFailed: return "Failed to query Keychain"
-        case .accessFailed: return "Failed to access Keychain"
-        }
-    }
-}
-
-private func saveCertPin(to keychainKey: String, hash: Data) throws {
-    let query: [String: Any] = [
-        kSecClass as String: kSecClassKey,
-        kSecAttrService as String: KeychainKeys.service,
-        kSecAttrAccount as String: keychainKey,
-        kSecValueData as String: hash,
-        kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
-    ]
-    SecItemDelete(query as CFDictionary)
-    guard SecItemAdd(query as CFDictionary, nil) == errSecSuccess else {
-        throw KeychainError.addFailed
-    }
-}
-
-private func loadCertPin(from keychainKey: String) throws -> Data? {
-    let query: [String: Any] = [
-        kSecClass as String: kSecClassKey,
-        kSecAttrService as String: KeychainKeys.service,
-        kSecAttrAccount as String: keychainKey,
-        kSecReturnData as String: true,
-        kSecMatchLimit as String: kSecMatchLimitOne,
-    ]
-    var result: AnyObject?
-    guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess else {
-        return nil
-    }
-    return result as? Data
-}
-
-private func deleteCertPin(from keychainKey: String) {
-    let query: [String: Any] = [
-        kSecClass as String: kSecClassKey,
-        kSecAttrService as String: KeychainKeys.service,
-        kSecAttrAccount as String: keychainKey,
-    ]
-    SecItemDelete(query as CFDictionary)
-}
 
 /// Network client that manages all communication with the Philips Hue Bridge
 /// using CLIP v2 API, mDNS discovery, mTLS with Trust-On-First-Use certificate
 /// pinning, and Server-Sent Events (SSE) for real-time state updates.
-final class HueClient: ObservableObject, Sendable {
+final class HueClient: ObservableObject, Sendable, HueClientProtocol {
     
     // MARK: - Published State
     
@@ -132,70 +73,91 @@ final class HueClient: ObservableObject, Sendable {
     // MARK: - Bridge Discovery
     
     /// Discover Hue bridges on the local network using mDNS.
+    /// Uses an `AsyncStream` to collect browse results over a 3-second
+    /// window, then returns the aggregated list.
     func discoverBridges() async -> [BridgeInfo] {
-        return await withCheckedContinuation { continuation in
-            let params = NWParameters.tcp
-            params.includePeerToPeer = true
-            
-            let browser = NWBrowser(
-                for: .bonjour(type: "_hue._tcp", domain: nil),
-                using: params
-            )
-            
-            defer { browser.cancel() }
-            
-            var discoveredBridges: [BridgeInfo] = []
-            
-            browser.stateUpdateHandler = { [weak self] newState in
-                switch newState {
-                case .ready:
-                    self?.logger.info("mDNS browser ready - discovering bridges")
-                case .failed(let error):
-                    self?.logger.error("mDNS browser failed: \(error.localizedDescription)")
-                    self?.lastError = "Discovery failed: \(error.localizedDescription)"
-                    Task {
-                        await self?.stateStream?.reportError(error, severity: .warning, source: "HueClient.discover")
-                    }
-                case .cancelled:
-                    self?.logger.info("mDNS browser cancelled")
-                default:
-                    break
+        let params = NWParameters.tcp
+        params.includePeerToPeer = true
+        
+        let browser = NWBrowser(
+            for: .bonjour(type: "_hue._tcp", domain: nil),
+            using: params
+        )
+        
+        var discoveredBridges: [BridgeInfo] = []
+        var discoveryTask: Task<Void, Never>?
+        
+        // Observe browser state; cancel the collection task on failure/cancel.
+        browser.stateUpdateHandler = { [weak self] newState in
+            switch newState {
+            case .ready:
+                self?.logger.info("mDNS browser ready - discovering bridges")
+            case .failed(let error):
+                self?.logger.error("mDNS browser failed: \(error.localizedDescription)")
+                self?.lastError = "Discovery failed: \(error.localizedDescription)"
+                Task {
+                    await self?.stateStream?.reportError(error, severity: .warning, source: "HueClient.discover")
                 }
+                discoveryTask?.cancel()
+            case .cancelled:
+                self?.logger.info("mDNS browser cancelled")
+                discoveryTask?.cancel()
+            default:
+                break
             }
-            
-            browser.browseResultsHandler = { [weak self] results, changes in
-                guard changes == .add else { return }
-                
-                for result in results {
-                    guard case .service(let service) = result.endpoint else { continue }
-                    
-                    let name = service.name
-                    let port = UInt(service.port)
-                    
-                    for interface in result.interfaces {
-                        let ip = interface.ipv4Address ?? interface.ipv6Address
-                        if let ip {
-                            let bridge = BridgeInfo(name: name, ip: ip.description, port: Int(port))
-                            discoveredBridges.append(bridge)
-                            self?.logger.info("Found Hue bridge: \(name) at \(ip.description):\(port)")
-                        }
-                    }
-                }
-                
-                if discoveredBridges.isEmpty {
-                    self?.logger.warning("No Hue bridges discovered")
-                    self?.lastError = "No Hue bridges found on the network"
-                    Task {
-                        await self?.stateStream?.reportError(HueError.noBridgeConfigured, severity: .warning, source: "HueClient.discover")
-                    }
-                }
-                
-                continuation.resume(returning: discoveredBridges)
-            }
-            
-            self.browser = browser
-            browser.start(queue: .main)
         }
+        
+        // Collect results as they arrive.
+        browser.browseResultsHandler = { [weak self] results, changes in
+            guard changes == .add else { return }
+            
+            for result in results {
+                guard case .service(let service) = result.endpoint else { return }
+                
+                let name = service.name
+                let port = UInt(service.port)
+                
+                for interface in result.interfaces {
+                    let ip = interface.ipv4Address ?? interface.ipv6Address
+                    if let ip {
+                        let bridge = BridgeInfo(name: name, ip: ip.description, port: Int(port))
+                        // Avoid duplicates by IP.
+                        guard !discoveredBridges.contains(where: { $0.ip == bridge.ip }) else { return }
+                        discoveredBridges.append(bridge)
+                        self?.logger.info("Found Hue bridge: \(name) at \(ip.description):\(port)")
+                    }
+                }
+            }
+            
+            if discoveredBridges.isEmpty {
+                self?.logger.warning("No Hue bridges discovered")
+                self?.lastError = "No Hue bridges found on the network"
+                Task {
+                    await self?.stateStream?.reportError(HueError.noBridgeConfigured, severity: .warning, source: "HueClient.discover")
+                }
+            }
+        }
+        
+        self.browser = browser
+        browser.start(queue: .main)
+        
+        // Collect results for 3 seconds, then stop.
+        discoveryTask = Task {
+            try? await Task.sleep(for: .seconds(3))
+        }
+        
+        // Wait for the collection window to elapse.
+        if let discoveryTask {
+            try? await discoveryTask.value
+        }
+        
+        browser.cancel()
+        
+        if discoveredBridges.isEmpty {
+            await stateStream?.reportError(HueError.noBridgeConfigured, severity: .warning, source: "HueClient.discover")
+        }
+        
+        return discoveredBridges
     }
     
     // MARK: - Authentication
@@ -307,6 +269,27 @@ final class HueClient: ObservableObject, Sendable {
         try await patchLightState(resourceId: groupId, state: LightStatePatch(on: on))
     }
     
+    /// Toggle power state for an individual light resource.
+    func togglePower(resourceId: String, on: Bool) async throws {
+        try await patchLightState(resourceId: resourceId, state: LightStatePatch(on: on))
+    }
+    
+    /// Set brightness for an individual light resource.
+    func setBrightness(resourceId: String, brightness: Int, transitionDuration: Int = 4) async throws {
+        try await patchLightState(
+            resourceId: resourceId,
+            state: LightStatePatch(on: true, brightness: brightness, transitionDuration: transitionDuration)
+        )
+    }
+    
+    /// Set color temperature for an individual light resource.
+    func setColorTemperature(resourceId: String, mireds: Int, transitionDuration: Int = 4) async throws {
+        try await patchLightState(
+            resourceId: resourceId,
+            state: LightStatePatch(on: true, ct: mireds, transitionDuration: transitionDuration)
+        )
+    }
+    
     // MARK: - SSE Event Stream
     
     /// Start the SSE connection to the bridge event stream using incremental streaming.
@@ -330,7 +313,7 @@ final class HueClient: ObservableObject, Sendable {
         request.setValue("keep-alive", forHTTPHeaderField: "Connection")
         request.timeoutInterval = 300
         
-        let sessionDelegate = HueSessionDelegate(pinnedHash: pinnedHash) { [weak self] trustedHash in
+        let sessionDelegate = CertificatePinningDelegate(pinnedHash: pinnedHash) { [weak self] trustedHash in
             Task { @MainActor [weak self] in
                 await self?.handleTOFUPin(for: trustedHash)
             }
@@ -361,51 +344,103 @@ final class HueClient: ObservableObject, Sendable {
     }
     
     /// Stream SSE events incrementally from AsyncBytes.
-    /// Buffers incomplete JSON objects across network chunk boundaries.
+    /// Treats the input as a byte stream, not a line stream, to handle
+    /// TCP fragmentation where a single network chunk may split mid-event
+    /// or multiple events may arrive in one chunk.
     private func streamSSEEvents(from bytes: AsyncBytes) async {
-        var lineBuffer = ""
-        var jsonBuffer = ""
+        var dataBuffer = Data()
         
         for await result in bytes.chunks(ofType: UInt8.self) {
-            guard let chunk = String(data: Data(result), encoding: .utf8) else { continue }
-            lineBuffer.append(chunk)
+            dataBuffer.append(contentsOf: result)
             
-            let lines = lineBuffer.split(separator: "\n", omittingEmptySubsequences: false)
-            
-            for line in lines.dropLast() {
-                let trimmed = String(line).trimmingCharacters(in: .whitespaces)
+            // Scan for complete SSE events delimited by \n\n.
+            // An SSE event consists of one or more lines ending with \n,
+            // followed by a blank line (\n). We look for the "data: " line
+            // followed by a \n\n separator.
+            while let endIndex = findEventEnd(in: dataBuffer) {
+                let eventBytes = dataBuffer[..<endIndex]
+                dataBuffer = dataBuffer[eventBytes.count...]
                 
-                if trimmed.isEmpty {
-                    processSSEEvent(buffer: &jsonBuffer)
+                guard let eventText = String(bytes: eventBytes, encoding: .utf8) else {
                     continue
                 }
                 
-                if trimmed.hasPrefix("data: ") {
-                    let jsonFragment = String(trimmed.dropFirst(6))
-                    jsonBuffer.append(jsonFragment)
-                }
+                processSSEEvent(text: eventText)
             }
-            
-            lineBuffer = String(lines.last ?? "")
         }
         
-        processSSEEvent(buffer: &jsonBuffer)
+        // Process any remaining data in the buffer after stream ends.
+        if !dataBuffer.isEmpty {
+            if let remaining = String(bytes: dataBuffer, encoding: .utf8) {
+                processSSEEvent(text: remaining)
+            }
+        }
     }
     
-    /// Process a complete SSE event from the JSON buffer.
-    private func processSSEEvent(buffer: inout String) {
-        guard !buffer.isEmpty else { return }
+    /// Find the end index of the next complete SSE event in the data buffer.
+    /// Returns the index after the terminating \n\n, or nil if no complete
+    /// event is available yet. An SSE event is identified by the presence
+    /// of a "data: " line followed by a blank line.
+    private func findEventEnd(in data: Data) -> Int? {
+        // Convert to a string slice for pattern matching.
+        // We scan for the "data: \n\n" pattern which marks a complete event.
+        // If we find "data: " but not the terminating \n\n, we wait for more data.
         
-        let json = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
-        buffer = ""
+        let text = String(bytes: data, encoding: .utf8) ?? ""
+        let lines = text.split(separator: "\n")
         
-        if json == "ping" || json.isEmpty {
+        // Find the index of "data: " line and the following blank line.
+        var i = 0
+        while i < lines.count {
+            let line = String(lines[i]).trimmingCharacters(in: .whitespaces)
+            
+            // Accumulate data lines until we hit a blank line.
+            if line.hasPrefix("data: ") {
+                var jsonAccumulator = ""
+                var j = i
+                while j < lines.count {
+                    let currentLine = String(lines[j]).trimmingCharacters(in: .whitespaces)
+                    if currentLine.hasPrefix("data: ") {
+                        jsonAccumulator.append(String(currentLine.dropFirst(6)))
+                    } else if currentLine.isEmpty {
+                        // Blank line marks end of event - process it.
+                        // Compute the byte offset to the end of this blank line.
+                        var byteOffset = 0
+                        for k in 0...j {
+                            byteOffset += lines[k].count + 1 // +1 for \n
+                        }
+                        return byteOffset
+                    } else {
+                        // Non-data, non-blank line after data - skip this event.
+                        break
+                    }
+                    j += 1
+                }
+                // No blank line found yet; more data needed.
+                return nil
+            }
+            i += 1
+        }
+        
+        return nil
+    }
+    
+    /// Process a complete SSE event text string.
+    private func processSSEEvent(text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        if trimmed.isEmpty {
+            return
+        }
+        
+        // Handle ping events.
+        if trimmed == "ping" {
             return
         }
         
         do {
             let decoder = JSONDecoder()
-            let update = try decoder.decode(ResourceUpdate.self, from: json.data(using: .utf8)!)
+            let update = try decoder.decode(ResourceUpdate.self, from: trimmed.data(using: .utf8)!)
             
             if let lights = update.lights, !lights.isEmpty {
                 logger.debug("Received \(lights.count) light update(s) via SSE")
@@ -417,7 +452,7 @@ final class HueClient: ObservableObject, Sendable {
             
         } catch {
             logger.warning("Failed to parse SSE event: \(error.localizedDescription)")
-            logger.debug("Raw event: \(json.prefix(200))")
+            logger.debug("Raw event: \(trimmed.prefix(200))")
         }
     }
     
@@ -500,13 +535,13 @@ final class HueClient: ObservableObject, Sendable {
         config.tlsMinimumProtocolVersion = .tls12
         config.tlsMaximumProtocolVersion = .tls13
         
-        // Load pinned hash from Keychain for TOFU
+        // Load pinned hash from Keychain for TOFU.
         if let ip = bridgeIP, let key = KeychainKeys.key(for: ip),
-           let hash = try? loadCertPin(from: key) {
+           let hash = try? KeychainManager.loadCertPin(from: key) {
             pinnedHash = hash
         }
         
-        let sessionDelegate = HueSessionDelegate(pinnedHash: pinnedHash) { [weak self] trustedHash in
+        let sessionDelegate = CertificatePinningDelegate(pinnedHash: pinnedHash) { [weak self] trustedHash in
             Task { @MainActor [weak self] in
                 await self?.handleTOFUPin(for: trustedHash)
             }
@@ -524,7 +559,7 @@ final class HueClient: ObservableObject, Sendable {
         let keychainKey = KeychainKeys.key(for: ip)
         
         do {
-            try saveCertPin(to: keychainKey, hash: trustedHash)
+            try KeychainManager.saveCertPin(to: keychainKey, hash: trustedHash)
             pinnedHash = trustedHash
             logger.info("Certificate pinned via TOFU for bridge at \(ip)")
         } catch {
@@ -563,64 +598,6 @@ final class HueClient: ObservableObject, Sendable {
         }
         
         return (data, response)
-    }
-}
-
-// MARK: - Session Delegate
-
-/// Unified URLSession delegate handling certificate pinning and TOFU.
-final class HueSessionDelegate: NSObject, Sendable, URLSessionDelegate {
-    
-    let pinnedHash: Data?
-    let tofuCallback: (Data) async -> Void
-    
-    init(pinnedHash: Data?, tofuCallback: @escaping (Data) async -> Void) {
-        self.pinnedHash = pinnedHash
-        self.tofuCallback = tofuCallback
-        super.init()
-    }
-    
-    func urlSession(
-        _ session: URLSession,
-        didReceive challenge: URLAuthenticationChallenge,
-        completionHandler: @escaping (URLSession.AuthChallengeDisposition, SecCredential?) -> Void
-    ) {
-        guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
-              let serverTrust = challenge.protectionSpace.serverTrust else {
-            completionHandler(.cancelAuthenticationChallenge, nil)
-            return
-        }
-        
-        let secTrust = serverTrust.secTrust
-        var error: CFError?
-        
-        guard SecTrustEvaluateWithError(secTrust, &error) else {
-            completionHandler(.cancelAuthenticationChallenge, nil)
-            return
-        }
-        
-        guard let publicKey = SecTrustCopyPublicKey(secTrust),
-              let publicKeyData = SecKeyCopyExternalRepresentation(publicKey, nil) as Data? else {
-            completionHandler(.cancelAuthenticationChallenge, nil)
-            return
-        }
-        
-        let hash = publicKeyData.sha256()
-        
-        if let pinnedHash {
-            // Enforcement mode: compare against stored hash
-            if hash == pinnedHash {
-                completionHandler(.useCredential, nil)
-            } else {
-                completionHandler(.cancelAuthenticationChallenge, nil)
-            }
-        } else {
-            // TOFU mode: trust on first use, cache the hash
-            Task {
-                await tofuCallback(hash)
-                completionHandler(.useCredential, nil)
-            }
-        }
     }
 }
 

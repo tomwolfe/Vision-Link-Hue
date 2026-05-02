@@ -1,15 +1,21 @@
 import Foundation
 import Combine
 
-/// Severity levels for application errors.
+/// Severity levels for application errors, used to prioritize UI feedback.
+/// Ordered from least to most severe for `Comparable` conformance.
 enum AppErrorSeverity: Comparable {
+    /// Informational messages that auto-dismiss after 3 seconds.
     case informational
+    /// Warnings about non-critical issues (e.g., no bridge found).
     case warning
+    /// Errors requiring user attention (e.g., API failures).
     case error
+    /// Critical errors that may prevent the app from functioning.
     case critical
 }
 
-/// Unified error type for the application.
+/// Unified error type for the application, wrapping any `Error` with
+/// severity classification, source attribution, and display formatting.
 struct AppError: Identifiable, LocalizedError {
     let id: UUID
     let error: any Error
@@ -57,12 +63,13 @@ final class HueStateStream: ObservableObject {
     /// Active error queue for toast/banner display.
     @Published var activeErrors: [AppError] = []
     
+    /// Mapping from local fixture UUID to Hue bridge light ID.
+    /// Populated via tap-to-link in the HUD.
+    @Published private(set) var fixtureLightMapping: [UUID: String] = [:]
+    
     func setIsConnected(_ connected: Bool) {
         isConnected = connected
     }
-    
-    /// Deprecated: use `activeErrors` instead.
-    @Published var errorMessage: String?
     
     /// UUID of the currently selected light group for HUD anchoring.
     @Published var selectedGroupId: String?
@@ -99,9 +106,25 @@ final class HueStateStream: ObservableObject {
         return result
     }
     
-    /// Resolve a light by its ID.
+    /// Resolve a light by its bridge-assigned ID.
     func light(by id: String) -> HueLightResource? {
         lights.first { $0.id == id }
+    }
+    
+    /// Resolve a light that is mapped to a local fixture UUID.
+    func light(forFixture fixtureId: UUID) -> HueLightResource? {
+        guard let lightId = fixtureLightMapping[fixtureId] else { return nil }
+        return light(by: lightId)
+    }
+    
+    /// Link a local fixture UUID to a Hue bridge light ID.
+    func linkFixture(_ fixtureId: UUID, toLight lightId: String) {
+        fixtureLightMapping[fixtureId] = lightId
+    }
+    
+    /// Unlink a local fixture from its mapped Hue light.
+    func unlinkFixture(_ fixtureId: UUID) {
+        fixtureLightMapping.removeValue(forKey: fixtureId)
     }
     
     /// Resolve a scene by its ID.
