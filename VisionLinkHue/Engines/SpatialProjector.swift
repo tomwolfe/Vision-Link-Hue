@@ -23,28 +23,28 @@ actor SpatialProjector {
     }
     
     private let configuration: Configuration
-    private let session: ARSession
-    private let scene: ARSCNView? // Optional SceneKit overlay for debug
+    private weak var session: ARSession?
     private var lastWorldMap: WorldMap?
     
-    init(session: ARSession, configuration: Configuration = .init()) {
+    init(session: ARSession? = nil, configuration: Configuration = .init()) {
         self.configuration = configuration
         self.session = session
-        self.scene = nil
+    }
+    
+    /// Update the session reference after the AR session is launched.
+    func configure(with arSession: ARSession) {
+        self.session = arSession
     }
     
     // MARK: - Coordinate Projection
     
     /// Project a normalized 2D point to a 3D world position.
-    /// Uses raycast on scene reconstruction mesh as primary method,
-    /// falls back to depth map unprojection.
     func project(
         normalizedPoint: SIMD2<Float>,
         inFrame frame: ARFrame,
         anchor: AnchorEntity.World
     ) async -> ProjectionResult {
         
-        // Step 1: Convert normalized [0,1] to camera-space direction vector
         guard let intrinsics = frame.camera.intrinsics else {
             return .failure("Failed to compute camera direction vector")
         }
@@ -57,7 +57,6 @@ actor SpatialProjector {
             return .failure("Failed to compute camera direction vector")
         }
         
-        // Step 2: Try raycasting on scene reconstruction mesh
         if let meshResult = try? await raycastOnMesh(
             from: normalizedPoint,
             in: frame,
@@ -66,7 +65,6 @@ actor SpatialProjector {
             return .success(meshResult)
         }
         
-        // Step 3: Fallback to depth map unprojection
         if let depthResult = unprojectViaDepthMap(
             normalizedPoint,
             frame: frame,
@@ -75,7 +73,6 @@ actor SpatialProjector {
             return .success(depthResult)
         }
         
-        // Step 4: Last resort - use camera frustum projection
         let fallbackPosition = SpatialMath.fallbackPosition(
             normalized: normalizedPoint,
             cameraTransform: frame.camera.transform,
@@ -86,7 +83,7 @@ actor SpatialProjector {
         let fallbackOrientation = simd_quatf(rotationMatrix: rotationMatrix)
         
         return .anchored(
-            AnchoredFixture(
+            TrackedFixture(
                 id: UUID(),
                 detection: FixtureDetection(
                     type: .lamp,
@@ -112,7 +109,6 @@ actor SpatialProjector {
         
         let center = region.center
         
-        // Get the dominant direction from the bounding box normal
         guard let intrinsics = frame.camera.intrinsics else {
             return .failure("Camera intrinsics unavailable")
         }
@@ -123,29 +119,29 @@ actor SpatialProjector {
             cameraTransform: frame.camera.transform
         ) ?? SIMD3<Float>(0, 0, -1)
         
-        // Step 1: Raycast on scene reconstruction
         if let meshResult = try? await raycastOnMesh(
             from: center,
             in: frame,
             anchor: anchor
         ) {
-            // Adjust orientation to face the camera
             let lookTarget = SIMD3<Float>(
                 meshResult.position.x,
                 meshResult.position.y,
                 meshResult.position.z
             ) + direction * -1.0
             
-            let orientation = simd_look_at(
+            guard let orientation = SpatialMath.lookAtSafe(
                 from: meshResult.position,
                 at: lookTarget,
                 worldUp: SIMD3<Float>(0, 1, 0)
-            )
+            ) else {
+                return .failure("Failed to compute orientation")
+            }
             
             let adjustedPosition = meshResult.position + configuration.hudOffset
             
             return .anchored(
-                AnchoredFixture(
+TrackedFixture(
                     id: UUID(),
                     detection: FixtureDetection(
                         type: .lamp,
@@ -159,7 +155,6 @@ actor SpatialProjector {
             )
         }
         
-        // Step 2: Depth map fallback
         if let depthResult = unprojectViaDepthMap(
             center,
             frame: frame,
@@ -177,7 +172,7 @@ actor SpatialProjector {
         from normalizedPoint: SIMD2<Float>,
         in frame: ARFrame,
         anchor: AnchorEntity.World
-    ) async throws -> AnchoredFixture {
+    ) async throws -> TrackedFixture {
         
         guard let worldMap = frame.worldMap else {
             throw ProjectionError.noWorldMap
@@ -196,6 +191,10 @@ actor SpatialProjector {
             throw ProjectionError.invalidNormalizedPoint
         }
         
+        guard let activeSession = session else {
+            throw ProjectionError.noSession
+        }
+        
         let raycastQuery = RaycastQuery(
             origin: ray.origin,
             direction: ray.direction,
@@ -205,7 +204,7 @@ actor SpatialProjector {
             filter: .mesh
         )
         
-        let results = session.raycast(raycastQuery, using: worldMap)
+        let results = activeSession.raycast(raycastQuery, using: worldMap)
         
         guard let hit = results.first else {
             throw ProjectionError.raycastMiss
@@ -222,7 +221,7 @@ actor SpatialProjector {
         
         let adjustedPosition = position + configuration.hudOffset
         
-        return AnchoredFixture(
+        return TrackedFixture(
             id: UUID(),
             detection: FixtureDetection(
                 type: .lamp,
@@ -295,7 +294,7 @@ actor SpatialProjector {
         let adjustedPosition = position + configuration.hudOffset
         
         return .anchored(
-            AnchoredFixture(
+            TrackedFixture(
                 id: UUID(),
                 detection: FixtureDetection(
                     type: .lamp,
@@ -311,21 +310,16 @@ actor SpatialProjector {
             )
         )
     }
-    
-    // MARK: - Utility
-    
-    /// Look-at matrix construction for orientation.
-    private func simd_look_at(from: SIMD3<Float>, at: SIMD3<Float>, worldUp: SIMD3<Float>) -> simd_quatf {
-        SpatialMath.lookAt(from: from, at: at, worldUp: worldUp)
-    }
 }
+
+// MARK: - Projection Result
 
 /// Result of a coordinate projection operation.
 enum ProjectionResult {
-    case anchored(AnchoredFixture)
+    case anchored(TrackedFixture)
     case failure(String)
     
-    var anchoredFixture: AnchoredFixture? {
+    var anchoredFixture: TrackedFixture? {
         if case .anchored(let fixture) = self { return fixture }
         return nil
     }
@@ -341,6 +335,8 @@ enum ProjectionResult {
     }
 }
 
+// MARK: - Projection Errors
+
 /// Errors that can occur during spatial projection.
 enum ProjectionError: Error, LocalizedError {
     case noWorldMap
@@ -348,6 +344,7 @@ enum ProjectionError: Error, LocalizedError {
     case raycastMiss
     case depthUnavailable
     case invalidIntrinsics
+    case noSession
     
     var errorDescription: String? {
         switch self {
@@ -356,6 +353,7 @@ enum ProjectionError: Error, LocalizedError {
         case .raycastMiss: return "Raycast did not hit any mesh geometry"
         case .depthUnavailable: return "Depth data unavailable"
         case .invalidIntrinsics: return "Invalid camera intrinsics"
+        case .noSession: return "ARSession not configured"
         }
     }
 }

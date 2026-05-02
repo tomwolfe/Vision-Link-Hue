@@ -43,8 +43,8 @@ struct AppError: Identifiable, LocalizedError {
     }
 }
 
-/// Typed stream of Hue state changes from the SSE event stream.
-@MainActor
+/// Centralized state manager for Hue bridge data and connection status.
+/// Publishes lights, scenes, groups, connection status, and errors via Combine.
 final class HueStateStream: ObservableObject {
     
     @Published private(set) var lights: [HueLightResource] = []
@@ -119,10 +119,8 @@ final class HueStateStream: ObservableObject {
         // Auto-clear informational errors after 3 seconds
         if severity == .informational {
             Task {
-                try await Task.sleep(for: .seconds(3))
-                await MainActor.run {
-                    self.activeErrors.removeAll { $0.id == appError.id }
-                }
+                try? await Task.sleep(for: .seconds(3))
+                self.activeErrors.removeAll { $0.id == appError.id }
             }
         }
     }

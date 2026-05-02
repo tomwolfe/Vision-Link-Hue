@@ -116,9 +116,33 @@ enum SpatialMath {
     }
     
     /// Construct a look-at orientation quaternion.
+    /// Returns nil if worldUp and forward are parallel (singularity).
     static func lookAt(from: SIMD3<Float>, at: SIMD3<Float>, worldUp: SIMD3<Float>) -> simd_quatf {
         let forward = normalize(at - from)
         let right = normalize(cross(worldUp, forward))
+        let up = cross(forward, right)
+        
+        let rotationMatrix = simd_float3x3(
+            right,
+            up,
+            -forward
+        )
+        
+        return simd_quatf(rotationMatrix)
+    }
+    
+    /// Construct a look-at orientation quaternion, returning nil on singularity.
+    /// Use this when worldUp alignment cannot be guaranteed (e.g., camera pointing straight up/down).
+    static func lookAtSafe(from: SIMD3<Float>, at: SIMD3<Float>, worldUp: SIMD3<Float>) -> simd_quatf? {
+        let forward = normalize(at - from)
+        let crossProduct = cross(worldUp, forward)
+        
+        let crossLength = length(crossProduct)
+        guard crossLength > 1e-6 else {
+            return nil
+        }
+        
+        let right = normalize(crossProduct)
         let up = cross(forward, right)
         
         let rotationMatrix = simd_float3x3(

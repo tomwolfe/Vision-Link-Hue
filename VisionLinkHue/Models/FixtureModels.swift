@@ -1,5 +1,6 @@
 import Foundation
 import simd
+import RealityKit
 
 /// Categories of lighting fixtures the on-device model can detect.
 enum FixtureType: String, Codable, CaseIterable, Sendable {
@@ -78,8 +79,10 @@ struct FixtureDetection: Identifiable, @unchecked Sendable {
     }
 }
 
-/// A detected fixture with its resolved 3D world transform.
-struct AnchoredFixture: Identifiable, Sendable {
+/// A detected fixture with its resolved 3D world transform and HUD entity state.
+/// Combines detection data, spatial position, and RealityKit entity tracking
+/// into a single unified structure.
+struct TrackedFixture: Identifiable, Sendable {
     let id: UUID
     let detection: FixtureDetection
     let position: SIMD3<Float>
@@ -88,4 +91,10 @@ struct AnchoredFixture: Identifiable, Sendable {
     
     /// The RealityKit entity ID that represents this fixture's HUD.
     var hudEntityID: Entity.ID?
+    
+    /// Convenience accessor for fixture type.
+    var type: FixtureType { detection.type }
+    
+    /// Convenience accessor for detection confidence.
+    var confidence: Double { detection.confidence }
 }

@@ -72,18 +72,6 @@ extension JSONEncoder {
     }
 }
 
-// MARK: - Color Interpolation
-
-extension Color {
-    /// Interpolate between two colors based on a factor.
-    static func interpolate(_ from: Color, to: Color, factor: Double) -> Color {
-        // Simplified - in production use CGColor interpolation
-        if factor >= 1.0 { return to }
-        if factor <= 0.0 { return from }
-        return from // Placeholder
-    }
-}
-
 // MARK: - Optional Chaining Helper
 
 extension Optional where Wrapped: RangeReplaceableCollection {

@@ -15,10 +15,6 @@ struct ARViewContainer: UIViewRepresentable {
         arView.session.delegate = context.coordinator
         arView.session.delegateQueue = .main
         
-        // Enable world reconstruction visualization (debug)
-        arView.debugOptions = [.showAnchorLocators]
-        
-        // Configure for best performance on A18 chip
         arView.preferredFramesPerSecond = 60
         arView.preferredStereoRenderingMode = .mono
         
@@ -77,30 +73,6 @@ struct ARViewContainerView: View {
                     }
                 )
                 .ignoresSafeArea()
-                
-                // 3D overlay layer for RealityKit entities
-                RealityView { content in
-                    // Add 3D reticles for each anchored fixture
-                    for fixture in sessionManager.anchoredFixtures {
-                        let reticle = Entity() {
-                            ModelEntity(
-                                mesh: .generateSphere(radius: 0.02),
-                                materials: [
-                                    SimpleMaterial(
-                                        color: .white,
-                                        isMetallic: false,
-                                        roughness: 0.3
-                                    )
-                                ]
-                            )
-                        }
-                        reticle.position = fixture.position
-                        reticle.orientation = fixture.orientation
-                        
-                        content.add(reticle)
-                    }
-                }
-                .cameraStartTransform(.identity)
                 
                 // 2D HUD overlay (always faces camera)
                 HUDOverlay(

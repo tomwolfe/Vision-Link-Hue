@@ -6,7 +6,7 @@ import simd
 /// Uses phaseAnimator to pulse when detection confidence is low.
 struct FixtureReticle: View {
     
-    let fixture: AnchoredFixture
+    let fixture: TrackedFixture
     let onSelect: () -> Void
     
     /// Threshold below which the reticle pulses to indicate low certainty.
@@ -152,7 +152,7 @@ struct FixtureReticle: View {
 /// Anchored to a detected fixture via ViewAttachmentComponent.
 struct HueControlPanel: View {
     
-    let fixture: AnchoredFixture
+    let fixture: TrackedFixture
     let hueClient: HueClient
     let stateStream: HueStateStream
     

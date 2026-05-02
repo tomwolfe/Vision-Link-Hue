@@ -21,7 +21,7 @@ struct ContentView: View {
         _hueClient = StateObject(wrappedValue: client)
         
         let detector = DetectionEngine()
-        let projector = SpatialProjector(session: ARWorldTrackingConfiguration().session)
+        let projector = SpatialProjector()
         
         let manager = ARSessionManager(
             detectionEngine: detector,

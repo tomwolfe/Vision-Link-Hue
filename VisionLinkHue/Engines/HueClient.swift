@@ -1,12 +1,69 @@
 import Foundation
 import Network
+import Security
 import os
 
-/// Network actor that manages all communication with the Philips Hue Bridge
-/// using CLIP v2 API, mDNS discovery, mTLS with certificate pinning,
-/// and Server-Sent Events (SSE) for real-time state updates.
-@MainActor
-final class HueClient: ObservableObject {
+// MARK: - Keychain Helpers
+
+private enum KeychainKeys {
+    static let service = "com.tomwolfe.visionlinkhue.certpins"
+    static func key(for bridgeIP: String) -> String { "certpin_\(bridgeIP)" }
+}
+
+private enum KeychainError: Error, LocalizedError {
+    case addFailed, queryFailed, accessFailed
+    
+    var errorDescription: String? {
+        switch self {
+        case .addFailed: return "Failed to add item to Keychain"
+        case .queryFailed: return "Failed to query Keychain"
+        case .accessFailed: return "Failed to access Keychain"
+        }
+    }
+}
+
+private func saveCertPin(to keychainKey: String, hash: Data) throws {
+    let query: [String: Any] = [
+        kSecClass as String: kSecClassKey,
+        kSecAttrService as String: KeychainKeys.service,
+        kSecAttrAccount as String: keychainKey,
+        kSecValueData as String: hash,
+        kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+    ]
+    SecItemDelete(query as CFDictionary)
+    guard SecItemAdd(query as CFDictionary, nil) == errSecSuccess else {
+        throw KeychainError.addFailed
+    }
+}
+
+private func loadCertPin(from keychainKey: String) throws -> Data? {
+    let query: [String: Any] = [
+        kSecClass as String: kSecClassKey,
+        kSecAttrService as String: KeychainKeys.service,
+        kSecAttrAccount as String: keychainKey,
+        kSecReturnData as String: true,
+        kSecMatchLimit as String: kSecMatchLimitOne,
+    ]
+    var result: AnyObject?
+    guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess else {
+        return nil
+    }
+    return result as? Data
+}
+
+private func deleteCertPin(from keychainKey: String) {
+    let query: [String: Any] = [
+        kSecClass as String: kSecClassKey,
+        kSecAttrService as String: KeychainKeys.service,
+        kSecAttrAccount as String: keychainKey,
+    ]
+    SecItemDelete(query as CFDictionary)
+}
+
+/// Network client that manages all communication with the Philips Hue Bridge
+/// using CLIP v2 API, mDNS discovery, mTLS with Trust-On-First-Use certificate
+/// pinning, and Server-Sent Events (SSE) for real-time state updates.
+final class HueClient: ObservableObject, Sendable {
     
     // MARK: - Published State
     
@@ -27,9 +84,11 @@ final class HueClient: ObservableObject {
         category: "HueClient"
     )
     
-    /// Certificate pinning: expected SHA-256 hash of the bridge's public key.
-    /// In production, this would be configured per-bridge or discovered securely.
-    private let expectedPublicKeyHash: Data? = nil // nil = skip pinning in dev
+    /// Cached certificate pin hash for the current bridge (TOFU).
+    private var pinnedHash: Data?
+    
+    /// Whether we have already pinned a certificate for this bridge.
+    private var isPinned: Bool { pinnedHash != nil }
     
     /// Network connection for REST API calls.
     private var urlSession: URLSession?
@@ -56,7 +115,7 @@ final class HueClient: ObservableObject {
     private var browser: NWBrowser?
     
     /// State stream publisher.
-    private var stateStream: HueStateStream?
+    weak var stateStream: HueStateStream?
     
     // MARK: - Initialization
     
@@ -74,7 +133,7 @@ final class HueClient: ObservableObject {
     
     /// Discover Hue bridges on the local network using mDNS.
     func discoverBridges() async -> [BridgeInfo] {
-        await withCheckedContinuation { continuation in
+        return await withCheckedContinuation { continuation in
             let params = NWParameters.tcp
             params.includePeerToPeer = true
             
@@ -83,59 +142,53 @@ final class HueClient: ObservableObject {
                 using: params
             )
             
+            var discoveredBridges: [BridgeInfo] = []
+            
             browser.stateUpdateHandler = { [weak self] newState in
-                Task { @MainActor [weak self] in
-                    guard let self else { return }
-                    
-                    switch newState {
-                    case .ready:
-                        self.logger.info("mDNS browser ready - discovering bridges")
-                    case .failed(let error):
-                        self.logger.error("mDNS browser failed: \(error.localizedDescription)")
-                        self.lastError = "Discovery failed: \(error.localizedDescription)"
-                        self.stateStream?.reportError(error, severity: .warning, source: "HueClient.discover")
-                    case .cancelled:
-                        self.logger.info("mDNS browser cancelled")
-                    default:
-                        break
+                switch newState {
+                case .ready:
+                    self?.logger.info("mDNS browser ready - discovering bridges")
+                case .failed(let error):
+                    self?.logger.error("mDNS browser failed: \(error.localizedDescription)")
+                    self?.lastError = "Discovery failed: \(error.localizedDescription)"
+                    Task {
+                        await self?.stateStream?.reportError(error, severity: .warning, source: "HueClient.discover")
                     }
+                case .cancelled:
+                    self?.logger.info("mDNS browser cancelled")
+                default:
+                    break
                 }
             }
             
             browser.browseResultsHandler = { [weak self] results, changes in
-                Task { @MainActor [weak self] in
-                    guard let self else { return }
+                guard changes == .add else { return }
+                
+                for result in results {
+                    guard case .service(let service) = result.endpoint else { continue }
                     
-                    var bridges: [BridgeInfo] = []
+                    let name = service.name
+                    let port = UInt(service.port)
                     
-                    for result in results where changes == .add {
-                        guard case .service(let service) = result.endpoint else { continue }
-                        
-                        let name = service.name
-                        let port = UInt(service.port)
-                        
-                        // Extract IP from interface addresses
-                        for interface in result.interfaces {
-                            let ip = interface.ipv4Address ?? interface.ipv6Address
-                            if let ip {
-                                bridges.append(BridgeInfo(
-                                    name: name,
-                                    ip: ip.description,
-                                    port: Int(port)
-                                ))
-                                self.logger.info("Found Hue bridge: \(name) at \(ip.description):\(port)")
-                            }
+                    for interface in result.interfaces {
+                        let ip = interface.ipv4Address ?? interface.ipv6Address
+                        if let ip {
+                            let bridge = BridgeInfo(name: name, ip: ip.description, port: Int(port))
+                            discoveredBridges.append(bridge)
+                            self?.logger.info("Found Hue bridge: \(name) at \(ip.description):\(port)")
                         }
                     }
-                    
-                    if bridges.isEmpty {
-                        self.logger.warning("No Hue bridges discovered")
-                        self.lastError = "No Hue bridges found on the network"
-                        self.stateStream?.reportError(HueError.noBridgeConfigured, severity: .warning, source: "HueClient.discover")
-                    }
-                    
-                    continuation.resume(returning: bridges)
                 }
+                
+                if discoveredBridges.isEmpty {
+                    self?.logger.warning("No Hue bridges discovered")
+                    self?.lastError = "No Hue bridges found on the network"
+                    Task {
+                        await self?.stateStream?.reportError(HueError.noBridgeConfigured, severity: .warning, source: "HueClient.discover")
+                    }
+                }
+                
+                continuation.resume(returning: discoveredBridges)
             }
             
             self.browser = browser
@@ -155,23 +208,14 @@ final class HueClient: ObservableObject {
         let url = URL(string: "https://\(ip)/api")!
         let requestBody = CreateApiKeyRequest(devicetype: "Vision-Link-Hue-\(UUID().uuidString.prefix(8))")
         
-        let (data, response) = try await authenticatedRequest(
-            url: url,
-            method: "POST",
-            body: requestBody
-        ) { [weak self] in
-            self?.handleCertificateTrust($0)
-        }
+        let (data, response) = try await authenticatedRequest(url: url, method: "POST", body: requestBody)
         
         guard let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode == 200 else {
             throw HueError.authenticationFailed
         }
         
-        let apiKeyResponse = try JSONDecoder().decode(
-            CreateApiKeyResponse.self,
-            from: data
-        )
+        let apiKeyResponse = try JSONDecoder().decode(CreateApiKeyResponse.self, from: data)
         
         guard let username = apiKeyResponse.success?.username else {
             throw HueError.noUsernameReturned
@@ -195,22 +239,13 @@ final class HueClient: ObservableObject {
         
         let url = URL(string: "https://\(ip):\(port)/api/\(username)/resources")!
         
-        let (data, _) = try await authenticatedRequest(
-            url: url,
-            method: "GET",
-            body: nil
-        ) { [weak self] in
-            self?.handleCertificateTrust($0)
-        }
+        let (data, _) = try await authenticatedRequest(url: url, method: "GET", body: nil as Codable?)
         
         return try JSONDecoder().decode(HueBridgeState.self, from: data)
     }
     
     /// Patch light state via CLIP v2 API.
-    func patchLightState(
-        resourceId: String,
-        state: LightStatePatch
-    ) async throws {
+    func patchLightState(resourceId: String, state: LightStatePatch) async throws {
         guard let username = apiKey else {
             throw HueError.noApiKey
         }
@@ -221,20 +256,11 @@ final class HueClient: ObservableObject {
         
         let url = URL(string: "https://\(ip):\(port)/api/\(username)/resources/\(resourceId)/action")!
         
-        _ = try await authenticatedRequest(
-            url: url,
-            method: "PUT",
-            body: state
-        ) { [weak self] in
-            self?.handleCertificateTrust($0)
-        }
+        _ = try await authenticatedRequest(url: url, method: "PUT", body: state)
     }
     
     /// Recall a scene via CLIP v2 API.
-    func recallScene(
-        groupId: String,
-        sceneId: String
-    ) async throws {
+    func recallScene(groupId: String, sceneId: String) async throws {
         guard let username = apiKey else {
             throw HueError.noApiKey
         }
@@ -247,70 +273,36 @@ final class HueClient: ObservableObject {
         
         let patch = ScenePatch(on: true, scene: sceneId)
         
-        _ = try await authenticatedRequest(
-            url: url,
-            method: "PUT",
-            body: patch
-        ) { [weak self] in
-            self?.handleCertificateTrust($0)
-        }
+        _ = try await authenticatedRequest(url: url, method: "PUT", body: patch)
     }
     
     /// Set brightness for a light group.
-    func setBrightness(
-        groupId: String,
-        brightness: Int,
-        transitionDuration: Int = 4
-    ) async throws {
+    func setBrightness(groupId: String, brightness: Int, transitionDuration: Int = 4) async throws {
         try await patchLightState(
             resourceId: groupId,
-            state: LightStatePatch(
-                on: true,
-                brightness: brightness,
-                transitionDuration: transitionDuration
-            )
+            state: LightStatePatch(on: true, brightness: brightness, transitionDuration: transitionDuration)
         )
     }
     
     /// Set color temperature for a light group.
-    func setColorTemperature(
-        groupId: String,
-        mireds: Int,
-        transitionDuration: Int = 4
-    ) async throws {
+    func setColorTemperature(groupId: String, mireds: Int, transitionDuration: Int = 4) async throws {
         try await patchLightState(
             resourceId: groupId,
-            state: LightStatePatch(
-                on: true,
-                ct: mireds,
-                transitionDuration: transitionDuration
-            )
+            state: LightStatePatch(on: true, ct: mireds, transitionDuration: transitionDuration)
         )
     }
     
     /// Set XY color for a light group.
-    func setColorXY(
-        groupId: String,
-        x: Double,
-        y: Double,
-        transitionDuration: Int = 4
-    ) async throws {
+    func setColorXY(groupId: String, x: Double, y: Double, transitionDuration: Int = 4) async throws {
         try await patchLightState(
             resourceId: groupId,
-            state: LightStatePatch(
-                on: true,
-                xy: (x, y),
-                transitionDuration: transitionDuration
-            )
+            state: LightStatePatch(on: true, xy: (x, y), transitionDuration: transitionDuration)
         )
     }
     
     /// Toggle power state for a light group.
     func togglePower(groupId: String, on: Bool) async throws {
-        try await patchLightState(
-            resourceId: groupId,
-            state: LightStatePatch(on: on)
-        )
+        try await patchLightState(resourceId: groupId, state: LightStatePatch(on: on))
     }
     
     // MARK: - SSE Event Stream
@@ -334,9 +326,15 @@ final class HueClient: ObservableObject {
         var request = URLRequest(url: url)
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         request.setValue("keep-alive", forHTTPHeaderField: "Connection")
-        request.timeoutInterval = 300 // 5 minute timeout
+        request.timeoutInterval = 300
         
-        let session = URLSession(configuration: .default, delegate: URLSessionDelegate(), delegateQueue: nil)
+        let sessionDelegate = HueSessionDelegate(pinnedHash: pinnedHash) { [weak self] trustedHash in
+            Task { @MainActor [weak self] in
+                await self?.handleTOFUPin(for: trustedHash)
+            }
+        }
+        
+        let session = URLSession(configuration: .default, delegate: sessionDelegate, delegateQueue: nil)
         
         sseTask = session.dataTask(with: request) { [weak self] data, response, error in
             Task { @MainActor [weak self] in
@@ -345,7 +343,7 @@ final class HueClient: ObservableObject {
                 if let error {
                     self.logger.error("SSE stream error: \(error.localizedDescription)")
                     self.lastError = "Stream error: \(error.localizedDescription)"
-                    self.stateStream?.reportError(error, severity: .error, source: "HueClient.sse")
+                    await self.stateStream?.reportError(error, severity: .error, source: "HueClient.sse")
                     self.scheduleReconnection()
                     return
                 }
@@ -371,18 +369,15 @@ final class HueClient: ObservableObject {
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             
-            // Empty line signals end of an event
             if trimmed.isEmpty {
                 processSSEEvent()
                 continue
             }
             
-            // Skip event type lines (not used for CLIP v2)
             if trimmed.hasPrefix("event:") {
                 continue
             }
             
-            // Data lines start with "data: "
             if trimmed.hasPrefix("data: ") {
                 let jsonFragment = String(trimmed.dropFirst(6))
                 sseBuffer.append(jsonFragment)
@@ -397,12 +392,10 @@ final class HueClient: ObservableObject {
         let json = sseBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
         sseBuffer = ""
         
-        // Skip heartbeat ping events from Hue bridge
         if json == "ping" || json.isEmpty {
             return
         }
         
-        // Try to parse as a JSON fragment
         do {
             let decoder = JSONDecoder()
             let update = try decoder.decode(ResourceUpdate.self, from: json.data(using: .utf8)!)
@@ -411,7 +404,9 @@ final class HueClient: ObservableObject {
                 logger.debug("Received \(lights.count) light update(s) via SSE")
             }
             
-            stateStream?.applyUpdate(update)
+            Task {
+                await stateStream?.applyUpdate(update)
+            }
             
         } catch {
             logger.warning("Failed to parse SSE event: \(error.localizedDescription)")
@@ -427,10 +422,9 @@ final class HueClient: ObservableObject {
         
         reconnectionTimer?.invalidate()
         reconnectionTimer = Timer.scheduledTimer(withTimeInterval: reconnectDelay, repeats: false) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.logger.info("Attempting SSE reconnection...")
-                self.startEventStream()
+            Task {
+                await self?.logger.info("Attempting SSE reconnection...")
+                Task { await self?.startEventStream() }
             }
         }
         
@@ -465,13 +459,14 @@ final class HueClient: ObservableObject {
         disconnect()
         
         if bridgeIP == nil {
-            // Try auto-discovery first
             let bridges = await discoverBridges()
             if let first = bridges.first {
                 await connect(to: first)
             } else {
                 lastError = "No bridge found for reconnection"
-                stateStream?.reportError(HueError.noBridgeConfigured, severity: .error, source: "HueClient.reconnect")
+                Task {
+                    await stateStream?.reportError(HueError.noBridgeConfigured, severity: .error, source: "HueClient.reconnect")
+                }
                 return
             }
         }
@@ -486,55 +481,36 @@ final class HueClient: ObservableObject {
         config.tlsMinimumProtocolVersion = .tls12
         config.tlsMaximumProtocolVersion = .tls13
         
-        // Disable standard certificate validation (we use pinning)
-        let delegate = HueURLSessionDelegate(expectedHash: expectedPublicKeyHash)
-        
-        urlSession = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
-    }
-    
-    // MARK: - Certificate Pinning
-    
-    private func handleCertificateTrust(_ challenge: URLAuthenticationChallenge) {
-        guard let serverTrust = challenge.protectionSpace.serverTrust,
-              let expectedHash = expectedPublicKeyHash else {
-            // No pinning configured - accept system trust chain
-            challenge.proceed(for: challenge)
-            return
+        // Load pinned hash from Keychain for TOFU
+        if let ip = bridgeIP, let key = KeychainKeys.key(for: ip),
+           let hash = try? loadCertPin(from: key) {
+            pinnedHash = hash
         }
         
-        let secTrust = serverTrust.secTrust
-        var error: CFError?
-        
-        if SecTrustEvaluateWithError(secTrust, &error) {
-            // Validate against pinned hash
-            if let publicKey = SecTrustCopyPublicKey(secTrust),
-               let publicKeyData =SecKeyCopyExternalRepresentation(publicKey, nil) as Data?,
-               let hash = publicKeyHash(publicKeyData) {
-                
-                if hash == expectedHash {
-                    challenge.proceed(for: challenge)
-                    logger.info("Certificate pinning verified")
-                } else {
-                    challenge.cancelAuthenticationChallenge(challenge)
-                    logger.error("Certificate pinning failed - hash mismatch")
-                    lastError = "Bridge certificate pinning failed"
-                    stateStream?.reportError(HueError.certificatePinningFailed, severity: .critical, source: "HueClient.pinning")
-                }
-            } else {
-                challenge.cancelAuthenticationChallenge(challenge)
-                lastError = "Could not extract public key from certificate"
-                stateStream?.reportError(HueError.certificatePinningFailed, severity: .critical, source: "HueClient.pinning")
+        let sessionDelegate = HueSessionDelegate(pinnedHash: pinnedHash) { [weak self] trustedHash in
+            Task { @MainActor [weak self] in
+                await self?.handleTOFUPin(for: trustedHash)
             }
-        } else {
-            challenge.cancelAuthenticationChallenge(challenge)
-            lastError = "Server trust evaluation failed: \(error?.localizedDescription ?? "unknown")"
-            stateStream?.reportError(NSError(domain: "HueClient", code: -1, userInfo: [NSLocalizedDescriptionKey: error?.localizedDescription ?? "unknown"]), severity: .critical, source: "HueClient.pinning")
         }
+        
+        urlSession = URLSession(configuration: config, delegate: sessionDelegate, delegateQueue: nil)
     }
     
-    private func publicKeyHash(_ publicKeyData: Data) -> Data? {
-        let hash = publicKeyData.sha256()
-        return hash
+    // MARK: - Trust-On-First-Use Certificate Pinning
+    
+    /// Handle TOFU pinning: cache the trusted certificate hash on first successful handshake.
+    private func handleTOFUPin(for trustedHash: Data) async {
+        guard let ip = bridgeIP, !isPinned else { return }
+        
+        let keychainKey = KeychainKeys.key(for: ip)
+        
+        do {
+            try saveCertPin(to: keychainKey, hash: trustedHash)
+            pinnedHash = trustedHash
+            logger.info("Certificate pinned via TOFU for bridge at \(ip)")
+        } catch {
+            logger.error("Failed to save certificate pin to Keychain: \(error.localizedDescription)")
+        }
     }
     
     // MARK: - Authenticated Request Helper
@@ -542,8 +518,7 @@ final class HueClient: ObservableObject {
     private func authenticatedRequest<T: Codable>(
         url: URL,
         method: String,
-        body: Codable?,
-        certificateHandler: ((URLAuthenticationChallenge) -> Void)? = nil
+        body: T?
     ) async throws -> (data: Data, response: URLResponse) {
         
         var request = URLRequest(url: url)
@@ -557,53 +532,39 @@ final class HueClient: ObservableObject {
         
         let session = urlSession ?? URLSession.shared
         
-        return try await withCheckedThrowingContinuation { continuation in
-            let task = session.dataTask(with: request) { data, response, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-                
-                guard let data, let httpResponse = response as? HTTPURLResponse else {
-                    continuation.resume(throwing: HueError.invalidResponse)
-                    return
-                }
-                
-                guard (200...299).contains(httpResponse.statusCode) else {
-                    let errorMsg = String(data: data, encoding: .utf8) ?? "Unknown error (\(httpResponse.statusCode))"
-                    continuation.resume(throwing: HueError.apiError(statusCode: httpResponse.statusCode, message: errorMsg))
-                    return
-                }
-                
-                continuation.resume(returning: (data, response))
-            }
-            task.resume()
+        let (data, response) = try await session.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw HueError.invalidResponse
         }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let errorMsg = String(data: data, encoding: .utf8) ?? "Unknown error (\(httpResponse.statusCode))"
+            throw HueError.apiError(statusCode: httpResponse.statusCode, message: errorMsg)
+        }
+        
+        return (data, response)
     }
 }
 
-/// Bridge information discovered via mDNS.
-struct BridgeInfo: Identifiable, Sendable {
-    let id = UUID()
-    let name: String
-    let ip: String
-    let port: Int
-}
+// MARK: - Session Delegate
 
-/// Custom URLSession delegate for mTLS certificate pinning.
-final class HueURLSessionDelegate: NSObject, URLSessionDelegate {
+/// Unified URLSession delegate handling certificate pinning and TOFU.
+final class HueSessionDelegate: NSObject, Sendable, URLSessionDelegate {
     
-    private let expectedHash: Data?
+    let pinnedHash: Data?
+    let tofuCallback: (Data) async -> Void
     
-    init(expectedHash: Data?) {
-        self.expectedHash = expectedHash
+    init(pinnedHash: Data?, tofuCallback: @escaping (Data) async -> Void) {
+        self.pinnedHash = pinnedHash
+        self.tofuCallback = tofuCallback
         super.init()
     }
     
     func urlSession(
         _ session: URLSession,
         didReceive challenge: URLAuthenticationChallenge,
-        completionHandler: @escaping (URLSession.AuthChallengeDisposition, SecCertificate?) -> Void
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, SecCredential?) -> Void
     ) {
         guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
               let serverTrust = challenge.protectionSpace.serverTrust else {
@@ -611,33 +572,47 @@ final class HueURLSessionDelegate: NSObject, URLSessionDelegate {
             return
         }
         
-        // Default: use system trust evaluation
-        if expectedHash == nil {
-            completionHandler(.performDefaultHandling, nil)
-            return
-        }
-        
-        // Certificate pinning mode
         let secTrust = serverTrust.secTrust
         var error: CFError?
         
-        if SecTrustEvaluateWithError(secTrust, &error) {
-            if let publicKey = SecTrustCopyPublicKey(secTrust),
-               let publicKeyData = SecKeyCopyExternalRepresentation(publicKey, nil) as Data?,
-               let hash = publicKeyData.sha256() {
-                
-                if hash == expectedHash {
-                    completionHandler(.useCredential, nil)
-                } else {
-                    completionHandler(.cancelAuthenticationChallenge, nil)
-                }
+        guard SecTrustEvaluateWithError(secTrust, &error) else {
+            completionHandler(.cancelAuthenticationChallenge, nil)
+            return
+        }
+        
+        guard let publicKey = SecTrustCopyPublicKey(secTrust),
+              let publicKeyData = SecKeyCopyExternalRepresentation(publicKey, nil) as Data? else {
+            completionHandler(.cancelAuthenticationChallenge, nil)
+            return
+        }
+        
+        let hash = publicKeyData.sha256()
+        
+        if let pinnedHash {
+            // Enforcement mode: compare against stored hash
+            if hash == pinnedHash {
+                completionHandler(.useCredential, nil)
             } else {
                 completionHandler(.cancelAuthenticationChallenge, nil)
             }
         } else {
-            completionHandler(.cancelAuthenticationChallenge, nil)
+            // TOFU mode: trust on first use, cache the hash
+            Task {
+                await tofuCallback(hash)
+                completionHandler(.useCredential, nil)
+            }
         }
     }
+}
+
+// MARK: - Bridge Info
+
+/// Bridge information discovered via mDNS.
+struct BridgeInfo: Identifiable, Sendable {
+    let id = UUID()
+    let name: String
+    let ip: String
+    let port: Int
 }
 
 // MARK: - Data SHA-256 Extension

@@ -5,7 +5,6 @@ import os
 
 /// Manages the AR session lifecycle and bridges ARKit frames to
 /// the RealityKit scene and DetectionEngine.
-@MainActor
 final class ARSessionManager: ObservableObject {
     
     @Published var isSessionActive: Bool = false
@@ -13,6 +12,7 @@ final class ARSessionManager: ObservableObject {
     @Published var frameTimestamp: TimeInterval = 0
     @Published var trackingState: ARTrackingState = .notAvailable
     @Published var worldMapAvailable: Bool = false
+    @Published var trackedFixtures: [TrackedFixture] = []
     
     private let logger = Logger(
         subsystem: "com.tomwolfe.visionlinkhue",
@@ -26,8 +26,7 @@ final class ARSessionManager: ObservableObject {
     
     private var arView: ARView?
     private var anchorEntity: AnchorEntity.World?
-    private var detectedFixtures: [UUID: AnchoredFixture] = [:]
-    private var hudEntities: [UUID: ModelEntity] = [:]
+    private var fixtureEntities: [UUID: ModelEntity] = [:]
     
     private var lastInferenceTime: TimeInterval = 0
     private let inferenceInterval: TimeInterval = 0.5
@@ -35,9 +34,11 @@ final class ARSessionManager: ObservableObject {
     /// Root anchor for all AR content.
     var rootAnchor: AnchorEntity.World? { anchorEntity }
     
-    /// Currently detected and anchored fixtures.
-    var anchoredFixtures: [AnchoredFixture] {
-        Array(detectedFixtures.values)
+    /// Currently tracked fixtures.
+    var anchoredFixtures: [TrackedFixture] {
+        Array(fixtureEntities.values.compactMap { entity in
+            trackedFixtures.first { $0.hudEntityID == entity.id }
+        })
     }
     
     init(
@@ -58,6 +59,9 @@ final class ARSessionManager: ObservableObject {
     func configureAndStart(in arView: ARView) async {
         self.arView = arView
         
+        // Update spatial projector with the active session
+        await spatialProjector.configure(with: arView.session)
+        
         let configuration = ARWorldTrackingConfiguration()
         
         // Enable world reconstruction for mesh-based raycasting
@@ -68,13 +72,8 @@ final class ARSessionManager: ObservableObject {
         
         // Enable light estimation for ambient lighting awareness
         configuration.lightEstimation = .automatic
-        
-        // Enable face tracking is not needed - we're doing object detection
         configuration.isLightEstimationEnabled = true
         configuration.isWorldSensingEnabled = true
-        
-        // Request increased memory for on-device ML
-        // (com.apple.developer.kernel.increased-memory-limit in entitlements)
         
         do {
             try await arView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
@@ -92,6 +91,7 @@ final class ARSessionManager: ObservableObject {
             logger.info("AR session started with world reconstruction")
         } catch {
             logger.error("Failed to start AR session: \(error.localizedDescription)")
+            await stateStream.reportError(error, severity: .critical, source: "ARSessionManager.configure")
         }
     }
     
@@ -145,7 +145,7 @@ final class ARSessionManager: ObservableObject {
                 await processDetection(detection, in: frame)
             }
             
-            anchorCount = detectedFixtures.count
+            anchorCount = trackedFixtures.count
         } catch {
             logger.warning("Frame processing failed: \(error.localizedDescription)")
         }
@@ -160,9 +160,7 @@ final class ARSessionManager: ObservableObject {
         guard let anchor = anchorEntity else { return }
         
         // Check if we already have this detection
-        if let existing = detectedFixtures[detection.id] {
-            // Update existing fixture position
-            await updateFixturePosition(existing, in: frame)
+        if trackedFixtures.first(where: { $0.id == detection.id }) != nil {
             return
         }
         
@@ -178,29 +176,27 @@ final class ARSessionManager: ObservableObject {
             return
         }
         
-        // Store the anchored fixture
-        detectedFixtures[detection.id] = fixture
+        // Store the tracked fixture
+        let trackedFixture = TrackedFixture(
+            id: fixture.id,
+            detection: fixture.detection,
+            position: fixture.position,
+            orientation: fixture.orientation,
+            distanceMeters: fixture.distanceMeters
+        )
+        
+        trackedFixtures.append(trackedFixture)
         
         logger.info(
-            "Anchored \(fixture.type.displayName) at \(String(format: "%.2f", fixture.distanceMeters))m " +
-            "(confidence: \(String(format: "%.2f", fixture.confidence)))"
+            "Tracked \(trackedFixture.type.displayName) at \(String(format: "%.2f", trackedFixture.distanceMeters))m " +
+            "(confidence: \(String(format: "%.2f", trackedFixture.confidence)))"
         )
-    }
-    
-    private func updateFixturePosition(
-        _ fixture: AnchoredFixture,
-        in frame: ARFrame
-    ) async {
-        // Only re-project if the fixture has been idle for a while
-        // (to avoid jitter from continuous re-projection)
-        // For now, skip updates after initial placement
-        _ = frame
     }
     
     // MARK: - Fixture Management
     
     /// Create a HUD entity for a fixture in the RealityKit scene.
-    func createHUD(for fixture: AnchoredFixture, in scene: RealityKit.Scene) async {
+    func createHUD(for fixture: TrackedFixture, in scene: RealityKit.Scene) async {
         guard let anchor = anchorEntity else { return }
         
         // Create the model entity
@@ -218,32 +214,35 @@ final class ARSessionManager: ObservableObject {
         // Add to scene
         anchor.addChild(entity)
         
-        // Store entity reference
-        hudEntities[fixture.id] = entity
-        detectedFixtures[fixture.id]?.hudEntityID = entity.id
+        // Update tracked fixture with entity ID
+        if let idx = trackedFixtures.firstIndex(where: { $0.id == fixture.id }) {
+            var updated = trackedFixtures[idx]
+            updated.hudEntityID = entity.id
+            trackedFixtures[idx] = updated
+        }
+        
+        fixtureEntities[fixture.id] = entity
         
         logger.debug("Created HUD entity for fixture \(fixture.id)")
     }
     
     /// Remove a fixture and its HUD from the scene.
     func removeFixture(_ fixtureId: UUID) {
-        detectedFixtures.removeValue(forKey: fixtureId)
-        hudEntities.removeValue(forKey: fixtureId)
-        anchorCount = detectedFixtures.count
+        trackedFixtures.removeAll { $0.id == fixtureId }
+        fixtureEntities.removeValue(forKey: fixtureId)
+        anchorCount = trackedFixtures.count
         logger.debug("Removed fixture \(fixtureId)")
     }
     
     /// Clear all fixtures from the scene.
     func clearAllFixtures() {
-        detectedFixtures.removeAll()
-        hudEntities.removeAll()
+        trackedFixtures.removeAll()
+        fixtureEntities.removeAll()
         anchorCount = 0
     }
     
     /// Get the Hue light group ID that corresponds to a fixture.
-    func resolveHueGroup(for fixture: AnchoredFixture) -> String? {
-        // Match fixture position to nearest light group
-        // This is a heuristic - in production, user would manually associate
+    func resolveHueGroup(for fixture: TrackedFixture) -> String? {
         guard let groupId = stateStream.selectedGroupId else { return nil }
         return groupId
     }
