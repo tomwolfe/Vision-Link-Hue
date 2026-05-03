@@ -11,7 +11,7 @@ struct ScoringRule: Sendable {
     let type: FixtureType
     
     /// Aspect ratio range that triggers this rule. `nil` matches any aspect ratio.
-    let aspectRange: ClosedRange<Float>?
+    let aspectRange: ClosedRange<Double>?
     
     /// Normalized Y position range (0=top, 1=bottom) that triggers this rule.
     /// `nil` matches any vertical position.
@@ -50,8 +50,8 @@ struct ScoringConfig {
         static let largeThreshold: Double = 0.15
         static let mediumThreshold: Double = 0.05
         static let largeAreaRange: ClosedRange<Double> = 0.15...Double.infinity
-        static let mediumAreaRange: ClosedRange<Double> = 0.05..<0.15
-        static let smallAreaRange: ClosedRange<Double> = 0.0..<0.05
+        static let mediumAreaRange: ClosedRange<Double> = 0.05...0.1499
+        static let smallAreaRange: ClosedRange<Double> = 0.0...0.0499
     }
     
     // MARK: - Specificity Tiebreaker
@@ -187,15 +187,7 @@ struct FixtureHeuristicClassifier {
     /// - Returns: The loaded rules array.
     /// - Throws: `ClassificationConfigError` if the config is invalid or cannot be loaded.
     mutating func loadRules(from url: URL) throws {
-        let data: Data
-        
-        #if canImport(UniformTypeIdentifiers)
-        // Use Resource trait (Swift 6.2+) for bundled resource loading
-        data = try Self.loadResource(from: url)
-        #else
-        // Fallback for older toolchains
-        data = try Data(contentsOf: url)
-        #endif
+        let data = try Data(contentsOf: url)
         
         let decoder = JSONDecoder()
         
@@ -238,17 +230,6 @@ struct FixtureHeuristicClassifier {
         }
         
         self.rules = loadedRules
-    }
-    
-    /// Load a bundled resource using Swift 6.2 Resource trait.
-    /// Falls back to URL-based loading for compatibility.
-    private static func loadResource(from url: URL) throws -> Data {
-        #if canImport(UniformTypeIdentifiers)
-        if let resource = try? Resource(url: url) {
-            return try resource.loadData()
-        }
-        #endif
-        return try Data(contentsOf: url)
     }
     
     /// Reset to the bundled default classification rules.

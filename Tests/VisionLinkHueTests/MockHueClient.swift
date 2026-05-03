@@ -130,6 +130,10 @@ final class MockHueClient: HueClientProtocol {
         )
     }
     
+    var isCalibrated: Bool {
+        return false
+    }
+    
     var isSpatialAwareSupported: Bool {
         return true
     }

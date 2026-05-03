@@ -2,7 +2,6 @@ import Foundation
 import AVFoundation
 import Vision
 import os
-import UIKit
 
 /// Engine that performs on-device lighting fixture detection using
 /// the Vision framework for bounding box detection and heuristic
@@ -104,7 +103,7 @@ final class DetectionEngine {
         if useLowPower != isLowPowerMode {
             isLowPowerMode = useLowPower
             if useLowPower {
-                logger.info("Low-power detection mode enabled (thermal state: \(thermalState))")
+                logger.info("Low-power detection mode enabled (thermal state: \(self.thermalState))")
             }
         }
         
@@ -133,13 +132,11 @@ final class DetectionEngine {
         
         let request = VNDetectRectanglesRequest()
         request.minimumConfidence = 0.2
-        request.maximumOutputCount = lowPower ? 10 : 20
-        request.quadTolerance = lowPower ? 0.15 : 0.1
         
         return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<[FixtureDetection], Error>) in
             // In low-power mode, use .utility QoS to reduce CPU/GPU load
             // and prevent thermal throttling that forces LiDAR shut-off
-            let qos: DispatchQoS = lowPower ? .utility : .userInitiated
+            let qos: DispatchQoS.QoSClass = lowPower ? .utility : .userInitiated
             
             DispatchQueue.global(qos: qos).async {
                 do {
@@ -240,7 +237,7 @@ final class DetectionEngine {
     private func updateThermalState() {
         let systemThermalState = ProcessInfo.processInfo.thermalState
         switch systemThermalState {
-        case .good:
+        case .normal:
             self.thermalState = .nominal
         case .fair:
             self.thermalState = .fair
@@ -258,7 +255,7 @@ final class DetectionEngine {
     /// LiDAR/Depth sensor shutdown during thermal throttling.
     private func startThermalMonitoring() {
         thermalMonitoringTask = Task {
-            for await notification in NotificationCenter.default.notifications(named: ProcessInfo.didChangeThermalStateNotification) {
+            for await notification in NotificationCenter.default.notifications(named: ProcessInfo.thermalStateDidChangeNotification) {
                 guard let _ = notification.object as? ProcessInfo else { continue }
                 await MainActor.run {
                     let previousState = self.thermalState

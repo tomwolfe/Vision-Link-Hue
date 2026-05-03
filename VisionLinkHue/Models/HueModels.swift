@@ -1,9 +1,10 @@
 import Foundation
+import simd
 
 // MARK: - CLIP v2 Resource Models
 
 /// A single Hue light resource.
-struct HueLightResource: Codable, Sendable {
+struct HueLightResource: Codable, Sendable, Identifiable {
     let id: String
     let type: String
     let metadata: Metadata
@@ -15,7 +16,7 @@ struct HueLightResource: Codable, Sendable {
         var name: String?
         private var archetype: String?
         var archetypeValue: Archetype {
-            Archetype(rawValue: archetype ?? "")
+            Archetype(rawValue: archetype ?? "unknown") ?? .unknown
         }
         var manufacturerCode: String?
         var firmwareVersion: String?
@@ -41,7 +42,7 @@ struct HueLightResource: Codable, Sendable {
             case ambiance = "ambiance"
             case candle = "candle"
             case nightlight = "nightlight"
-            case unknownCase = "unknown"
+            case generic = "generic"
         }
     }
     
@@ -70,7 +71,7 @@ struct HueLightResource: Codable, Sendable {
         var saturationValue: Int? { saturation }
     }
     
-    struct Product: Codable, Sendable {
+    struct ProductInfo: Codable, Sendable {
         var name: String?
         var manufacturerName: String?
         var modelID: String?
@@ -87,7 +88,7 @@ struct HueLightResource: Codable, Sendable {
 }
 
 /// A Hue scene resource.
-struct HueSceneResource: Codable, Sendable {
+struct HueSceneResource: Codable, Sendable, Identifiable, Equatable {
     let id: String
     let type: String
     let metadata: Metadata
@@ -129,10 +130,17 @@ struct ResourceUpdate: Codable, Sendable {
     let lights: [HueLightResource]?
     let scenes: [HueSceneResource]?
     let groups: [BridgeGroup]?
+    let spatial_awareness: SpatialAwareInfo?
+}
+
+/// Spatial awareness info from the bridge.
+struct SpatialAwareInfo: Codable, Sendable {
+    let firmware_version: String?
+    let fixtures: [SpatialAwareUpdate.SpatialAwareResource]?
 }
 
 /// A Hue group (room, area, or light list).
-struct BridgeGroup: Codable, Sendable {
+struct BridgeGroup: Codable, Sendable, Identifiable {
     let id: String
     let type: String
     let state: GroupState

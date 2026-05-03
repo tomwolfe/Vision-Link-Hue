@@ -1,4 +1,5 @@
 import Foundation
+import simd
 
 // MARK: - Error Severity Levels
 
@@ -94,13 +95,13 @@ actor AppNotificationSystem {
         // Skip if we already have this exact error from the same source
         // within the cooldown period
         if let lastTime = lastNotificationTimeBySource[source],
-           Date().timeIntervalSince(lastTime) < SourceCooldownInterval {
+           Date().timeIntervalSince(lastTime) < AppNotificationSystem.cooldownInterval {
             return
         }
         
         // Skip if we're at the maximum notification limit and this is
         // not a critical error
-        if activeNotifications.count >= maxActiveNotifications,
+        if activeNotifications.count >= AppNotificationSystem.maxNotifications,
            severity != .critical {
             return
         }
@@ -143,12 +144,12 @@ actor AppNotificationSystem {
 
 extension AppNotificationSystem {
     /// Convenience alias for the cooldown interval constant.
-    private static var SourceCooldownInterval: TimeInterval {
+    private static var cooldownInterval: TimeInterval {
         Self.sourceCooldownInterval
     }
     
     /// Convenience alias for the max notifications constant.
-    private static var maxActiveNotifications: Int {
+    private static var maxNotifications: Int {
         Self.maxActiveNotifications
     }
 }
@@ -186,14 +187,15 @@ final class HueStateStream {
     
     private let persistence: FixturePersistence
     
-    init(persistence: FixturePersistence = .shared) {
+    init(persistence: FixturePersistence) {
         self.persistence = persistence
-        notificationSystem.onNotification = { [weak self] notifications in
-            // Update the UI-visible error list on the caller's context
-            // The actor guarantees thread-safe access to activeErrors
+        loadPersistedState()
+    }
+    
+    func configure() {
+        onNotification = { [weak self] notifications in
             self?.activeErrors = notifications
         }
-        loadPersistedState()
     }
     
     func setIsConnected(_ connected: Bool) {
@@ -220,16 +222,19 @@ final class HueStateStream {
     
     /// Merge incoming identifiable resources into the existing collection,
     /// replacing entries with matching IDs and appending new ones.
-    private func merge<T: Identifiable & Equatable>(existing: [T], incoming: [T]) -> [T]
+    private func merge<T: Identifiable>(existing: [T], incoming: [T]) -> [T]
     where T.ID == String {
         var result = existing
-        for item in incoming {
-            if let idx = result.firstIndex(where: { $0.id == item.id }) {
-                result[idx] = item
+        let incomingById = Dictionary(grouping: incoming) { $0.id }
+        
+        for (id, newItems) in incomingById {
+            if let idx = result.firstIndex(where: { $0.id == id }) {
+                result[idx] = newItems.last!
             } else {
-                result.append(item)
+                result.append(newItems.last!)
             }
         }
+        
         return result
     }
     

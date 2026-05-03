@@ -56,14 +56,14 @@ struct HUDOverlay: View {
                     ScenePickerView(
                         scenes: stateStream.scenes,
                         groupId: stateStream.selectedGroupId ?? "",
-                        hueClient: hueClient
+                        hueClient: hueClient,
+                        stateStream: stateStream
                     )
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
             .background(.ultraThinMaterial, in: Rectangle())
-            .glassEffect(.liquid, alignment: .center)
             
             Spacer()
             
@@ -84,7 +84,7 @@ struct HUDOverlay: View {
                         .foregroundStyle(.secondary)
                 }
                 .padding()
-                .glassEffect(.liquid, alignment: .center)
+                .background(.ultraThinMaterial, in: Rectangle())
                 .padding(.bottom, 32)
             } else {
                 // Detection instructions
@@ -116,7 +116,6 @@ struct HUDOverlay: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 .background(.ultraThinMaterial, in: Rectangle())
-                .glassEffect(.liquid, alignment: .center)
                 .padding(.bottom, 32)
             }
         }

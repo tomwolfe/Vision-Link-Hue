@@ -9,7 +9,7 @@ enum SpatialMath {
     /// Convert normalized [0,1] coordinates to a camera-space ray using intrinsics.
     static func cameraRay(
         normalized: SIMD2<Float>,
-        intrinsics: cameraIntrinsics,
+        intrinsics: ARCamera.Intrinsics,
         cameraTransform: simd_float4x4,
         imageSize: CGSize
     ) -> (origin: SIMD3<Float>, direction: SIMD3<Float>)? {
@@ -38,7 +38,7 @@ enum SpatialMath {
     /// Unproject a normalized 2D point into a camera-space direction vector.
     static func unprojectDirection(
         normalized: SIMD2<Float>,
-        intrinsics: cameraIntrinsics?,
+        intrinsics: ARCamera.Intrinsics?,
         cameraTransform: simd_float4x4
     ) -> SIMD3<Float>? {
         guard let intrinsics else {
@@ -65,7 +65,7 @@ enum SpatialMath {
         pixelX: Int,
         pixelY: Int,
         depthMeters: Float,
-        intrinsics: cameraIntrinsics,
+        intrinsics: ARCamera.Intrinsics,
         cameraTransform: simd_float4x4,
         imageWidth: Int,
         imageHeight: Int
@@ -157,20 +157,14 @@ enum SpatialMath {
     /// Extract the 3x3 rotation matrix from a 4x4 transform.
     /// Uses native simd_float4x4 accessors available since iOS 19/26.
     static func rotationMatrix(from transform: simd_float4x4) -> simd_float3x3 {
-        // iOS 19+ provides native quaternion accessor; extract rotation
-        // matrix from the upper 3x3 submatrix directly
         simd_float3x3(
-            transform.columns.0.xyz,
-            transform.columns.1.xyz,
-            transform.columns.2.xyz
+            SIMD3<Float>(transform.columns.0.x, transform.columns.0.y, transform.columns.0.z),
+            SIMD3<Float>(transform.columns.1.x, transform.columns.1.y, transform.columns.1.z),
+            SIMD3<Float>(transform.columns.2.x, transform.columns.2.y, transform.columns.2.z)
         )
     }
     
-    /// Extract the translation vector from a 4x4 transform.
-    /// Uses native simd_float4x4.position accessor available since iOS 19/26.
     static func translation(from transform: simd_float4x4) -> SIMD3<Float> {
-        // iOS 19+ provides native .position accessor on simd_float4x4
-        // Fall back to column extraction for compatibility
-        transform.columns.3.xyz
+        SIMD3<Float>(transform.columns.3.x, transform.columns.3.y, transform.columns.3.z)
     }
 }

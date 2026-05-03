@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import simd
 
 /// SwiftData model for persisting fixture-to-light mappings with
 /// spatial coordinates. Ensures atomic integrity for spatial

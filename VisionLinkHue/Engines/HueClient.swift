@@ -1,6 +1,7 @@
 import Foundation
 import Network
 import os
+import simd
 
 /// Network client that manages all communication with the Philips Hue Bridge
 /// using CLIP v2 API, mDNS discovery, mTLS with Trust-On-First-Use certificate
@@ -35,29 +36,9 @@ final class HueClient: ObservableObject, HueClientProtocol {
     /// Network connection for REST API calls.
     private var urlSession: URLSession?
     
-    /// SSE connection task (holds the parsing task for cancellation).
-    private var sseTask: Task<Void, Never>?
-    
-    /// SSE reconnection timer.
-    private var reconnectionTimer: Timer?
-    
-    /// Accumulates data lines for multi-line SSE events.
-    private var sseDataBuffer = ""
-    
-    /// SSE reconnection state machine.
-    private var sseReconnectionState: SSEReconnectionState = .idle
-    
-    /// SSE reconnect delay (managed by state machine).
-    private var reconnectDelay: TimeInterval = 1.0
-    
-    /// Maximum reconnect delay.
-    private let maxReconnectDelay: TimeInterval = 30.0
-    
-    /// Minimum reconnect delay.
-    private let minReconnectDelay: TimeInterval = 1.0
-    
-    /// Maximum consecutive parse failures before entering degraded mode.
-    private let maxParseFailures = 10
+    /// Dedicated actor for SSE event stream management.
+    /// Isolates high-frequency network events from the MainActor.
+    private let eventStream = HueEventStreamActor()
     
     /// Bridge discovery browser.
     private var browser: NWBrowser?
@@ -67,12 +48,12 @@ final class HueClient: ObservableObject, HueClientProtocol {
     
     // MARK: - Spatial Calibration
     
-    /// Calibration points for 3-point affine transformation between ARKit and Bridge space.
-    /// Each point contains an ARKit coordinate and its corresponding Bridge Room Space coordinate.
-    private var calibrationPoints: [(arKit: SIMD3<Float>, bridge: SIMD3<Float>)] = []
+    /// Dedicated engine for computing ARKit-to-Bridge coordinate transformations
+    /// using the Kabsch algorithm with SVD for numerical stability.
+    private let calibrationEngine = SpatialCalibrationEngine()
     
-    /// Whether a valid 3-point calibration has been established.
-    var isCalibrated: Bool { calibrationPoints.count >= 3 }
+    /// Whether a valid 3+ point calibration has been established.
+    var isCalibrated: Bool { calibrationEngine.isCalibrated }
     
     // MARK: - Initialization
     
@@ -82,15 +63,13 @@ final class HueClient: ObservableObject, HueClientProtocol {
     }
     
     deinit {
-        disconnect()
         browser?.cancel()
     }
     
     // MARK: - Bridge Discovery
     
     /// Discover Hue bridges on the local network using mDNS.
-    /// Uses an `AsyncStream` to collect browse results over a 3-second
-    /// window, then returns the aggregated list.
+    /// Uses a synchronous browser with a 3-second timeout.
     func discoverBridges() async -> [BridgeInfo] {
         let params = NWParameters.tcp
         params.includePeerToPeer = true
@@ -101,9 +80,8 @@ final class HueClient: ObservableObject, HueClientProtocol {
         )
         
         var discoveredBridges: [BridgeInfo] = []
-        var discoveryTask: Task<Void, Never>?
+        let semaphore = DispatchSemaphore(value: 0)
         
-        // Observe browser state; cancel the collection task on failure/cancel.
         browser.stateUpdateHandler = { [weak self] newState in
             switch newState {
             case .ready:
@@ -111,24 +89,28 @@ final class HueClient: ObservableObject, HueClientProtocol {
             case .failed(let error):
                 self?.logger.error("mDNS browser failed: \(error.localizedDescription)")
                 self?.lastError = "Discovery failed: \(error.localizedDescription)"
-                Task {
-                    await self?.stateStream?.reportError(error, severity: .warning, source: "HueClient.discover")
-                }
-                discoveryTask?.cancel()
             case .cancelled:
                 self?.logger.info("mDNS browser cancelled")
-                discoveryTask?.cancel()
             default:
                 break
             }
         }
         
-        // Collect results as they arrive.
-        browser.browseResultsHandler = { [weak self] results, changes in
-            guard changes == .add else { return }
-            
+        // Use the results property to get discovered services
+        browser.start(queue: .main)
+        
+        // Wait for discovery to complete
+        DispatchQueue.global().asyncAfter(deadline: .now() + 3) {
+            browser.cancel()
+            semaphore.signal()
+        }
+        
+        semaphore.wait()
+        
+        // Collect results from the browser
+        if let results = browser.results as? [NWBrowser.Result] {
             for result in results {
-                guard case .service(let service) = result.endpoint else { return }
+                guard case .service(let service) = result.endpoint else { continue }
                 
                 let name = service.name
                 let port = UInt(service.port)
@@ -137,37 +119,13 @@ final class HueClient: ObservableObject, HueClientProtocol {
                     let ip = interface.ipv4Address ?? interface.ipv6Address
                     if let ip {
                         let bridge = BridgeInfo(name: name, ip: ip.description, port: Int(port))
-                        // Avoid duplicates by IP.
-                        guard !discoveredBridges.contains(where: { $0.ip == bridge.ip }) else { return }
+                        guard !discoveredBridges.contains(where: { $0.ip == bridge.ip }) else { continue }
                         discoveredBridges.append(bridge)
                         self?.logger.info("Found Hue bridge: \(name) at \(ip.description):\(port)")
                     }
                 }
             }
-            
-            if discoveredBridges.isEmpty {
-                self?.logger.warning("No Hue bridges discovered")
-                self?.lastError = "No Hue bridges found on the network"
-                Task {
-                    await self?.stateStream?.reportError(HueError.noBridgeConfigured, severity: .warning, source: "HueClient.discover")
-                }
-            }
         }
-        
-        self.browser = browser
-        browser.start(queue: .main)
-        
-        // Collect results for 3 seconds, then stop.
-        discoveryTask = Task {
-            try? await Task.sleep(for: .seconds(3))
-        }
-        
-        // Wait for the collection window to elapse.
-        if let discoveryTask {
-            try? await discoveryTask.value
-        }
-        
-        browser.cancel()
         
         if discoveredBridges.isEmpty {
             await stateStream?.reportError(HueError.noBridgeConfigured, severity: .warning, source: "HueClient.discover")
@@ -213,13 +171,13 @@ final class HueClient: ObservableObject, HueClientProtocol {
             throw HueError.noApiKey
         }
         
-        guard let ip = bridgeIP, let port = bridgePort else {
+        guard let ip = bridgeIP else {
             throw HueError.noBridgeConfigured
         }
         
-        let url = URL(string: "https://\(ip):\(port)/api/\(username)/resources")!
+        let url = URL(string: "https://\(ip):\(bridgePort)/api/\(username)/resources")!
         
-        let (data, _) = try await authenticatedRequest(url: url, method: "GET", body: nil as Codable?)
+        let (data, _) = try await authenticatedRequest(url: url, method: "GET", body: nil as HueBridgeState?)
         
         return try JSONDecoder().decode(HueBridgeState.self, from: data)
     }
@@ -230,11 +188,11 @@ final class HueClient: ObservableObject, HueClientProtocol {
             throw HueError.noApiKey
         }
         
-        guard let ip = bridgeIP, let port = bridgePort else {
+        guard let ip = bridgeIP else {
             throw HueError.noBridgeConfigured
         }
         
-        let url = URL(string: "https://\(ip):\(port)/api/\(username)/resources/\(resourceId)/action")!
+        let url = URL(string: "https://\(ip):\(bridgePort)/api/\(username)/resources/\(resourceId)/action")!
         
         _ = try await authenticatedRequest(url: url, method: "PUT", body: state)
     }
@@ -245,11 +203,11 @@ final class HueClient: ObservableObject, HueClientProtocol {
             throw HueError.noApiKey
         }
         
-        guard let ip = bridgeIP, let port = bridgePort else {
+        guard let ip = bridgeIP else {
             throw HueError.noBridgeConfigured
         }
         
-        let url = URL(string: "https://\(ip):\(port)/api/\(username)/groups/\(groupId)/action")!
+        let url = URL(string: "https://\(ip):\(bridgePort)/api/\(username)/groups/\(groupId)/action")!
         
         let patch = ScenePatch(on: true, scene: sceneId)
         
@@ -273,9 +231,9 @@ final class HueClient: ObservableObject, HueClientProtocol {
     }
     
     /// Set XY color for a light group.
-    func setColorXY(groupId: String, x: Double, y: Double, transitionDuration: Int = 4) async throws {
+    func setColorXY(resourceId: String, x: Double, y: Double, transitionDuration: Int = 4) async throws {
         try await patchLightState(
-            resourceId: groupId,
+            resourceId: resourceId,
             state: LightStatePatch(on: true, xy: (x, y), transitionDuration: transitionDuration)
         )
     }
@@ -329,7 +287,7 @@ final class HueClient: ObservableObject, HueClientProtocol {
         
         let url = URL(string: "https://\(ip):\(port)/api/\(username)/config")!
         
-        let (data, _) = try await authenticatedRequest(url: url, method: "GET", body: nil as Codable?)
+        let (data, _) = try await authenticatedRequest(url: url, method: "GET", body: nil as HueBridgeState?)
         
         // Decode bridge config to extract firmware version
         // The bridge returns firmware_version as part of the config response
@@ -369,7 +327,7 @@ final class HueClient: ObservableObject, HueClientProtocol {
     }
     
     /// Map ARKit local space coordinates to Bridge Room Space coordinates.
-    /// Uses a 3-point affine transformation when calibrated, falling back
+    /// Uses the Kabsch algorithm when calibrated, falling back
     /// to a single-point origin offset when calibration is unavailable.
     /// The bridge requires room_offset to be calibrated against the room's
     /// primary entrance or a "Bridge Origin" defined in the Hue App.
@@ -380,9 +338,9 @@ final class HueClient: ObservableObject, HueClientProtocol {
     ) -> (position: SpatialAwarePosition.Position3D, roomOffset: SpatialAwarePosition.RoomOffset?) {
         let bridgePosition: SIMD3<Float>
         
-        if calibrationPoints.count >= 3 {
-            // Apply 3-point affine transformation for large-room accuracy
-            bridgePosition = applyCalibration(arKitPosition)
+        if isCalibrated {
+            // Apply Kabsch transformation for large-room accuracy
+            bridgePosition = calibrationEngine.mapToBridgeSpace(arKitPosition)
         } else if let origin = referencePoint {
             // Fallback: single-point origin offset
             bridgePosition = origin + (arKitPosition - origin)
@@ -401,118 +359,21 @@ final class HueClient: ObservableObject, HueClientProtocol {
         return (position, roomOffset)
     }
     
-    /// Apply the 3-point affine calibration transformation to an ARKit position.
-    /// Solves for the optimal 3x3 transformation matrix and translation vector
-    /// that maps ARKit coordinates to Bridge Room Space coordinates.
-    private func applyCalibration(_ arKitPos: SIMD3<Float>) -> SIMD3<Float> {
-        guard calibrationPoints.count >= 3 else {
-            return arKitPos
-        }
-        
-        // Build the transformation matrix from calibration points.
-        // We solve: bridge_pos = M * arKit_pos + t
-        // Using at least 3 points to determine the 3x3 matrix M and translation t.
-        let n = min(calibrationPoints.count, 6)
-        
-        // Build source (ARKit) and target (Bridge) matrices
-        var source: [SIMD3<Float>] = []
-        var target: [SIMD3<Float>] = []
-        for i in 0..<n {
-            source.append(calibrationPoints[i].arKit)
-            target.append(calibrationPoints[i].bridge)
-        }
-        
-        // Compute centroids
-        var sourceCentroid = SIMD3<Float>(0, 0, 0)
-        var targetCentroid = SIMD3<Float>(0, 0, 0)
-        for s in source { sourceCentroid += s }
-        for t in target { targetCentroid += t }
-        sourceCentroid /= Float(n)
-        targetCentroid /= Float(n)
-        
-        // Compute centered covariance matrix
-        var covMatrix = SIMD3x3<Float>(0)
-        for i in 0..<n {
-            let ds = source[i] - sourceCentroid
-            let dt = target[i] - targetCentroid
-            covMatrix += dt * ds.transpose
-        }
-        
-        // Compute the optimal rotation using simplified SVD approach
-        // For production use, implement full SVD decomposition
-        let rotation = computeRotation(from: covMatrix)
-        
-        // Compute translation
-        let translation = targetCentroid - rotation * sourceCentroid
-        
-        // Apply transformation
-        return rotation * arKitPos + translation
-    }
-    
-    /// Compute an approximate rotation matrix from a covariance matrix.
-    /// Uses a simplified approach suitable for coordinate space alignment.
-    /// For production-grade accuracy, replace with full SVD decomposition.
-    private func computeRotation(from covMatrix: SIMD3x3<Float>) -> SIMD3x3<Float> {
-        // Use a simplified rotation computation based on the covariance matrix.
-        // This provides a good approximation for room-scale alignment.
-        // For higher precision, implement full singular value decomposition.
-        
-        // Compute the symmetric part for scaling
-        let symmetric = 0.5 * (covMatrix + covMatrix.transpose)
-        
-        // Use power iteration to find the dominant eigenvector
-        var v = SIMD3<Float>(1, 1, 1)
-        v = normalize(v)
-        
-        for _ in 0..<10 {
-            v = symmetric * v
-            v = normalize(v)
-        }
-        
-        // Build an orthonormal basis from the dominant eigenvector
-        let u1 = v
-        let u2Raw = SIMD3<Float>(
-            covMatrix[0][1] - covMatrix[1][0],
-            covMatrix[1][2] - covMatrix[2][1],
-            covMatrix[2][0] - covMatrix[0][2]
-        )
-        let u2 = normalize(u2Raw)
-        let u3 = cross(u1, u2)
-        
-        // Construct the rotation matrix
-        return SIMD3x3<Float>(
-            SIMD3<Float>(u1.x, u2.x, u3.x),
-            SIMD3<Float>(u1.y, u2.y, u3.y),
-            SIMD3<Float>(u1.z, u2.z, u3.z)
-        )
-    }
-    
     /// Add a calibration point to the affine transformation solver.
     /// Requires at least 3 points for a valid calibration.
     /// Points are stored in FIFO order with a maximum of 6 points.
     func addCalibrationPoint(arKit: SIMD3<Float>, bridge: SIMD3<Float>) {
-        calibrationPoints.append((arKit: arKit, bridge: bridge))
-        
-        // Keep only the most recent 6 points for averaging
-        if calibrationPoints.count > 6 {
-            calibrationPoints = Array(calibrationPoints.suffix(6))
-        }
-        
-        logger.info(
-            "Calibration point added (\(calibrationPoints.count)/3 minimum). " +
-            "Calibrated: \(isCalibrated)"
-        )
+        calibrationEngine.addCalibrationPoint(arKit: arKit, bridge: bridge)
     }
     
     /// Clear all calibration points.
     func clearCalibration() {
-        calibrationPoints.removeAll()
-        logger.info("Calibration cleared")
+        calibrationEngine.clearCalibration()
     }
     
     /// Get the current calibration points for inspection.
     func getCalibrationPoints() -> [(arKit: SIMD3<Float>, bridge: SIMD3<Float>)] {
-        calibrationPoints
+        calibrationEngine.getCalibrationPoints()
     }
     
     /// Create a full SpatialAwarePosition from ARKit detection data with
@@ -608,7 +469,7 @@ final class HueClient: ObservableObject, HueClientProtocol {
         
         let url = URL(string: "https://\(ip):\(port)/api/\(username)/resources/spatial_awareness")!
         
-        let (data, _) = try await authenticatedRequest(url: url, method: "GET", body: nil as Codable?)
+        let (data, _) = try await authenticatedRequest(url: url, method: "GET", body: nil as HueBridgeState?)
         
         let response = try JSONDecoder().decode(SpatialAwareSyncResponse.self, from: data)
         
@@ -648,189 +509,33 @@ final class HueClient: ObservableObject, HueClientProtocol {
         disconnect()
         
         let url = URL(string: "https://\(ip):\(port)/api/\(username)/eventstream/clip/v2")!
-        
-        var request = URLRequest(url: url)
-        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-        request.setValue("keep-alive", forHTTPHeaderField: "Connection")
-        request.timeoutInterval = 300
-        
-        let keychainKey = bridgeIP.map { KeychainKeys.key(for: $0) }
-        
-        let sessionDelegate = CertificatePinningDelegate(pinnedHash: pinnedHash, keychainKey: keychainKey) { [weak self] trustedHash in
-            Task { @MainActor [weak self] in
-                await self?.handleTOFUPin(for: trustedHash)
-            }
-        }
-        
-        let session = URLSession(configuration: .default, delegate: sessionDelegate, delegateQueue: nil)
-        
-        sseTask = Task { [weak self] in
-            do {
-                let (bytes, response) = try await session.bytes(for: request)
-                
-                guard let httpResponse = response as? HTTPURLResponse,
-                      (200...299).contains(httpResponse.statusCode) else {
-                    await self?.handleSSEDisconnect(error: HueError.invalidResponse)
-                    return
-                }
-                
-                await self?.streamSSEEvents(from: bytes, session: session)
-                
-            } catch {
-                await self?.handleSSEDisconnect(error: error)
-            }
-        }
+        let keychainKey = ip.map { KeychainKeys.key(for: $0) }
         
         stateStream?.setIsConnected(true)
-        logger.info("SSE event stream started (streaming)")
-    }
-    
-    /// Stream SSE events using `URLSession.AsyncBytes.lines` with
-    /// `TaskGroup` for parallel fragment parsing. Each complete SSE
-    /// event is parsed as an independent task within the group.
-    ///
-    /// `bytes.lines` handles UTF-8 boundaries automatically.
-    /// Empty "keep-alive" lines are skipped rather than breaking the stream.
-    private func streamSSEEvents(from bytes: AsyncBytes<UInt8>, session: URLSession) async {
-        sseDataBuffer = ""
-        sseReconnectionState = .connected
-        var parseFailures = 0
         
-        for await line in bytes.lines {
-            // Skip empty keep-alive lines.
-            if line.isEmpty {
-                // Empty line marks end of a complete SSE event.
-                if !sseDataBuffer.isEmpty {
-                    let eventText = sseDataBuffer
-                    sseDataBuffer = ""
-                    
-                    // Use TaskGroup for parallel fragment parsing.
-                    // Each SSE event is parsed independently.
-                    do {
-                        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                            Task {
-                                do {
-                                    try await parseSSEEvent(eventText)
-                                    parseFailures = 0
-                                    continuation.resume()
-                                } catch {
-                                    parseFailures += 1
-                                    if parseFailures >= maxParseFailures {
-                                        sseReconnectionState = .degraded
-                                    }
-                                    continuation.resume(throwing: error)
-                                }
-                            }
-                        }
-                    } catch {
-                        logger.warning("SSE event parse failure (\(parseFailures)/\(maxParseFailures)): \(error.localizedDescription)")
-                    }
-                }
-                continue
-            }
-            
-            // Accumulate data lines for multi-line SSE events.
-            if line.hasPrefix("data: ") {
-                sseDataBuffer.append(line.dropFirst(6))
-            }
-        }
-        
-        // Process any remaining buffered data after stream ends.
-        if !sseDataBuffer.isEmpty {
-            try? await parseSSEEvent(sseDataBuffer)
-        }
-        
-        sseReconnectionState = .disconnected
-    }
-    
-    /// Parse a complete SSE event text using JSON decoding.
-    /// Called within a TaskGroup for parallel execution.
-    private func parseSSEEvent(_ text: String) async throws {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        if trimmed.isEmpty {
-            return
-        }
-        
-        // Handle ping events.
-        if trimmed == "ping" {
-            return
-        }
-        
-        let decoder = JSONDecoder()
-        let update = try decoder.decode(ResourceUpdate.self, from: trimmed.data(using: .utf8)!)
-        
-        if let lights = update.lights, !lights.isEmpty {
-            logger.debug("Received \(lights.count) light update(s) via SSE")
-        }
-        
-        await stateStream?.applyUpdate(update)
-    }
-    
-    /// Process a complete SSE event text string.
-    private func processSSEEvent(text: String) {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        if trimmed.isEmpty {
-            return
-        }
-        
-        // Handle ping events.
-        if trimmed == "ping" {
-            return
-        }
-        
-        do {
-            let decoder = JSONDecoder()
-            let update = try decoder.decode(ResourceUpdate.self, from: trimmed.data(using: .utf8)!)
-            
-            if let lights = update.lights, !lights.isEmpty {
-                logger.debug("Received \(lights.count) light update(s) via SSE")
-            }
-            
-            Task {
-                await stateStream?.applyUpdate(update)
-            }
-            
-        } catch {
-            logger.warning("Failed to parse SSE event: \(error.localizedDescription)")
-            logger.debug("Raw event: \(trimmed.prefix(200))")
-        }
-    }
-    
-    /// Handle SSE stream disconnection with state machine-driven reconnection.
-    private func handleSSEDisconnect(error: any Error) async {
-        await MainActor.run { [weak self] in
+        Task { [weak self] in
             guard let self else { return }
             
-            self.logger.error("SSE stream error: \(error.localizedDescription)")
-            self.lastError = "Stream error: \(error.localizedDescription)"
-            await self.stateStream?.reportError(error, severity: .error, source: "HueClient.sse")
+            await self.eventStream.onEvent = { [weak self] update in
+                await self?.stateStream?.applyUpdate(update)
+            }
             
-            // Transition to reconnecting state and schedule reconnection.
-            self.sseReconnectionState = .reconnecting
-            self.scheduleReconnection()
-        }
-    }
-    
-    /// Schedule an exponential backoff reconnection using the state machine.
-    private func scheduleReconnection() {
-        disconnect()
-        
-        // Exponential backoff: double the delay each time, capped at max.
-        reconnectDelay = min(reconnectDelay * 2, maxReconnectDelay)
-        
-        reconnectionTimer?.invalidate()
-        reconnectionTimer = Timer.scheduledTimer(withTimeInterval: reconnectDelay, repeats: false) { [weak self] _ in
-            Task { [weak self] in
-                guard let self else { return }
-                
-                await self.logger.info("Attempting SSE reconnection (delay: \(String(format: "%.1f", self.reconnectDelay))s)...")
-                await self.startEventStream()
+            await self.eventStream.onError = { [weak self] error in
+                await self?.stateStream?.reportError(error, severity: .error, source: "HueClient.sse")
+            }
+            
+            await self.eventStream.start(
+                url: url,
+                pinnedHash: pinnedHash,
+                keychainKey: keychainKey
+            ) { [weak self] trustedHash in
+                Task { @MainActor [weak self] in
+                    await self?.handleTOFUPin(for: trustedHash)
+                }
             }
         }
         
-        logger.info("SSE disconnected, scheduling reconnection in \(reconnectDelay)s")
+        logger.info("SSE event stream started (actor-managed)")
     }
     
     // MARK: - Connection Management
@@ -846,13 +551,9 @@ final class HueClient: ObservableObject, HueClientProtocol {
     
     /// Disconnect from the bridge.
     func disconnect() {
-        sseTask?.cancel()
-        sseTask = nil
-        reconnectionTimer?.invalidate()
-        reconnectionTimer = nil
-        sseDataBuffer = ""
-        reconnectDelay = minReconnectDelay
-        sseReconnectionState = .idle
+        Task { [eventStream] in
+            await eventStream.disconnect()
+        }
         stateStream?.setIsConnected(false)
         logger.info("Disconnected from bridge")
     }
@@ -893,15 +594,7 @@ final class HueClient: ObservableObject, HueClientProtocol {
             }
         }
         
-        let keychainKey = bridgeIP.map { KeychainKeys.key(for: $0) }
-        
-        let sessionDelegate = CertificatePinningDelegate(pinnedHash: pinnedHash, keychainKey: keychainKey) { [weak self] trustedHash in
-            Task { @MainActor [weak self] in
-                await self?.handleTOFUPin(for: trustedHash)
-            }
-        }
-        
-        urlSession = URLSession(configuration: config, delegate: sessionDelegate, delegateQueue: nil)
+        urlSession = URLSession(configuration: config, delegate: nil, delegateQueue: nil)
     }
     
     // MARK: - Trust-On-First-Use Certificate Pinning
@@ -969,12 +662,11 @@ struct BridgeInfo: Identifiable, Sendable {
 
 extension Data {
     func sha256() -> Data {
-        guard let hash = self.withUnsafeBytes { bytes -> Data? in
+        self.withUnsafeBytes { bytes in
             var digest = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
-            CC_SHA256(bytes.baseAddress, CC_LONG(count), &digest)
+            CC_SHA256(bytes.baseAddress, CC_LONG(bytes.count), &digest)
             return Data(digest)
         }
-        return hash
     }
 }
 
@@ -1015,21 +707,4 @@ enum HueError: Error, LocalizedError {
 struct SpatialAwareSyncError: Sendable {
     let code: String
     let message: String
-}
-
-// MARK: - SSE Reconnection State Machine
-
-/// State machine for SSE stream reconnection lifecycle.
-/// Manages the transition between connected, disconnected,
-/// reconnecting, and degraded states with appropriate backoff.
-enum SSEReconnectionState: Sendable {
-    /// No active or pending SSE connection.
-    case idle
-    /// SSE stream is actively receiving events.
-    case connected
-    /// Stream has disconnected; reconnection is scheduled or in progress.
-    case reconnecting
-    /// Stream has disconnected and consecutive parse failures indicate
-    /// potential data corruption; reconnection attempts are throttled.
-    case degraded
 }

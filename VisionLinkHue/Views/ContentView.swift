@@ -6,11 +6,32 @@ import ARKit
 /// Uses `@State` with `@Observable` types for granular dependency tracking.
 struct ContentView: View {
     
-    @State private var stateStream = HueStateStream()
+    @State private var stateStream: HueStateStream
     @State private var hueClient: HueClient
-    @State private var detectionEngine = DetectionEngine()
+    @State private var detectionEngine: DetectionEngine
     @State private var arSessionManager: ARSessionManager
     @State private var spatialProjector: SpatialProjector
+    
+    init() {
+        let persistence = FixturePersistence.shared
+        let stream = HueStateStream(persistence: persistence)
+        stream.configure()
+        let client = HueClient(stateStream: stream)
+        let detector = DetectionEngine()
+        let projector = SpatialProjector()
+        let manager = ARSessionManager(
+            detectionEngine: detector,
+            spatialProjector: projector,
+            hueClient: client,
+            stateStream: stream
+        )
+        
+        _stateStream = State(initialValue: stream)
+        _hueClient = State(initialValue: client)
+        _detectionEngine = State(initialValue: detector)
+        _arSessionManager = State(initialValue: manager)
+        _spatialProjector = State(initialValue: projector)
+    }
     
     @State private var showSettings: Bool = false
     @State private var dismissedErrorId: UUID?
@@ -18,32 +39,38 @@ struct ContentView: View {
     
     var body: some View {
         GeometryReader { geometry in
-            ZStack {
                 // AR session view
-                ARViewContainer(
-                    sessionManager: arSessionManager,
-                    onFrameUpdate: { frame in
-                        Task {
-                            await arSessionManager.didUpdateFrame(frame)
+                let sessionManager = arSessionManager
+                let detector = detectionEngine
+                let client = hueClient
+                let stream = stateStream
+                let projector = spatialProjector
+                ZStack {
+                    // AR session view
+                    ARViewContainer(
+                        sessionManager: sessionManager,
+                        onFrameUpdate: { frame in
+                            Task {
+                                await sessionManager.didUpdateFrame(frame)
+                            }
+                        },
+                        onARViewReady: { arView in
+                            arViewRef = arView
+                            Task {
+                                await sessionManager.configureAndStart(in: arView)
+                            }
                         }
-                    },
-                    onARViewReady: { arView in
-                        arViewRef = arView
-                        Task {
-                            await arSessionManager.configureAndStart(in: arView)
-                        }
-                    }
-                )
-                .ignoresSafeArea()
-                
-                // HUD overlay
-                HUDOverlay(
-                    sessionManager: arSessionManager,
-                    detectionEngine: detectionEngine,
-                    hueClient: hueClient,
-                    stateStream: stateStream,
-                    frameSize: geometry.size
-                )
+                    )
+                    .ignoresSafeArea()
+                    
+                    // HUD overlay
+                    HUDOverlay(
+                        sessionManager: sessionManager,
+                        detectionEngine: detector,
+                        hueClient: client,
+                        stateStream: stream,
+                        frameSize: geometry.size
+                    )
             }
         }
         .sheet(isPresented: $showSettings) {
@@ -88,7 +115,6 @@ struct ContentView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .background(.ultraThinMaterial, in: Rectangle())
-        .glassEffect(.liquid, alignment: .center)
         .shadow(radius: 5)
     }
 }

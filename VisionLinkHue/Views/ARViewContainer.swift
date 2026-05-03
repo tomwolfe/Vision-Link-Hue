@@ -55,11 +55,9 @@ struct ARViewRepresentable: UIViewRepresentable {
     
     func makeUIView(context: Context) -> ARView {
         let arView = ARView(frame: .zero)
-        arView.session.delegate = context.coordinator
-        arView.session.delegateQueue = .main
-        
-        arView.preferredFramesPerSecond = 60
-        arView.preferredStereoRenderingMode = .mono
+        let session = ARSession()
+        session.delegate = context.coordinator
+        session.run(ARWorldTrackingConfiguration())
         
         onARViewReady(arView)
         

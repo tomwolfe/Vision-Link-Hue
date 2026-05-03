@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import simd
 import os
 
 /// Service that manages SwiftData persistence for fixture-light mappings
@@ -24,7 +25,7 @@ final class FixturePersistence {
         
         do {
             modelContainer = try ModelContainer(for: schema, configurations: [ModelConfiguration()])
-            modelContext = ModelContainer.shared.mainContext
+            modelContext = modelContainer.mainContext
             logger.info("FixturePersistence initialized with SwiftData")
         } catch {
             fatalError("Failed to create FixturePersistence container: \(error.localizedDescription)")
@@ -45,6 +46,8 @@ final class FixturePersistence {
     }
     
     /// Save a fixture-light mapping with spatial coordinates atomically.
+    /// Validates the spatial data before persisting to prevent malformed
+    /// coordinate data from being stored in SwiftData.
     func saveMapping(
         fixtureId: UUID,
         lightId: String?,
@@ -54,21 +57,28 @@ final class FixturePersistence {
         fixtureType: String,
         confidence: Double
     ) {
+        // Validate spatial data before persisting
+        guard validateSpatialData(position: position, orientation: orientation, distanceMeters: distanceMeters) else {
+            logger.error("Rejected malformed spatial data for fixture \(fixtureId): position=\(position), orientation=[\(orientation.vector.x), \(orientation.vector.y), \(orientation.vector.z), \(orientation.vector.w)], distance=\(distanceMeters)")
+            return
+        }
+        
         do {
             // Check if a mapping already exists for this fixture
             let descriptor = FetchDescriptor<FixtureMapping>(
-                predicate: Predicate<FixtureMapping> { $0.fixtureId == fixtureId.uuidString }
+                predicate: ##Predicate<FixtureMapping> { $0.fixtureId == fixtureId.uuidString }
             )
             
-            if let existing = try modelContext.fetchFirst(descriptor) {
+            let results = try modelContext.fetch(descriptor)
+            if let existing = results.first {
                 existing.lightId = lightId
                 existing.positionX = position.x
                 existing.positionY = position.y
                 existing.positionZ = position.z
-                existing.orientationX = orientation.x
-                existing.orientationY = orientation.y
-                existing.orientationZ = orientation.z
-                existing.orientationW = orientation.w
+                existing.orientationX = orientation.vector.x
+                existing.orientationY = orientation.vector.y
+                existing.orientationZ = orientation.vector.z
+                existing.orientationW = orientation.vector.w
                 existing.distanceMeters = distanceMeters
                 existing.fixtureType = fixtureType
                 existing.confidence = confidence
@@ -93,14 +103,63 @@ final class FixturePersistence {
         }
     }
     
+    // MARK: - Spatial Data Validation
+    
+    /// Validate spatial coordinate data before persisting.
+    /// Prevents malformed data (NaN, infinity, out-of-bounds) from
+    /// being stored in SwiftData, which could corrupt the spatial database.
+    ///
+    /// - Parameters:
+    ///   - position: 3D position in world space.
+    ///   - orientation: Orientation quaternion.
+    ///   - distanceMeters: Distance to the fixture.
+    /// - Returns: `true` if the data is valid, `false` otherwise.
+    private func validateSpatialData(
+        position: SIMD3<Float>,
+        orientation: simd_quatf,
+        distanceMeters: Float
+    ) -> Bool {
+        // Reject NaN or infinity in position
+        if position.x.isNaN || position.y.isNaN || position.z.isNaN {
+            return false
+        }
+        if position.x.isInfinite || position.y.isInfinite || position.z.isInfinite {
+            return false
+        }
+        
+        // Reject non-unit quaternions (norm should be ~1.0)
+        let quatNorm = simd_length(orientation)
+        if quatNorm.isNaN || quatNorm.isInfinite {
+            return false
+        }
+        let normDelta = abs(quatNorm - 1.0)
+        if normDelta > 0.01 {
+            return false
+        }
+        
+        // Reject unreasonable distances (0 to 100 meters)
+        if distanceMeters <= 0 || distanceMeters > 100 {
+            return false
+        }
+        
+        // Reject extreme position values (> 1km from origin)
+        let positionMagnitude = simd_length(position)
+        if positionMagnitude > 1000 {
+            return false
+        }
+        
+        return true
+    }
+    
     /// Link a fixture UUID to a Hue light ID.
     func linkFixture(_ fixtureId: UUID, toLight lightId: String) {
         do {
             let descriptor = FetchDescriptor<FixtureMapping>(
-                predicate: Predicate<FixtureMapping> { $0.fixtureId == fixtureId.uuidString }
+                predicate: #Predicate<FixtureMapping> { $0.fixtureId == fixtureId.uuidString }
             )
             
-            if let mapping = try modelContext.fetchFirst(descriptor) {
+            let results = try modelContext.fetch(descriptor)
+            if let mapping = results.first {
                 mapping.lightId = lightId
                 mapping.updatedAt = Date()
                 try modelContext.save()
@@ -115,10 +174,11 @@ final class FixturePersistence {
     func unlinkFixture(_ fixtureId: UUID) {
         do {
             let descriptor = FetchDescriptor<FixtureMapping>(
-                predicate: Predicate<FixtureMapping> { $0.fixtureId == fixtureId.uuidString }
+                predicate: #Predicate<FixtureMapping> { $0.fixtureId == fixtureId.uuidString }
             )
             
-            if let mapping = try modelContext.fetchFirst(descriptor) {
+            let results = try modelContext.fetch(descriptor)
+            if let mapping = results.first {
                 mapping.lightId = nil
                 mapping.updatedAt = Date()
                 try modelContext.save()
@@ -133,10 +193,11 @@ final class FixturePersistence {
     func removeMapping(for fixtureId: UUID) {
         do {
             let descriptor = FetchDescriptor<FixtureMapping>(
-                predicate: Predicate<FixtureMapping> { $0.fixtureId == fixtureId.uuidString }
+                predicate: #Predicate<FixtureMapping> { $0.fixtureId == fixtureId.uuidString }
             )
             
-            if let mapping = try modelContext.fetchFirst(descriptor) {
+            let results = try modelContext.fetch(descriptor)
+            if let mapping = results.first {
                 modelContext.delete(mapping)
                 try modelContext.save()
                 logger.debug("Removed fixture mapping for \(fixtureId)")
@@ -150,10 +211,11 @@ final class FixturePersistence {
     func markSynced(_ fixtureId: UUID) {
         do {
             let descriptor = FetchDescriptor<FixtureMapping>(
-                predicate: Predicate<FixtureMapping> { $0.fixtureId == fixtureId.uuidString }
+                predicate: #Predicate<FixtureMapping> { $0.fixtureId == fixtureId.uuidString }
             )
             
-            if let mapping = try modelContext.fetchFirst(descriptor) {
+            let results = try modelContext.fetch(descriptor)
+            if let mapping = results.first {
                 mapping.isSyncedToBridge = true
                 mapping.updatedAt = Date()
                 try modelContext.save()

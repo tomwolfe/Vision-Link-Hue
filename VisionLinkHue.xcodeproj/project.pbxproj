@@ -1,0 +1,619 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0AC7C10CE6B0DC77312C87ED /* FixtureMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E5E8EEB1B69F992D330E955 /* FixtureMapping.swift */; };
+		11B44BA2FD7378C702D08504 /* SpatialProjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27CF45B419A50697200CF344 /* SpatialProjector.swift */; };
+		17FE64294D6E1CF17EAC0579 /* HueStateStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BD4020BBE9F66E6C7A12BF4 /* HueStateStream.swift */; };
+		181096DD07FCC8886791A171 /* classification_rules.json in Resources */ = {isa = PBXBuildFile; fileRef = 3AFA647508BF564F9F9FA5F6 /* classification_rules.json */; };
+		23BAF78E0C0819A4C9FEC78F /* FixturePersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCCF3CBE0E6613D3E9DF0DFB /* FixturePersistence.swift */; };
+		29BA3BD4BA9E48D3E85CF905 /* SpatialProjectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 705489F3F2BF68688FA1975B /* SpatialProjectorTests.swift */; };
+		32CF656269CE2229B491F8DB /* BridgeDiscoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E443EB84995113663DCA191 /* BridgeDiscoveryView.swift */; };
+		338734094F83463E10A63B48 /* CalibrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1421575C5E9232F749767E85 /* CalibrationTests.swift */; };
+		3765CCE937030AAF783682C8 /* HueControlPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77C3C0947E5619E680836273 /* HueControlPanel.swift */; };
+		4E8D4846FAB8B6DC24F909B5 /* CertificatePinningDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A58A999810DADAC4665355D9 /* CertificatePinningDelegate.swift */; };
+		4EBD8F5E9DC7711DC5B9505A /* SpatialMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A04FE47AED193FE58A7AC30 /* SpatialMath.swift */; };
+		532949754C9D06A1539ABF00 /* SpatialCalibrationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = E47BA61F9090C83D7B16D92D /* SpatialCalibrationEngine.swift */; };
+		6007944BF9ABED62B06E5F4F /* HueClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38F7EE4EE247B64F3F5EA4A9 /* HueClient.swift */; };
+		641D1BC8A6308149CC1A7ACC /* VisionLinkHueApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42E513DE585187B5BC0098AA /* VisionLinkHueApp.swift */; };
+		6F8832B09A2529FF44500541 /* FixtureHeuristicClassifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 788CFC6CAFD604FC2DE4DF7A /* FixtureHeuristicClassifierTests.swift */; };
+		7335AB60C3C527C53294FAD3 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0B2F9CD762C0B9580DDD3AD /* ContentView.swift */; };
+		73AC28EA9E04D8AAEFB51CC4 /* FixtureHeuristicClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F602CDBD2A936AAA555F9B8 /* FixtureHeuristicClassifier.swift */; };
+		7E56506D8990A271C15C25CE /* FixtureReticle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98E97358C8FE198BCF090646 /* FixtureReticle.swift */; };
+		828E5F737EDCD2FA4D368DAE /* LiquidGlassHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20229124698A9076EB0AC0B5 /* LiquidGlassHUD.swift */; };
+		93733C0DBB56E68BEA6BA70C /* FixtureModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE3AF9C2519C92FD05483887 /* FixtureModels.swift */; };
+		94786EF9EBC77ECF7FD7E7AA /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B4136600B738D9973D35B21 /* Constants.swift */; };
+		A419B6FCA9A50F54908E3943 /* DetectionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2EB75B6F6438D47B0DC3518 /* DetectionEngine.swift */; };
+		ADA2735170B0F5910CFF8F59 /* DetectionEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49DA178056BF1F365DB4D2C5 /* DetectionEngineTests.swift */; };
+		B093D1DB4970EFA16ACA4B4F /* ScenePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FEED54E9BED2EDF0DDAF8EE /* ScenePickerView.swift */; };
+		B0FD97156859E176C54B288F /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C7CFE88E1083C9D9ADC6DE6 /* KeychainManager.swift */; };
+		BD1754EB51AAA94D737475F2 /* MockHueClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20436443E97ED90C6AA2852D /* MockHueClient.swift */; };
+		C35A9803FA2101A929F1E93E /* SpatialMathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF9FF5ED8521E57492B18C2B /* SpatialMathTests.swift */; };
+		C3F32E9354AB32F1879F2789 /* HueClientProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA918F1B394BBC49BD3E7292 /* HueClientProtocol.swift */; };
+		CBB5FDACB767159363B36302 /* ARSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0038078F889E45E668262CA4 /* ARSessionManager.swift */; };
+		CD92A32B79565AAB54CD28C7 /* HueModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 265706314D8CA066D282077E /* HueModels.swift */; };
+		D1493CA94B784A5627A4D4CC /* ARViewContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63D52FBF9BEA54F3BB00A0A2 /* ARViewContainer.swift */; };
+		DE8E12A879EC29E57D360BE2 /* SceneRecallButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = F43270D560C1B1CD820C485C /* SceneRecallButton.swift */; };
+		E022D466C4C4BF2014F6D6D8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C3773D6FD40A1D0C05AB37AA /* Assets.xcassets */; };
+		E2BD477639C1EA188179A645 /* ViewAttachmentComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FBE4ED0D7F289735CA52155 /* ViewAttachmentComponents.swift */; };
+		E3A0D9831BB808C6CB4B3C52 /* QuaternionAttributeTransformer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D342A7DCA82DC0F175310AAD /* QuaternionAttributeTransformer.swift */; };
+		F4CCEC981BB611E0E3D7812D /* HueEventStreamActor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A3088B6BD175CE1AE5D13D /* HueEventStreamActor.swift */; };
+		F897E4F964A89C76FB832BAD /* HUDOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08E7992EF63FE19E26EE84A9 /* HUDOverlay.swift */; };
+		FEA584A66F891C2B0F182DEE /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F9DCCC892C073529129A8F7 /* Extensions.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		48526C643EFF335B769FB415 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D9FB3B583B9DCE05B48D2757 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C9357F068FD12CB86F48FEFD;
+			remoteInfo = VisionLinkHue;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0038078F889E45E668262CA4 /* ARSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARSessionManager.swift; sourceTree = "<group>"; };
+		08E7992EF63FE19E26EE84A9 /* HUDOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDOverlay.swift; sourceTree = "<group>"; };
+		097909EFE4C98C127134A567 /* VisionLinkHue.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VisionLinkHue.entitlements; sourceTree = "<group>"; };
+		1421575C5E9232F749767E85 /* CalibrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibrationTests.swift; sourceTree = "<group>"; };
+		20229124698A9076EB0AC0B5 /* LiquidGlassHUD.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidGlassHUD.swift; sourceTree = "<group>"; };
+		20436443E97ED90C6AA2852D /* MockHueClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockHueClient.swift; sourceTree = "<group>"; };
+		265706314D8CA066D282077E /* HueModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueModels.swift; sourceTree = "<group>"; };
+		27CF45B419A50697200CF344 /* SpatialProjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialProjector.swift; sourceTree = "<group>"; };
+		2FEED54E9BED2EDF0DDAF8EE /* ScenePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenePickerView.swift; sourceTree = "<group>"; };
+		38F7EE4EE247B64F3F5EA4A9 /* HueClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueClient.swift; sourceTree = "<group>"; };
+		3AFA647508BF564F9F9FA5F6 /* classification_rules.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = classification_rules.json; sourceTree = "<group>"; };
+		3F9DCCC892C073529129A8F7 /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
+		42E513DE585187B5BC0098AA /* VisionLinkHueApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisionLinkHueApp.swift; sourceTree = "<group>"; };
+		49DA178056BF1F365DB4D2C5 /* DetectionEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectionEngineTests.swift; sourceTree = "<group>"; };
+		63D52FBF9BEA54F3BB00A0A2 /* ARViewContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARViewContainer.swift; sourceTree = "<group>"; };
+		6B4136600B738D9973D35B21 /* Constants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Constants.swift; sourceTree = "<group>"; };
+		6E443EB84995113663DCA191 /* BridgeDiscoveryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeDiscoveryView.swift; sourceTree = "<group>"; };
+		6F602CDBD2A936AAA555F9B8 /* FixtureHeuristicClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureHeuristicClassifier.swift; sourceTree = "<group>"; };
+		6FBE4ED0D7F289735CA52155 /* ViewAttachmentComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewAttachmentComponents.swift; sourceTree = "<group>"; };
+		705489F3F2BF68688FA1975B /* SpatialProjectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialProjectorTests.swift; sourceTree = "<group>"; };
+		77C3C0947E5619E680836273 /* HueControlPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueControlPanel.swift; sourceTree = "<group>"; };
+		788CFC6CAFD604FC2DE4DF7A /* FixtureHeuristicClassifierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureHeuristicClassifierTests.swift; sourceTree = "<group>"; };
+		7BD4020BBE9F66E6C7A12BF4 /* HueStateStream.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueStateStream.swift; sourceTree = "<group>"; };
+		8C7CFE88E1083C9D9ADC6DE6 /* KeychainManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainManager.swift; sourceTree = "<group>"; };
+		98E97358C8FE198BCF090646 /* FixtureReticle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureReticle.swift; sourceTree = "<group>"; };
+		9A04FE47AED193FE58A7AC30 /* SpatialMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialMath.swift; sourceTree = "<group>"; };
+		9E5E8EEB1B69F992D330E955 /* FixtureMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureMapping.swift; sourceTree = "<group>"; };
+		A58A999810DADAC4665355D9 /* CertificatePinningDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertificatePinningDelegate.swift; sourceTree = "<group>"; };
+		B1A3088B6BD175CE1AE5D13D /* HueEventStreamActor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueEventStreamActor.swift; sourceTree = "<group>"; };
+		B6CC7C6072CFA6D940C3DBA3 /* VisionLinkHueTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = VisionLinkHueTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C3773D6FD40A1D0C05AB37AA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		CE3AF9C2519C92FD05483887 /* FixtureModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureModels.swift; sourceTree = "<group>"; };
+		D2EB75B6F6438D47B0DC3518 /* DetectionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectionEngine.swift; sourceTree = "<group>"; };
+		D342A7DCA82DC0F175310AAD /* QuaternionAttributeTransformer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuaternionAttributeTransformer.swift; sourceTree = "<group>"; };
+		D7A6864D4800313E5E637629 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		DA918F1B394BBC49BD3E7292 /* HueClientProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueClientProtocol.swift; sourceTree = "<group>"; };
+		DAFFF1902C936FFC20B66AAD /* VisionLinkHue.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = VisionLinkHue.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		DCCF3CBE0E6613D3E9DF0DFB /* FixturePersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixturePersistence.swift; sourceTree = "<group>"; };
+		DF9FF5ED8521E57492B18C2B /* SpatialMathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialMathTests.swift; sourceTree = "<group>"; };
+		E47BA61F9090C83D7B16D92D /* SpatialCalibrationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialCalibrationEngine.swift; sourceTree = "<group>"; };
+		F0B2F9CD762C0B9580DDD3AD /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		F43270D560C1B1CD820C485C /* SceneRecallButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneRecallButton.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		1B87872BBF7ABBCA097A5925 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				3AFA647508BF564F9F9FA5F6 /* classification_rules.json */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		282C6BB4789D27D74858553F /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				DCCF3CBE0E6613D3E9DF0DFB /* FixturePersistence.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		35BEC28BAA1762B791F5B167 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				DAFFF1902C936FFC20B66AAD /* VisionLinkHue.app */,
+				B6CC7C6072CFA6D940C3DBA3 /* VisionLinkHueTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		417CC75D16E8166249F2C245 /* VisionLinkHue */ = {
+			isa = PBXGroup;
+			children = (
+				1B87872BBF7ABBCA097A5925 /* Config */,
+				8002FB63C79BEA6D5670F301 /* Engines */,
+				956FA935FFAA80E7B286713B /* Managers */,
+				8D3E994FF5034260CB6CD4D5 /* Models */,
+				C094563CAACC1D04A0AB2ADB /* Network */,
+				E5ECCE44CB247E3377754315 /* Protocols */,
+				282C6BB4789D27D74858553F /* Services */,
+				F6FF707D23D27FAAC3CFF1DD /* Utilities */,
+				807D7E1E9D9096284BDFAE78 /* Views */,
+				42E513DE585187B5BC0098AA /* VisionLinkHueApp.swift */,
+			);
+			path = VisionLinkHue;
+			sourceTree = "<group>";
+		};
+		8002FB63C79BEA6D5670F301 /* Engines */ = {
+			isa = PBXGroup;
+			children = (
+				D2EB75B6F6438D47B0DC3518 /* DetectionEngine.swift */,
+				6F602CDBD2A936AAA555F9B8 /* FixtureHeuristicClassifier.swift */,
+				38F7EE4EE247B64F3F5EA4A9 /* HueClient.swift */,
+				B1A3088B6BD175CE1AE5D13D /* HueEventStreamActor.swift */,
+				E47BA61F9090C83D7B16D92D /* SpatialCalibrationEngine.swift */,
+				27CF45B419A50697200CF344 /* SpatialProjector.swift */,
+			);
+			path = Engines;
+			sourceTree = "<group>";
+		};
+		807D7E1E9D9096284BDFAE78 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				63D52FBF9BEA54F3BB00A0A2 /* ARViewContainer.swift */,
+				6E443EB84995113663DCA191 /* BridgeDiscoveryView.swift */,
+				F0B2F9CD762C0B9580DDD3AD /* ContentView.swift */,
+				98E97358C8FE198BCF090646 /* FixtureReticle.swift */,
+				08E7992EF63FE19E26EE84A9 /* HUDOverlay.swift */,
+				77C3C0947E5619E680836273 /* HueControlPanel.swift */,
+				20229124698A9076EB0AC0B5 /* LiquidGlassHUD.swift */,
+				2FEED54E9BED2EDF0DDAF8EE /* ScenePickerView.swift */,
+				F43270D560C1B1CD820C485C /* SceneRecallButton.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		8D3E994FF5034260CB6CD4D5 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				9E5E8EEB1B69F992D330E955 /* FixtureMapping.swift */,
+				CE3AF9C2519C92FD05483887 /* FixtureModels.swift */,
+				265706314D8CA066D282077E /* HueModels.swift */,
+				7BD4020BBE9F66E6C7A12BF4 /* HueStateStream.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		956FA935FFAA80E7B286713B /* Managers */ = {
+			isa = PBXGroup;
+			children = (
+				0038078F889E45E668262CA4 /* ARSessionManager.swift */,
+			);
+			path = Managers;
+			sourceTree = "<group>";
+		};
+		994AFCF27DF34BBCD2A4204B /* VisionLinkHueTests */ = {
+			isa = PBXGroup;
+			children = (
+				1421575C5E9232F749767E85 /* CalibrationTests.swift */,
+				49DA178056BF1F365DB4D2C5 /* DetectionEngineTests.swift */,
+				788CFC6CAFD604FC2DE4DF7A /* FixtureHeuristicClassifierTests.swift */,
+				20436443E97ED90C6AA2852D /* MockHueClient.swift */,
+				DF9FF5ED8521E57492B18C2B /* SpatialMathTests.swift */,
+				705489F3F2BF68688FA1975B /* SpatialProjectorTests.swift */,
+			);
+			name = VisionLinkHueTests;
+			path = Tests/VisionLinkHueTests;
+			sourceTree = "<group>";
+		};
+		9B2DEE114CF431DF7A46AB69 = {
+			isa = PBXGroup;
+			children = (
+				417CC75D16E8166249F2C245 /* VisionLinkHue */,
+				994AFCF27DF34BBCD2A4204B /* VisionLinkHueTests */,
+				C3773D6FD40A1D0C05AB37AA /* Assets.xcassets */,
+				D7A6864D4800313E5E637629 /* Info.plist */,
+				097909EFE4C98C127134A567 /* VisionLinkHue.entitlements */,
+				35BEC28BAA1762B791F5B167 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		C094563CAACC1D04A0AB2ADB /* Network */ = {
+			isa = PBXGroup;
+			children = (
+				A58A999810DADAC4665355D9 /* CertificatePinningDelegate.swift */,
+			);
+			path = Network;
+			sourceTree = "<group>";
+		};
+		E5ECCE44CB247E3377754315 /* Protocols */ = {
+			isa = PBXGroup;
+			children = (
+				DA918F1B394BBC49BD3E7292 /* HueClientProtocol.swift */,
+			);
+			path = Protocols;
+			sourceTree = "<group>";
+		};
+		F6FF707D23D27FAAC3CFF1DD /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+				6B4136600B738D9973D35B21 /* Constants.swift */,
+				3F9DCCC892C073529129A8F7 /* Extensions.swift */,
+				8C7CFE88E1083C9D9ADC6DE6 /* KeychainManager.swift */,
+				D342A7DCA82DC0F175310AAD /* QuaternionAttributeTransformer.swift */,
+				9A04FE47AED193FE58A7AC30 /* SpatialMath.swift */,
+				6FBE4ED0D7F289735CA52155 /* ViewAttachmentComponents.swift */,
+			);
+			path = Utilities;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		2E5A85BD823C530810EA4A14 /* VisionLinkHueTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E27E6353AFB8D403618B6CC3 /* Build configuration list for PBXNativeTarget "VisionLinkHueTests" */;
+			buildPhases = (
+				3702C0BFC870D2BCEC2F4EC4 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				FCD809FEC51E1F385BEEF460 /* PBXTargetDependency */,
+			);
+			name = VisionLinkHueTests;
+			packageProductDependencies = (
+			);
+			productName = VisionLinkHueTests;
+			productReference = B6CC7C6072CFA6D940C3DBA3 /* VisionLinkHueTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		C9357F068FD12CB86F48FEFD /* VisionLinkHue */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C83D30D676C6E37FEFDA7335 /* Build configuration list for PBXNativeTarget "VisionLinkHue" */;
+			buildPhases = (
+				C5D1D1628778AD3731DCD83E /* Sources */,
+				AB6EF97FAB2A017C138B6763 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = VisionLinkHue;
+			packageProductDependencies = (
+			);
+			productName = VisionLinkHue;
+			productReference = DAFFF1902C936FFC20B66AAD /* VisionLinkHue.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		D9FB3B583B9DCE05B48D2757 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = E6C8BBA3F05C332272A66BAF /* Build configuration list for PBXProject "VisionLinkHue" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 9B2DEE114CF431DF7A46AB69;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 35BEC28BAA1762B791F5B167 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				C9357F068FD12CB86F48FEFD /* VisionLinkHue */,
+				2E5A85BD823C530810EA4A14 /* VisionLinkHueTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AB6EF97FAB2A017C138B6763 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E022D466C4C4BF2014F6D6D8 /* Assets.xcassets in Resources */,
+				181096DD07FCC8886791A171 /* classification_rules.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		3702C0BFC870D2BCEC2F4EC4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				338734094F83463E10A63B48 /* CalibrationTests.swift in Sources */,
+				ADA2735170B0F5910CFF8F59 /* DetectionEngineTests.swift in Sources */,
+				6F8832B09A2529FF44500541 /* FixtureHeuristicClassifierTests.swift in Sources */,
+				BD1754EB51AAA94D737475F2 /* MockHueClient.swift in Sources */,
+				C35A9803FA2101A929F1E93E /* SpatialMathTests.swift in Sources */,
+				29BA3BD4BA9E48D3E85CF905 /* SpatialProjectorTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C5D1D1628778AD3731DCD83E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CBB5FDACB767159363B36302 /* ARSessionManager.swift in Sources */,
+				D1493CA94B784A5627A4D4CC /* ARViewContainer.swift in Sources */,
+				32CF656269CE2229B491F8DB /* BridgeDiscoveryView.swift in Sources */,
+				4E8D4846FAB8B6DC24F909B5 /* CertificatePinningDelegate.swift in Sources */,
+				94786EF9EBC77ECF7FD7E7AA /* Constants.swift in Sources */,
+				7335AB60C3C527C53294FAD3 /* ContentView.swift in Sources */,
+				A419B6FCA9A50F54908E3943 /* DetectionEngine.swift in Sources */,
+				FEA584A66F891C2B0F182DEE /* Extensions.swift in Sources */,
+				73AC28EA9E04D8AAEFB51CC4 /* FixtureHeuristicClassifier.swift in Sources */,
+				0AC7C10CE6B0DC77312C87ED /* FixtureMapping.swift in Sources */,
+				93733C0DBB56E68BEA6BA70C /* FixtureModels.swift in Sources */,
+				23BAF78E0C0819A4C9FEC78F /* FixturePersistence.swift in Sources */,
+				7E56506D8990A271C15C25CE /* FixtureReticle.swift in Sources */,
+				F897E4F964A89C76FB832BAD /* HUDOverlay.swift in Sources */,
+				6007944BF9ABED62B06E5F4F /* HueClient.swift in Sources */,
+				C3F32E9354AB32F1879F2789 /* HueClientProtocol.swift in Sources */,
+				3765CCE937030AAF783682C8 /* HueControlPanel.swift in Sources */,
+				F4CCEC981BB611E0E3D7812D /* HueEventStreamActor.swift in Sources */,
+				CD92A32B79565AAB54CD28C7 /* HueModels.swift in Sources */,
+				17FE64294D6E1CF17EAC0579 /* HueStateStream.swift in Sources */,
+				B0FD97156859E176C54B288F /* KeychainManager.swift in Sources */,
+				828E5F737EDCD2FA4D368DAE /* LiquidGlassHUD.swift in Sources */,
+				E3A0D9831BB808C6CB4B3C52 /* QuaternionAttributeTransformer.swift in Sources */,
+				B093D1DB4970EFA16ACA4B4F /* ScenePickerView.swift in Sources */,
+				DE8E12A879EC29E57D360BE2 /* SceneRecallButton.swift in Sources */,
+				532949754C9D06A1539ABF00 /* SpatialCalibrationEngine.swift in Sources */,
+				4EBD8F5E9DC7711DC5B9505A /* SpatialMath.swift in Sources */,
+				11B44BA2FD7378C702D08504 /* SpatialProjector.swift in Sources */,
+				E2BD477639C1EA188179A645 /* ViewAttachmentComponents.swift in Sources */,
+				641D1BC8A6308149CC1A7ACC /* VisionLinkHueApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		FCD809FEC51E1F385BEEF460 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C9357F068FD12CB86F48FEFD /* VisionLinkHue */;
+			targetProxy = 48526C643EFF335B769FB415 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		1528D2035EDD2F8A9EE1CD11 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.visionlinkhue.VisionLinkHueTests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.3;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/VisionLinkHue.app/VisionLinkHue";
+			};
+			name = Debug;
+		};
+		22C431F3A861A75EA3365C20 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENTITLEMENTS_DIRECTORY = .;
+				ENTITLEMENTS_FILENAME = VisionLinkHue.entitlements;
+				INFOPLIST_FILE = Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.visionlinkhue.VisionLinkHue;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.3;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		9A8A1A52047758ECC596980C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		C329268CA9A730DAED7024A6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		D1697B277BEECB23C8CDEC31 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.visionlinkhue.VisionLinkHueTests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.3;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/VisionLinkHue.app/VisionLinkHue";
+			};
+			name = Release;
+		};
+		D21941592EDD6F56586F1641 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENTITLEMENTS_DIRECTORY = .;
+				ENTITLEMENTS_FILENAME = VisionLinkHue.entitlements;
+				INFOPLIST_FILE = Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.visionlinkhue.VisionLinkHue;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.3;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		C83D30D676C6E37FEFDA7335 /* Build configuration list for PBXNativeTarget "VisionLinkHue" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				22C431F3A861A75EA3365C20 /* Debug */,
+				D21941592EDD6F56586F1641 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		E27E6353AFB8D403618B6CC3 /* Build configuration list for PBXNativeTarget "VisionLinkHueTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1528D2035EDD2F8A9EE1CD11 /* Debug */,
+				D1697B277BEECB23C8CDEC31 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		E6C8BBA3F05C332272A66BAF /* Build configuration list for PBXProject "VisionLinkHue" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C329268CA9A730DAED7024A6 /* Debug */,
+				9A8A1A52047758ECC596980C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = D9FB3B583B9DCE05B48D2757 /* Project object */;
+}

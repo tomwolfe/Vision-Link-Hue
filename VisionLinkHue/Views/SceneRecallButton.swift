@@ -37,6 +37,5 @@ struct SceneRecallButton: View {
             Label("Scenes", systemImage: "light.beacon.min")
                 .font(.caption)
         }
-        .glassEffect(.liquid, alignment: .center)
     }
 }

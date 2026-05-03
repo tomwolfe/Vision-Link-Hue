@@ -34,7 +34,7 @@ final class CertificatePinningDelegate: NSObject, Sendable, URLSessionDelegate {
     func urlSession(
         _ session: URLSession,
         didReceive challenge: URLAuthenticationChallenge,
-        completionHandler: @escaping (URLSession.AuthChallengeDisposition, SecCredential?) -> Void
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, Any?) -> Void
     ) {
         guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
               let serverTrust = challenge.protectionSpace.serverTrust else {

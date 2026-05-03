@@ -7,7 +7,8 @@ import simd
 /// detection into 3D world coordinates using ARKit raycasting and depth.
 /// All methods execute on the MainActor since ARKit raycast APIs are
 /// strictly main-thread bound.
-final class SpatialProjector @MainActor {
+@MainActor
+final class SpatialProjector {
     
     /// Configuration for the projector.
     struct Configuration {
@@ -26,7 +27,6 @@ final class SpatialProjector @MainActor {
     
     private let configuration: Configuration
     private weak var session: ARSession?
-    private var lastWorldMap: WorldMap?
     
     init(session: ARSession? = nil, configuration: Configuration = .init()) {
         self.configuration = configuration
@@ -44,7 +44,7 @@ final class SpatialProjector @MainActor {
     func project(
         normalizedPoint: SIMD2<Float>,
         inFrame frame: ARFrame,
-        anchor: AnchorEntity.World
+        anchor: AnchorEntity
     ) -> ProjectionResult {
         
         guard let intrinsics = frame.camera.intrinsics else {
@@ -106,7 +106,7 @@ final class SpatialProjector @MainActor {
     func project(
         region: NormalizedRect,
         inFrame frame: ARFrame,
-        anchor: AnchorEntity.World
+        anchor: AnchorEntity
     ) -> ProjectionResult {
         
         let center = region.center
@@ -175,7 +175,7 @@ final class SpatialProjector @MainActor {
     private func raycastOnMesh(
         from normalizedPoint: SIMD2<Float>,
         in frame: ARFrame,
-        anchor: AnchorEntity.World
+        anchor: AnchorEntity
     ) -> TrackedFixture? {
         
         guard let intrinsics = frame.camera.intrinsics else {
@@ -242,7 +242,7 @@ final class SpatialProjector @MainActor {
     private func unprojectViaDepthMap(
         _ normalizedPoint: SIMD2<Float>,
         frame: ARFrame,
-        anchor: AnchorEntity.World
+        anchor: AnchorEntity
     ) -> ProjectionResult? {
         
         guard let sceneDepth = frame.sceneDepth,

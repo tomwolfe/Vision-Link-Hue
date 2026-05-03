@@ -29,11 +29,6 @@ final class FixtureHUDFactory {
         entity.position = fixture.position
         entity.orientation = fixture.orientation
         
-        let attachment = ViewAttachmentComponent(rootView: {
-            FixtureHUDView(fixture: fixture)
-        })
-        
-        entity.components.set(attachment)
         entity.components.set(BillboardComponent())
         
         anchor.addChild(entity)

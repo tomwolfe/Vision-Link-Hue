@@ -1,7 +1,9 @@
 import Foundation
+import simd
 
 /// Protocol abstraction for Hue bridge communication.
 /// Enables mocking in unit tests and decouples networking from UI layers.
+@MainActor
 protocol HueClientProtocol: AnyObject {
     
     /// The IP address of the connected bridge.
@@ -70,6 +72,9 @@ protocol HueClientProtocol: AnyObject {
         areaId: String?,
         origin: SIMD3<Float>?
     ) -> SpatialAwarePosition
+    
+    /// Whether a valid 3+ point calibration has been established.
+    var isCalibrated: Bool { get }
     
     /// Check if the connected bridge supports SpatialAware features.
     var isSpatialAwareSupported: Bool { get }
