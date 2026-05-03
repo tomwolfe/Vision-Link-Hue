@@ -25,14 +25,11 @@ final class ARSessionManager {
     private let spatialProjector: SpatialProjector
     private let hueClient: HueClient
     private let stateStream: HueStateStream
+    private let hudFactory: FixtureHUDFactory
     
     private var arView: ARView?
     private var anchorEntity: AnchorEntity.World?
-    private var fixtureEntities: [UUID: ModelEntity] = [:]
-    
-    /// RealityView content reference for unified view attachments.
-    /// Used by the RealityKit 2026 Unified Attachment API.
-    private var realityViewContent: RealityViewContent?
+    private var fixtureEntities: [UUID: Entity] = [:]
     
     private var lastInferenceTime: TimeInterval = 0
     
@@ -50,12 +47,14 @@ final class ARSessionManager {
         detectionEngine: DetectionEngine,
         spatialProjector: SpatialProjector,
         hueClient: HueClient,
-        stateStream: HueStateStream
+        stateStream: HueStateStream,
+        hudFactory: FixtureHUDFactory = FixtureHUDFactory()
     ) {
         self.detectionEngine = detectionEngine
         self.spatialProjector = spatialProjector
         self.hueClient = hueClient
         self.stateStream = stateStream
+        self.hudFactory = hudFactory
     }
     
     // MARK: - Session Lifecycle
@@ -231,46 +230,13 @@ final class ARSessionManager {
     // MARK: - Fixture Management
     
     /// Create a HUD entity for a fixture in the RealityKit scene.
-    /// Uses the RealityKit 2026 native ViewAttachmentComponent API for
-    /// automatic SwiftUI view lifecycle management and @Observable-driven
-    /// entity updates.
+    /// Uses the RealityKit 2026 native ViewAttachmentComponent(rootView:)
+    /// API for automatic SwiftUI view lifecycle management and
+    /// @Observable-driven entity updates.
     func createHUD(for fixture: TrackedFixture, in scene: RealityKit.Scene) async {
         guard let anchor = anchorEntity else { return }
         
-        // Create the model entity
-        let entity = ModelEntity()
-        entity.name = "FixtureHUD"
-        entity.position = fixture.position
-        entity.orientation = fixture.orientation
-        
-        // RealityKit 2026 native ViewAttachmentComponent for SwiftUI integration.
-        // The unified attachment system handles view lifecycle automatically
-        // and drives SwiftUI updates through @Observable entity properties.
-        if let content = realityViewContent {
-            entity.components.set(HUDAttachmentComponent.self, set: HUDAttachmentComponent(
-                fixtureId: fixture.id,
-                parent: anchor,
-                offset: .zero
-            ))
-            
-            // Register with RealityView content for native view attachment
-            // The RealityKit 2026 ViewAttachmentComponent handles the rest
-            entity.components.set(RealityViewAttachmentComponent.self, set: RealityViewAttachmentComponent(
-                content: content,
-                parent: anchor,
-                offset: .zero
-            ))
-        } else {
-            // Fallback: attach HUD component without RealityView content
-            entity.components.set(HUDAttachmentComponent.self, set: HUDAttachmentComponent(
-                fixtureId: fixture.id,
-                parent: anchor,
-                offset: .zero
-            ))
-        }
-        
-        // Add to scene
-        anchor.addChild(entity)
+        guard let entity = hudFactory.createHUD(for: fixture, in: scene, parent: anchor) else { return }
         
         // Update tracked fixture with entity ID and mapped Hue light ID.
         if let idx = trackedFixtures.firstIndex(where: { $0.id == fixture.id }) {
@@ -306,13 +272,6 @@ final class ARSessionManager {
         return groupId
     }
     
-    // MARK: - RealityView Integration
-    
-    /// Set the RealityView content reference for unified view attachments.
-    /// This enables the RealityKit 2026 Unified Attachment API for HUD entities.
-    func setRealityViewContent(_ content: RealityViewContent?) {
-        self.realityViewContent = content
-    }
 }
 
 /// Tracking state representation.

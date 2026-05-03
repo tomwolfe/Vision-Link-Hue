@@ -4,8 +4,8 @@ import ARKit
 
 /// SwiftUI view that manages an ARKit session using RealityKit 2026's
 /// `RealityView` for entity management with unified view attachments.
-/// Uses the native RealityKit 2026 ViewAttachmentComponent API for
-/// automatic SwiftUI view lifecycle management and @Observable-driven
+/// Uses the native RealityKit 2026 ViewAttachmentComponent(rootView:)
+/// API for automatic SwiftUI view lifecycle management and @Observable-driven
 /// entity updates.
 struct ARViewContainer: View {
     
@@ -14,7 +14,6 @@ struct ARViewContainer: View {
     let onARViewReady: (ARView) -> Void
     
     @State private var arViewRef: ARView?
-    @State private var entityRegistry: [Entity.ID: TrackedFixture] = [:]
     
     var body: some View {
         ZStack {
@@ -27,29 +26,21 @@ struct ARViewContainer: View {
             )
             .ignoresSafeArea()
             
-            // RealityView overlay for SwiftUI-rendered HUD entities
-            // using the RealityKit 2026 native ViewAttachmentComponent API
-            RealityView { content in
+            // RealityView overlay for SwiftUI-rendered HUD entities.
+            // Fixture HUDs are created directly on RealityKit entities using
+            // the native ViewAttachmentComponent(rootView:) API, so no
+            // additional RealityViewContent registration is needed.
+            RealityView { content, attachments in
                 guard let arView = arViewRef else { return }
                 
                 // Add a root entity for HUD overlays
                 let hudRoot = Entity()
                 hudRoot.name = "HUDRoot"
                 arView.scene.addEntity(hudRoot)
-                
-                // Register with session manager for unified view attachment
-                sessionManager.setRealityViewContent(content)
-            } update: { content, entities in
-                // RealityKit 2026 unified attachment updates are handled
-                // automatically through @Observable entity property tracking
-            } content: {
-                RealityViewContent { attachments in
-                    // Register attachment handlers for fixture HUDs
-                    // using the RealityKit 2026 native ViewAttachmentComponent
-                    for fixture in sessionManager.trackedFixtures {
-                        attachments.add(fixture.hudEntityID.map { Entity($0) })
-                    }
-                }
+            } update: { content, attachments in
+                // Fixture HUD entities are managed directly via
+                // ViewAttachmentComponent(rootView:) on each entity.
+                // No additional update logic needed.
             }
         }
     }

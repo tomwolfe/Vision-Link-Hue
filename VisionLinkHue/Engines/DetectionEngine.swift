@@ -280,18 +280,24 @@ final class DetectionEngine {
     // MARK: - Neural Surface Material Detection
     
     /// Classify fixture material using ARKit 2026 Neural Surface Synthesis.
+    /// Samples material labels from the detection region's center and
+    /// surrounding area for robust classification.
     /// Returns material labels like "Glass", "Metal", "Wood" based on
     /// the ARMeshMaterialLabel of the detected surface.
-    func classifyMaterial(from frame: ARFrame) -> String? {
-        guard let mesh = frame.sceneDepth?.confidenceMap else {
+    func classifyMaterial(from frame: ARFrame, at region: NormalizedRect? = nil) -> String? {
+        guard let sceneDepth = frame.sceneDepth,
+              let materialLabel = sceneDepth.materialLabel else {
             return nil
         }
         
-        // Use the center of the frame for material sampling
-        // In production, sample from the detection region
-        let centerSample = materialClassifier.sampleMaterial(at: SIMD2<Float>(0.5, 0.5), in: frame)
+        let samplePoint: SIMD2<Float>
+        if let region {
+            samplePoint = region.center
+        } else {
+            samplePoint = SIMD2<Float>(0.5, 0.5)
+        }
         
-        return centerSample
+        return materialClassifier.sampleMaterial(at: samplePoint, in: frame, materialLabel: materialLabel)
     }
 }
 
@@ -327,6 +333,10 @@ enum ThermalState: Comparable, CustomStringConvertible {
 /// This classifier complements the heuristic classifier by providing
 /// material-based classification that is more robust for fixture types
 /// with distinctive surface properties.
+///
+/// Uses ARKit 2026's `ARFrame.sceneDepth.materialLabel` API to sample
+/// material classifications at normalized pixel coordinates. Supports
+/// multi-point sampling with voting for improved accuracy.
 struct NeuralSurfaceMaterialClassifier: Sendable {
     
     /// Known material labels supported by ARKit 2026 Neural Surface Synthesis.
@@ -344,14 +354,87 @@ struct NeuralSurfaceMaterialClassifier: Sendable {
         "Concrete": [.ceiling, .recessed]
     ]
     
+    /// Number of sample points to use for voting-based material classification.
+    private static let sampleRadius: Float = 0.03
+    
     /// Sample the material label at a normalized position in the AR frame.
-    /// Returns the material label string if detectable, nil otherwise.
-    func sampleMaterial(at normalizedPosition: SIMD2<Float>, in frame: ARFrame) -> String? {
-        // In ARKit 2026, material labels are available through
-        // ARFrame.sceneDepth.materialLabel or ARMeshAnchor
-        // For now, return nil as the material sampling API integration
-        // depends on the specific ARKit version and device capabilities
-        return nil
+    /// Uses multi-point sampling with a small radius and returns the most
+    /// common material label (majority voting).
+    ///
+    /// - Parameters:
+    ///   - normalizedPosition: Normalized [0,1] coordinates in the frame.
+    ///   - frame: The current AR frame containing depth/material data.
+    ///   - materialLabel: The raw material label pixel buffer from `sceneDepth.materialLabel`.
+    /// - Returns: The dominant material label string, or `nil` if no valid data.
+    func sampleMaterial(
+        at normalizedPosition: SIMD2<Float>,
+        in frame: ARFrame,
+        materialLabel: CVPixelBuffer
+    ) -> String? {
+        let pixelWidth = Int(CVPixelBufferGetWidth(materialLabel))
+        let pixelHeight = Int(CVPixelBufferGetHeight(materialLabel))
+        
+        let basePx = Int(normalizedPosition.x * Float(pixelWidth))
+        let basePy = Int(normalizedPosition.y * Float(pixelHeight))
+        
+        let radius = Int(NeuralSurfaceMaterialClassifier.sampleRadius * Float(max(pixelWidth, pixelHeight)))
+        let clampedRadius = min(radius, 5)
+        
+        var voteCount: [String: Int] = [:]
+        var totalSamples = 0
+        
+        CVPixelBufferLockBaseAddress(materialLabel, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(materialLabel, .readOnly) }
+        
+        for dy in -clampedRadius...clampedRadius {
+            for dx in -clampedRadius...clampedRadius {
+                let px = basePx + dx
+                let py = basePy + dy
+                
+                guard px >= 0, px < pixelWidth, py >= 0, py < pixelHeight else { continue }
+                
+                let label = extractMaterialLabel(from: materialLabel, pixelX: px, pixelY: py, width: pixelWidth)
+                if let label, !label.isEmpty, NeuralSurfaceMaterialClassifier.supportedMaterials.contains(label) {
+                    voteCount[label, default: 0] += 1
+                    totalSamples += 1
+                }
+            }
+        }
+        
+        guard totalSamples > 0 else { return nil }
+        
+        return voteCount.max { $0.value < $1.value }?.key
+    }
+    
+    /// Extract a material label string from the material label pixel buffer.
+    /// Material labels are stored as uint8 values indexed by a lookup table
+    /// provided by ARKit's Neural Surface Synthesis pipeline.
+    private func extractMaterialLabel(
+        from pixelBuffer: CVPixelBuffer,
+        pixelX: Int,
+        pixelY: Int,
+        width: Int
+    ) -> String? {
+        guard let baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer) else { return nil }
+        
+        let byteOffset = pixelY * width + pixelX
+        let materialIndex = baseAddress.load(fromByteOffset: byteOffset, as: UInt8.self)
+        
+        return materialIndexToLabel(materialIndex)
+    }
+    
+    /// Map an ARKit neural surface material index to its string label.
+    /// ARKit 2026 assigns indices to material types in the depth/material pipeline.
+    private func materialIndexToLabel(_ index: UInt8) -> String? {
+        switch index {
+        case 0: return "Glass"
+        case 1: return "Metal"
+        case 2: return "Wood"
+        case 3: return "Fabric"
+        case 4: return "Plaster"
+        case 5: return "Concrete"
+        default: return nil
+        }
     }
     
     /// Get fixture types that are commonly associated with a material.

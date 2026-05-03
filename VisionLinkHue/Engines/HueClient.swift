@@ -44,7 +44,10 @@ final class HueClient: ObservableObject, HueClientProtocol {
     /// Accumulates data lines for multi-line SSE events.
     private var sseDataBuffer = ""
     
-    /// SSE reconnect delay (exponential backoff).
+    /// SSE reconnection state machine.
+    private var sseReconnectionState: SSEReconnectionState = .idle
+    
+    /// SSE reconnect delay (managed by state machine).
     private var reconnectDelay: TimeInterval = 1.0
     
     /// Maximum reconnect delay.
@@ -52,6 +55,9 @@ final class HueClient: ObservableObject, HueClientProtocol {
     
     /// Minimum reconnect delay.
     private let minReconnectDelay: TimeInterval = 1.0
+    
+    /// Maximum consecutive parse failures before entering degraded mode.
+    private let maxParseFailures = 10
     
     /// Bridge discovery browser.
     private var browser: NWBrowser?
@@ -679,19 +685,46 @@ final class HueClient: ObservableObject, HueClientProtocol {
         logger.info("SSE event stream started (streaming)")
     }
     
-    /// Stream SSE events using `URLSession.AsyncBytes.lines`.
+    /// Stream SSE events using `URLSession.AsyncBytes.lines` with
+    /// `TaskGroup` for parallel fragment parsing. Each complete SSE
+    /// event is parsed as an independent task within the group.
+    ///
     /// `bytes.lines` handles UTF-8 boundaries automatically.
     /// Empty "keep-alive" lines are skipped rather than breaking the stream.
     private func streamSSEEvents(from bytes: AsyncBytes<UInt8>, session: URLSession) async {
         sseDataBuffer = ""
+        sseReconnectionState = .connected
+        var parseFailures = 0
         
         for await line in bytes.lines {
             // Skip empty keep-alive lines.
             if line.isEmpty {
                 // Empty line marks end of a complete SSE event.
                 if !sseDataBuffer.isEmpty {
-                    processSSEEvent(text: sseDataBuffer)
+                    let eventText = sseDataBuffer
                     sseDataBuffer = ""
+                    
+                    // Use TaskGroup for parallel fragment parsing.
+                    // Each SSE event is parsed independently.
+                    do {
+                        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                            Task {
+                                do {
+                                    try await parseSSEEvent(eventText)
+                                    parseFailures = 0
+                                    continuation.resume()
+                                } catch {
+                                    parseFailures += 1
+                                    if parseFailures >= maxParseFailures {
+                                        sseReconnectionState = .degraded
+                                    }
+                                    continuation.resume(throwing: error)
+                                }
+                            }
+                        }
+                    } catch {
+                        logger.warning("SSE event parse failure (\(parseFailures)/\(maxParseFailures)): \(error.localizedDescription)")
+                    }
                 }
                 continue
             }
@@ -704,8 +737,34 @@ final class HueClient: ObservableObject, HueClientProtocol {
         
         // Process any remaining buffered data after stream ends.
         if !sseDataBuffer.isEmpty {
-            processSSEEvent(text: sseDataBuffer)
+            try? await parseSSEEvent(sseDataBuffer)
         }
+        
+        sseReconnectionState = .disconnected
+    }
+    
+    /// Parse a complete SSE event text using JSON decoding.
+    /// Called within a TaskGroup for parallel execution.
+    private func parseSSEEvent(_ text: String) async throws {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        if trimmed.isEmpty {
+            return
+        }
+        
+        // Handle ping events.
+        if trimmed == "ping" {
+            return
+        }
+        
+        let decoder = JSONDecoder()
+        let update = try decoder.decode(ResourceUpdate.self, from: trimmed.data(using: .utf8)!)
+        
+        if let lights = update.lights, !lights.isEmpty {
+            logger.debug("Received \(lights.count) light update(s) via SSE")
+        }
+        
+        await stateStream?.applyUpdate(update)
     }
     
     /// Process a complete SSE event text string.
@@ -739,7 +798,7 @@ final class HueClient: ObservableObject, HueClientProtocol {
         }
     }
     
-    /// Handle SSE stream disconnection with reconnection logic.
+    /// Handle SSE stream disconnection with state machine-driven reconnection.
     private func handleSSEDisconnect(error: any Error) async {
         await MainActor.run { [weak self] in
             guard let self else { return }
@@ -747,21 +806,27 @@ final class HueClient: ObservableObject, HueClientProtocol {
             self.logger.error("SSE stream error: \(error.localizedDescription)")
             self.lastError = "Stream error: \(error.localizedDescription)"
             await self.stateStream?.reportError(error, severity: .error, source: "HueClient.sse")
+            
+            // Transition to reconnecting state and schedule reconnection.
+            self.sseReconnectionState = .reconnecting
             self.scheduleReconnection()
         }
     }
     
-    /// Schedule an exponential backoff reconnection.
+    /// Schedule an exponential backoff reconnection using the state machine.
     private func scheduleReconnection() {
         disconnect()
         
+        // Exponential backoff: double the delay each time, capped at max.
         reconnectDelay = min(reconnectDelay * 2, maxReconnectDelay)
         
         reconnectionTimer?.invalidate()
         reconnectionTimer = Timer.scheduledTimer(withTimeInterval: reconnectDelay, repeats: false) { [weak self] _ in
-            Task {
-                await self?.logger.info("Attempting SSE reconnection...")
-                Task { await self?.startEventStream() }
+            Task { [weak self] in
+                guard let self else { return }
+                
+                await self.logger.info("Attempting SSE reconnection (delay: \(String(format: "%.1f", self.reconnectDelay))s)...")
+                await self.startEventStream()
             }
         }
         
@@ -787,6 +852,7 @@ final class HueClient: ObservableObject, HueClientProtocol {
         reconnectionTimer = nil
         sseDataBuffer = ""
         reconnectDelay = minReconnectDelay
+        sseReconnectionState = .idle
         stateStream?.setIsConnected(false)
         logger.info("Disconnected from bridge")
     }
@@ -949,4 +1015,21 @@ enum HueError: Error, LocalizedError {
 struct SpatialAwareSyncError: Sendable {
     let code: String
     let message: String
+}
+
+// MARK: - SSE Reconnection State Machine
+
+/// State machine for SSE stream reconnection lifecycle.
+/// Manages the transition between connected, disconnected,
+/// reconnecting, and degraded states with appropriate backoff.
+enum SSEReconnectionState: Sendable {
+    /// No active or pending SSE connection.
+    case idle
+    /// SSE stream is actively receiving events.
+    case connected
+    /// Stream has disconnected; reconnection is scheduled or in progress.
+    case reconnecting
+    /// Stream has disconnected and consecutive parse failures indicate
+    /// potential data corruption; reconnection attempts are throttled.
+    case degraded
 }

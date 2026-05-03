@@ -177,17 +177,17 @@ final class HueStateStream {
     
     /// Mapping from local fixture UUID to Hue bridge light ID.
     /// Populated via tap-to-link in the HUD.
+    /// Backed by SwiftData for atomic spatial coordinate persistence.
     private(set) var fixtureLightMapping: [UUID: String] = [:]
     
     /// Dedicated actor for error notification handling.
     /// Prevents main-thread hangs during SSE reconnection bursts.
     private let notificationSystem = AppNotificationSystem()
     
-    private let userDefaults = UserDefaults.standard
-    private let fixtureMappingKey = "com.tomwolfe.visionlinkhue.fixtureLightMapping"
-    private let bridgeConfigKey = "com.tomwolfe.visionlinkhue.bridgeConfig"
+    private let persistence: FixturePersistence
     
-    init() {
+    init(persistence: FixturePersistence = .shared) {
+        self.persistence = persistence
         notificationSystem.onNotification = { [weak self] notifications in
             // Update the UI-visible error list on the caller's context
             // The actor guarantees thread-safe access to activeErrors
@@ -245,15 +245,17 @@ final class HueStateStream {
     }
     
     /// Link a local fixture UUID to a Hue bridge light ID.
+    /// Persists the mapping atomically via SwiftData.
     func linkFixture(_ fixtureId: UUID, toLight lightId: String) {
         fixtureLightMapping[fixtureId] = lightId
-        saveFixtureLightMapping()
+        persistence.linkFixture(fixtureId, toLight: lightId)
     }
     
     /// Unlink a local fixture from its mapped Hue light.
+    /// Persists the change atomically via SwiftData.
     func unlinkFixture(_ fixtureId: UUID) {
         fixtureLightMapping.removeValue(forKey: fixtureId)
-        saveFixtureLightMapping()
+        persistence.unlinkFixture(fixtureId)
     }
     
     /// Resolve a scene by its ID.
@@ -292,62 +294,48 @@ final class HueStateStream {
     
     // MARK: - State Persistence
     
-    /// Load persisted fixture-light mappings and bridge config from UserDefaults.
+    /// Load persisted fixture-light mappings from SwiftData.
     private func loadPersistedState() {
-        if let data = userDefaults.data(forKey: fixtureMappingKey),
-           let mapping = try? JSONDecoder().decode([String: String].self, from: data) {
-            self.fixtureLightMapping = mapping.mapKeys { UUID(uuidString: $0) ?? UUID(), $1 }
-        }
-        
-        if let data = userDefaults.data(forKey: bridgeConfigKey),
-           let config = try? JSONDecoder().decode(BridgeConfig.self, from: data) {
-            self.bridgeConfig = config
+        let mappings = persistence.loadMappings()
+        self.fixtureLightMapping = mappings.compactMap { mapping in
+            guard let lightId = mapping.lightId else { return nil }
+            return (mapping.uuid, lightId)
+        }.reduce(into: [:]) { result, pair in
+            result[pair.0] = pair.1
         }
     }
     
-    /// Persist the current fixture-light mapping to UserDefaults.
-    func saveFixtureLightMapping() {
-        let stringMapping = fixtureLightMapping.mapKeys { $0.uuidString, $1 }
-        if let data = try? JSONEncoder().encode(stringMapping) {
-            userDefaults.set(data, forKey: fixtureMappingKey)
-        }
+    /// Save a fixture mapping with spatial coordinates to SwiftData.
+    func saveFixtureMapping(
+        fixtureId: UUID,
+        lightId: String?,
+        position: SIMD3<Float>,
+        orientation: simd_quatf,
+        distanceMeters: Float,
+        fixtureType: String,
+        confidence: Double
+    ) {
+        persistence.saveMapping(
+            fixtureId: fixtureId,
+            lightId: lightId,
+            position: position,
+            orientation: orientation,
+            distanceMeters: distanceMeters,
+            fixtureType: fixtureType,
+            confidence: confidence
+        )
     }
     
-    /// Persist the current bridge config to UserDefaults.
-    func saveBridgeConfig() {
-        if let config = bridgeConfig {
-            if let data = try? JSONEncoder().encode(config) {
-                userDefaults.set(data, forKey: bridgeConfigKey)
-            }
-        }
+    /// Mark a fixture mapping as synced to the Hue Bridge.
+    func markFixtureSynced(_ fixtureId: UUID) {
+        persistence.markSynced(fixtureId)
     }
     
-    /// Clear all persisted state.
+    /// Clear all persisted fixture mappings.
     func clearPersistedState() {
-        userDefaults.removeObject(forKey: fixtureMappingKey)
-        userDefaults.removeObject(forKey: bridgeConfigKey)
+        persistence.clearAllMappings()
+        fixtureLightMapping.removeAll()
     }
 }
 
-extension Dictionary {
-    /// Convert a dictionary with UUID keys to a string-keyed dictionary.
-    func mapKeys<Key: Hashable, Value>(_ keyTransform: (Key) -> String, _ valueTransform: (Value) -> Value) -> [String: Value] {
-        var result: [String: Value] = [:]
-        for (key, value) in self {
-            result[keyTransform(key)] = valueTransform(value)
-        }
-        return result
-    }
-}
 
-extension Dictionary where Key == UUID, Value == String {
-    /// Convert a string-keyed dictionary to a UUID-keyed dictionary.
-    init(mapKeys: [String: Value]) {
-        self = [:]
-        for (keyString, value) in mapKeys {
-            if let uuid = UUID(uuidString: keyString) {
-                self[uuid] = value
-            }
-        }
-    }
-}

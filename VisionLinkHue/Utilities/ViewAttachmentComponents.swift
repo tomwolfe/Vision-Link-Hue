@@ -1,68 +1,64 @@
 import RealityKit
+import SwiftUI
 import Foundation
 
-/// Manual view attachment component for SwiftUI integration.
-/// Deprecated: Use RealityKit 26's native ViewAttachmentComponent instead.
-/// The manual component is retained only for backward compatibility during
-/// the migration period. All new code should use the unified ViewAttachmentComponent
-/// API introduced in RealityKit 2026.
+/// RealityKit 2026 fixture HUD entity factory.
+/// Uses the native ViewAttachmentComponent(rootView:) API for automatic
+/// SwiftUI view lifecycle management and @Observable-driven entity updates.
 ///
-/// Migration: Replace manual ViewAttachmentComponent usage with the native
-/// `ViewAttachmentComponent` from RealityKit, which provides automatic
-/// lifecycle management and @Observable-driven SwiftUI updates.
-@available(*, deprecated, renamed: "RealityKit.ViewAttachmentComponent", message: "Use RealityKit 26's native ViewAttachmentComponent for automatic SwiftUI view lifecycle management and @Observable-driven entity updates.")
-struct ViewAttachmentComponent: Component, Sendable {
-    /// The parent anchor entity this view is attached to.
-    let parent: Entity
+/// This replaces the deprecated manual ViewAttachmentComponent and
+/// HUDAttachmentComponent components. All new fixture HUDs use the
+/// unified RealityKit 26 attachment system.
+@MainActor
+final class FixtureHUDFactory {
     
-    /// Position offset from the parent anchor.
-    let offset: SIMD3<Float>
-    
-    /// Whether the view should always face the camera (billboard).
-    var billboard: Bool = false
-}
-
-/// RealityKit 2026 Unified Attachment Component.
-/// Uses the finalized 2026 ViewAttachmentComponent API for attaching
-/// SwiftUI views to RealityKit entities with automatic lifecycle management.
-struct HUDAttachmentComponent: Component, Sendable {
-    /// The fixture UUID this HUD is associated with.
-    let fixtureId: UUID
-    
-    /// The parent anchor entity this view is attached to.
-    let parent: Entity
-    
-    /// Position offset from the parent anchor.
-    let offset: SIMD3<Float>
-    
-    /// Whether the view should always face the camera (billboard).
-    var billboard: Bool = true
-    
-    /// Initialize with the fixture ID and attachment parameters.
-    init(fixtureId: UUID, parent: Entity, offset: SIMD3<Float>) {
-        self.fixtureId = fixtureId
-        self.parent = parent
-        self.offset = offset
+    /// Create a HUD entity for a tracked fixture using the native
+    /// RealityKit 26 ViewAttachmentComponent API.
+    ///
+    /// The native ViewAttachmentComponent(rootView:) handles view lifecycle
+    /// automatically and drives SwiftUI updates through @Observable entity properties.
+    ///
+    /// - Parameters:
+    ///   - fixture: The tracked fixture to create a HUD for.
+    ///   - scene: The RealityKit scene to add the entity to.
+    ///   - anchor: The parent anchor entity for the HUD.
+    /// - Returns: The created entity, or nil if creation fails.
+    func createHUD(for fixture: TrackedFixture, in scene: RealityKit.Scene, parent anchor: Entity) -> Entity? {
+        let entity = ModelEntity()
+        entity.name = "FixtureHUD-\(fixture.id.uuidString)"
+        entity.position = fixture.position
+        entity.orientation = fixture.orientation
+        
+        let attachment = ViewAttachmentComponent(rootView: {
+            FixtureHUDView(fixture: fixture)
+        })
+        
+        entity.components.set(attachment)
+        entity.components.set(BillboardComponent())
+        
+        anchor.addChild(entity)
+        
+        return entity
     }
 }
 
-/// RealityKit 2026 native ViewAttachmentComponent wrapper.
-/// Bridges RealityViewContent to RealityKit entities for automatic
-/// SwiftUI view lifecycle management driven by @Observable properties.
-struct RealityViewAttachmentComponent: Component, Sendable {
-    /// The RealityView content used to render the attached SwiftUI view.
-    let content: RealityViewContent
+/// SwiftUI view rendered as a RealityKit HUD overlay on a fixture entity.
+struct FixtureHUDView: View {
+    let fixture: TrackedFixture
     
-    /// The parent anchor entity this view is attached to.
-    let parent: Entity
-    
-    /// Position offset from the parent anchor.
-    let offset: SIMD3<Float>
-    
-    /// Initialize with RealityView content and attachment parameters.
-    init(content: RealityViewContent, parent: Entity, offset: SIMD3<Float>) {
-        self.content = content
-        self.parent = parent
-        self.offset = offset
+    var body: some View {
+        VStack(spacing: 4) {
+            Text(fixture.type.displayName)
+                .font(.caption2)
+                .fontWeight(.semibold)
+            
+            Text(String(format: "%.1f m", fixture.distanceMeters))
+                .font(.system(size: 9))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 4))
+        .shadow(radius: 2)
     }
 }
