@@ -16,6 +16,11 @@ final class FixturePersistence: Sendable {
         category: "FixturePersistence"
     )
     
+    /// Whether the persistence layer is using in-memory storage instead of
+    /// persistent disk storage. When `true`, all fixture mappings will be
+    /// lost when the app terminates.
+    var isUsingInMemoryStorage: Bool = false
+    
     /// Shared singleton instance for app-wide persistence.
     static let shared = FixturePersistence()
     
@@ -30,6 +35,7 @@ final class FixturePersistence: Sendable {
             logger.info("FixturePersistence initialized with SwiftData")
         } catch {
             logger.warning("Failed to create persistent SwiftData container, falling back to in-memory: \(error.localizedDescription)")
+            isUsingInMemoryStorage = true
             do {
                 modelContainer = try ModelContainer(for: schema, configurations: [ModelConfiguration(isStoredInMemoryOnly: true)])
                 modelContext = ModelContext(modelContainer)

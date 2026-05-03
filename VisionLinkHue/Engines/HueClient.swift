@@ -478,6 +478,15 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
     
     // MARK: - Authenticated Request Helper
     
+    /// Transient error status codes that warrant automatic retry.
+    private static let retryableStatusCodes: Set<Int> = [408, 500, 502, 503, 504]
+    
+    /// Maximum number of retry attempts for transient failures.
+    private static let maxRetries = 2
+    
+    /// Base delay between retries in seconds.
+    private static let retryBaseDelay: TimeInterval = 0.5
+    
     /// Perform an authenticated REST API request with a JSON body.
     /// Used internally by `HueSpatialService` for spatial-aware API calls.
     func authenticatedRequest<T: Codable>(
@@ -494,7 +503,7 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
         
         let session = urlSession ?? URLSession.shared
         
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await authenticatedRequestWithRetry(session: session, request: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw HueError.invalidResponse
@@ -520,7 +529,7 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
         
         let session = urlSession ?? URLSession.shared
         
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await authenticatedRequestWithRetry(session: session, request: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw HueError.invalidResponse
@@ -532,6 +541,57 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
         }
         
         return (data, response)
+    }
+    
+    /// Perform a request with automatic retry for transient network failures.
+    private func authenticatedRequestWithRetry(
+        session: URLSession,
+        request: URLRequest
+    ) async throws -> (data: Data, response: URLResponse) {
+        var lastError: any Error = HueError.invalidResponse
+        
+        for attempt in 0...Self.maxRetries {
+            do {
+                let (data, response) = try await session.data(for: request)
+                
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw HueError.invalidResponse
+                }
+                
+                if Self.retryableStatusCodes.contains(httpResponse.statusCode) {
+                    lastError = HueError.apiError(statusCode: httpResponse.statusCode, message: "Transient server error on attempt \(attempt + 1)")
+                    if attempt < Self.maxRetries {
+                        let delay = Self.retryBaseDelay * (2.0.pow(Double(attempt)))
+                        logger.debug("Retryable status \(httpResponse.statusCode) on attempt \(attempt + 1), retrying in \(String(format: "%.2f", delay))s")
+                        try? await Task.sleep(for: .seconds(delay))
+                    } else {
+                        let errorMsg = String(data: data, encoding: .utf8) ?? "Unknown error (\(httpResponse.statusCode))"
+                        throw HueError.apiError(statusCode: httpResponse.statusCode, message: errorMsg)
+                    }
+                } else {
+                    return (data, response)
+                }
+            } catch {
+                lastError = error
+                
+                // Check if it's a URL session timeout error
+                let nsError = error as NSError
+                let isURLErrorTimeout = nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorTimedOut
+                let isURLErrorCancelled = nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
+                
+                if isURLErrorTimeout && attempt < Self.maxRetries {
+                    let delay = Self.retryBaseDelay * (2.0.pow(Double(attempt)))
+                    logger.debug("Timeout on attempt \(attempt + 1), retrying in \(String(format: "%.2f", delay))s")
+                    try? await Task.sleep(for: .seconds(delay))
+                } else if isURLErrorCancelled {
+                    throw error
+                } else {
+                    throw error
+                }
+            }
+        }
+        
+        throw lastError
     }
 }
 

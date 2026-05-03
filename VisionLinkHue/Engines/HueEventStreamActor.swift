@@ -37,6 +37,9 @@ actor HueEventStreamActor {
     /// The active SSE parsing task (holds the stream for cancellation).
     private var sseTask: Task<Void, Never>?
     
+    /// The active reconnection backoff task.
+    private var reconnectTask: Task<Void, Never>?
+    
     /// Accumulates data lines for multi-line SSE events.
     private var sseDataBuffer = ""
     
@@ -228,7 +231,7 @@ actor HueEventStreamActor {
         let delay = reconnectDelay
         let params = pendingReconnection
         
-        Task { [weak self] in
+        reconnectTask = Task { [weak self] in
             guard let self else { return }
             
             try? await Task.sleep(for: .seconds(delay))
@@ -261,6 +264,8 @@ actor HueEventStreamActor {
     func disconnect() {
         sseTask?.cancel()
         sseTask = nil
+        reconnectTask?.cancel()
+        reconnectTask = nil
         urlSession = nil
         sseDataBuffer = ""
         reconnectDelay = minReconnectDelay

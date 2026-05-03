@@ -195,6 +195,17 @@ final class HueStateStream {
                 }
             }
         }
+        
+        if persistence.isUsingInMemoryStorage {
+            let inMemoryError = NSError(
+                domain: "FixturePersistence",
+                code: 1,
+                userInfo: [
+                    NSLocalizedDescriptionKey: "Fixture mappings are stored in memory only and will be lost when the app closes. Persistent storage is unavailable."
+                ]
+            )
+            reportError(inMemoryError, severity: .critical, source: "FixturePersistence")
+        }
     }
     
     /// Update active errors from the notification system.
