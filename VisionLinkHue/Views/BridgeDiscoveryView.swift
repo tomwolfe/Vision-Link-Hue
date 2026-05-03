@@ -67,8 +67,8 @@ struct BridgeDiscoveryView: View {
                     }
                 }
                 
-                if let error = hueClient.lastError {
-                    Text(error)
+                if let error = stateStream.activeErrors.first {
+                    Text(error.displayMessage)
                         .font(.caption)
                         .foregroundStyle(.red)
                         .padding(.horizontal)

@@ -68,7 +68,7 @@ struct ScoringConfig {
 }
 
 /// JSON-serializable representation of a scoring rule for config file loading.
-private struct JSONScoringRule: Codable {
+struct JSONScoringRule: Sendable {
     let type: String
     let aspectRange: [Double]?
     let yRange: [Double]?
@@ -77,7 +77,7 @@ private struct JSONScoringRule: Codable {
 }
 
 /// JSON-serializable configuration for heuristic classification.
-private struct ClassificationConfigFile: Codable {
+struct ClassificationConfigFile: Codable {
     let version: String?
     let description: String?
     let config: ConfigSection?
@@ -85,6 +85,7 @@ private struct ClassificationConfigFile: Codable {
     
     struct ConfigSection: Codable {
         let specificity: [String: Int]?
+        let materialFixtureMapping: [String: [String]]?
     }
 }
 

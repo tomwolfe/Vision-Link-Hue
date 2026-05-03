@@ -1,6 +1,6 @@
 {
-    "version": "1.0.0",
-    "description": "Fixture classification scoring rules for OTA updates",
+    "version": "1.1.0",
+    "description": "Fixture classification scoring rules and material-to-fixture mappings for OTA updates",
     "config": {
         "aspectRanges": {
             "squareRange": [0.2, 0.8],
@@ -26,6 +26,14 @@
             "pendant": 2,
             "strip": 1,
             "lamp": 0
+        },
+        "materialFixtureMapping": {
+            "Glass": ["recessed", "ceiling"],
+            "Metal": ["pendant", "lamp"],
+            "Wood": ["ceiling", "recessed"],
+            "Fabric": ["lamp", "pendant"],
+            "Plaster": ["ceiling", "recessed"],
+            "Concrete": ["ceiling", "recessed"]
         }
     },
     "rules": [

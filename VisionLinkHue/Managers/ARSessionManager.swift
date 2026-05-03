@@ -60,17 +60,10 @@ final class ARSessionManager {
     // MARK: - Session Lifecycle
     
     /// Configure and start the AR session with scene reconstruction.
+    /// The AR session is already running via ARViewRepresentable;
+    /// this method sets up the root anchor and starts the detection engine.
     func configureAndStart(in arView: ARView) async {
         self.arView = arView
-        
-        let configuration = ARWorldTrackingConfiguration()
-        #if !targetEnvironment(simulator)
-        configuration.worldReconstructionMode = ARWorldTrackingConfiguration.WorldReconstructionMode.automatic
-        configuration.planeDetection = [.horizontal, .vertical]
-        configuration.lightEstimation = .automatic
-        #else
-        configuration.planeDetection = [.horizontal, .vertical]
-        #endif
         
         isSessionActive = true
         

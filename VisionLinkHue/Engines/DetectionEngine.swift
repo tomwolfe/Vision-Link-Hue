@@ -40,7 +40,14 @@ final class DetectionEngine: @unchecked Sendable {
     private let classifier = FixtureHeuristicClassifier()
     
     /// Neural surface material classifier for ARKit 2026 material detection.
-    private let materialClassifier = NeuralSurfaceMaterialClassifier()
+    private let materialClassifier: NeuralSurfaceMaterialClassifier
+    
+    /// Initialize with material fixture mapping loaded from classification_rules.json.
+    init() {
+        self.materialClassifier = NeuralSurfaceMaterialClassifier(
+            materialFixtureMapping: NeuralSurfaceMaterialClassifier.loadMaterialMapping()
+        )
+    }
     
     /// Timestamp of the last inference pass.
     private var lastInferenceTime: CFAbsoluteTime = 0
@@ -341,6 +348,9 @@ enum ThermalState: Comparable, CustomStringConvertible {
 /// Uses ARKit 2026's `ARFrame.sceneDepth.materialLabel` API to sample
 /// material classifications at normalized pixel coordinates. Supports
 /// multi-point sampling with voting for improved accuracy.
+///
+/// Material-to-fixture-type mapping is loaded from `classification_rules.json`
+/// to enable OTA updates without recompiling.
 struct NeuralSurfaceMaterialClassifier: Sendable {
     
     /// Known material labels supported by ARKit 2026 Neural Surface Synthesis.
@@ -348,8 +358,8 @@ struct NeuralSurfaceMaterialClassifier: Sendable {
         "Glass", "Metal", "Wood", "Fabric", "Plaster", "Concrete"
     ]
     
-    /// Material-to-fixture-type mapping for enhanced classification.
-    static let materialFixtureMapping: [String: [FixtureType]] = [
+    /// Default material-to-fixture-type mapping (used when config is unavailable).
+    private static let defaultMaterialFixtureMapping: [String: [FixtureType]] = [
         "Glass": [.recessed, .ceiling],
         "Metal": [.pendant, .lamp],
         "Wood": [.ceiling, .recessed],
@@ -358,8 +368,36 @@ struct NeuralSurfaceMaterialClassifier: Sendable {
         "Concrete": [.ceiling, .recessed]
     ]
     
+    /// Material-to-fixture-type mapping loaded from classification_rules.json.
+    private let materialFixtureMapping: [String: [FixtureType]]
+    
     /// Number of sample points to use for voting-based material classification.
     private static let sampleRadius: Float = 0.03
+    
+    /// Initialize with a material fixture mapping from the classification config.
+    /// - Parameter mapping: Material-to-fixture-type mapping loaded from `classification_rules.json`.
+    init(materialFixtureMapping: [String: [FixtureType]] = NeuralSurfaceMaterialClassifier.defaultMaterialFixtureMapping) {
+        self.materialFixtureMapping = materialFixtureMapping
+    }
+    
+    /// Load the material-to-fixture-type mapping from classification_rules.json.
+    /// Falls back to the default mapping if the config file is unavailable.
+    static func loadMaterialMapping() -> [String: [FixtureType]] {
+        // Try to load from the bundled classification_rules.json
+        guard let url = Bundle.main.url(forResource: "classification_rules", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let config = try? JSONDecoder().decode(ClassificationConfigFile.self, from: data),
+              let mapping = config.config?.materialFixtureMapping else {
+            return defaultMaterialFixtureMapping
+        }
+        
+        var result: [String: [FixtureType]] = [:]
+        for (material, fixtureNames) in mapping {
+            result[material] = fixtureNames.compactMap { FixtureType(from: $0) }
+        }
+        
+        return result.isEmpty ? defaultMaterialFixtureMapping : result
+    }
     
     /// Sample the material label at a normalized position in the AR frame.
     /// Uses multi-point sampling with a small radius and returns the most
@@ -442,8 +480,9 @@ struct NeuralSurfaceMaterialClassifier: Sendable {
     }
     
     /// Get fixture types that are commonly associated with a material.
+    /// Uses the mapping loaded from `classification_rules.json`.
     func fixtureTypes(forMaterial material: String) -> [FixtureType] {
-        NeuralSurfaceMaterialClassifier.materialFixtureMapping[material, default: []]
+        materialFixtureMapping[material, default: []]
     }
 }
 

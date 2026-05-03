@@ -15,9 +15,6 @@ protocol HueClientProtocol: AnyObject {
     /// The authenticated API key (username).
     var apiKey: String? { get }
     
-    /// Last error message, if any.
-    var lastError: String? { get }
-    
     /// Discover Hue bridges on the local network using mDNS.
     func discoverBridges() async -> [BridgeInfo]
     

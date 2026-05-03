@@ -2,69 +2,59 @@ import SwiftUI
 import RealityKit
 import ARKit
 
-/// SwiftUI view that manages an ARKit session using RealityKit 2026's
-/// `RealityView` for entity management with unified view attachments.
-/// Uses the native RealityKit 2026 ViewAttachmentComponent(rootView:)
-/// API for automatic SwiftUI view lifecycle management and @Observable-driven
-/// entity updates.
+/// SwiftUI view that manages an ARKit session using RealityKit.
+/// Provides a single ARView with frame callbacks for the detection pipeline.
+/// HUD entities are added directly via ARView.content for entity management.
 struct ARViewContainer: View {
     
     @Bindable var sessionManager: ARSessionManager
     let onFrameUpdate: (ARFrame) -> Void
-    let onARViewReady: (ARView) -> Void
-    
-    @State private var arViewRef: ARView?
+    let onARViewReady: (ARView) -> Void = { _ in }
     
     var body: some View {
-        ZStack {
-            ARViewRepresentable(
-                onFrameUpdate: onFrameUpdate,
-                onARViewReady: { arView in
-                    onARViewReady(arView)
-                    arViewRef = arView
-                }
-            )
-            .ignoresSafeArea()
-            
-            // RealityView overlay for SwiftUI-rendered HUD entities.
-            // Fixture HUDs are created directly on RealityKit entities using
-            // the native ViewAttachmentComponent(rootView:) API, so no
-            // additional RealityViewContent registration is needed.
-            RealityView { content in
-                guard let arView = arViewRef else { return }
-                
-                // Add a root entity for HUD overlays
-                let hudRoot = Entity()
-                hudRoot.name = "HUDRoot"
-                content.add(hudRoot)
-            } update: { content in
-                // Fixture HUD entities are managed directly via
-                // ViewAttachmentComponent(rootView:) on each entity.
-                // No additional update logic needed.
-            }
-        }
+        ARViewRepresentable(
+            sessionManager: sessionManager,
+            onFrameUpdate: onFrameUpdate
+        )
+        .ignoresSafeArea()
     }
 }
 
 /// UIViewRepresentable wrapper for ARKit's ARView.
-/// Uses the coordinator pattern for frame callbacks.
+/// Manages the AR session lifecycle and provides frame callbacks
+/// through the coordinator pattern.
 struct ARViewRepresentable: UIViewRepresentable {
     
+    @Bindable var sessionManager: ARSessionManager
     let onFrameUpdate: (ARFrame) -> Void
-    let onARViewReady: (ARView) -> Void
     
     func makeUIView(context: Context) -> ARView {
         let arView = ARView(frame: .zero)
-        let session = ARSession()
-        session.delegate = context.coordinator
-        session.run(ARWorldTrackingConfiguration())
         
-        onARViewReady(arView)
+        let configuration = ARWorldTrackingConfiguration()
+        #if !targetEnvironment(simulator)
+        configuration.worldReconstructionMode = ARWorldTrackingConfiguration.WorldReconstructionMode.automatic
+        configuration.planeDetection = [.horizontal, .vertical]
+        configuration.lightEstimation = .automatic
+        #else
+        configuration.planeDetection = [.horizontal, .vertical]
+        #endif
+        
+        arView.session.run(configuration)
+        arView.session.delegate = context.coordinator
+        
+        parent.onARViewReady(arView)
         
         return arView
     }
     
-    func updateUIView(_ uiView: ARView, context: Context) {}
+    func updateUIView(_ arView: ARView, context: Context) {
+        // Pass high-level session commands from ARSessionManager
+        // to the ARView's session
+        if !sessionManager.isSessionActive {
+            arView.session.pause()
+        }
+    }
     
     func makeCoordinator() -> Coordinator {
         Coordinator(self)

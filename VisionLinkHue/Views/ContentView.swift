@@ -35,11 +35,9 @@ struct ContentView: View {
     
     @State private var showSettings: Bool = false
     @State private var dismissedErrorId: UUID?
-    @State private var arViewRef: ARView?
     
     var body: some View {
         GeometryReader { geometry in
-                // AR session view
                 let sessionManager = arSessionManager
                 let detector = detectionEngine
                 let client = hueClient
@@ -55,7 +53,6 @@ struct ContentView: View {
                             }
                         },
                         onARViewReady: { arView in
-                            arViewRef = arView
                             Task {
                                 await sessionManager.configureAndStart(in: arView)
                             }

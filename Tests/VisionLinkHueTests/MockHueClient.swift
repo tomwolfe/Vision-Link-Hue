@@ -7,7 +7,11 @@ final class MockHueClient: HueClientProtocol {
     var bridgeIP: String?
     var bridgePort: Int = 80
     var apiKey: String?
-    var lastError: String?
+    
+    /// Mock discovery service.
+    let discoveryService: HueDiscoveryService
+    /// Mock spatial service.
+    let spatialService: HueSpatialService
     
     var didDiscoverBridges: [BridgeInfo] = []
     var didFetchState: Bool = false
@@ -24,6 +28,11 @@ final class MockHueClient: HueClientProtocol {
     private(set) var colorXycalls: [(resourceId: String, x: Double, y: Double)] = []
     private(set) var spatialSyncCalls: [Int] = []
     private(set) var spatialFetchCalls: Int = 0
+    
+    init() {
+        self.discoveryService = HueDiscoveryService()
+        self.spatialService = HueSpatialService(hueClient: self, stateStream: nil)
+    }
     
     func discoverBridges() async -> [BridgeInfo] {
         didDiscoverBridges = []
@@ -131,11 +140,11 @@ final class MockHueClient: HueClientProtocol {
     }
     
     var isCalibrated: Bool {
-        return false
+        spatialService.isCalibrated
     }
     
     var isSpatialAwareSupported: Bool {
-        return true
+        spatialService.isSpatialAwareSupported
     }
     
     func startEventStream() {

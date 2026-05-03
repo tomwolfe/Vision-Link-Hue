@@ -8,8 +8,11 @@ import Darwin
 #endif
 
 /// Network client that manages all communication with the Philips Hue Bridge
-/// using CLIP v2 API, mDNS discovery, mTLS with Trust-On-First-Use certificate
-/// pinning, and Server-Sent Events (SSE) for real-time state updates.
+/// using CLIP v2 API, mTLS with Trust-On-First-Use certificate pinning,
+/// and Server-Sent Events (SSE) for real-time state updates.
+///
+/// Acts as the authenticated transport layer, composing `HueDiscoveryService`
+/// for bridge discovery and `HueSpatialService` for spatial awareness operations.
 @MainActor
 final class HueClient: ObservableObject, HueClientProtocol {
     
@@ -19,7 +22,6 @@ final class HueClient: ObservableObject, HueClientProtocol {
     @Published var bridgePort: Int = 80
     @Published var apiKey: String?
     @Published var bridgeConfig: BridgeConfig?
-    @Published var lastError: String?
     
     /// The authenticated username (API key) for bridge communication.
     var username: String? { apiKey }
@@ -44,25 +46,23 @@ final class HueClient: ObservableObject, HueClientProtocol {
     /// Isolates high-frequency network events from the MainActor.
     private let eventStream = HueEventStreamActor()
     
-    /// Bridge discovery browser.
-    private var browser: NWBrowser?
-    
     /// State stream publisher.
     weak var stateStream: HueStateStream?
     
-    // MARK: - Spatial Calibration
+    // MARK: - Composed Services
     
-    /// Dedicated engine for computing ARKit-to-Bridge coordinate transformations
-    /// using the Kabsch algorithm with SVD for numerical stability.
-    private let calibrationEngine = SpatialCalibrationEngine()
+    /// Service for discovering Hue bridges on the local network.
+    let discoveryService: HueDiscoveryService
     
-    /// Whether a valid 3+ point calibration has been established.
-    var isCalibrated: Bool { calibrationEngine.isCalibrated }
+    /// Service for spatial awareness and coordinate transformation.
+    let spatialService: HueSpatialService
     
     // MARK: - Initialization
     
     init(stateStream: HueStateStream) {
         self.stateStream = stateStream
+        self.discoveryService = HueDiscoveryService()
+        self.spatialService = HueSpatialService(hueClient: self, stateStream: stateStream)
         setupURLSession()
     }
     
@@ -73,36 +73,9 @@ final class HueClient: ObservableObject, HueClientProtocol {
     // MARK: - Bridge Discovery
     
     /// Discover Hue bridges on the local network using mDNS.
-    /// Uses a synchronous browser with a 3-second timeout.
+    /// Delegates to `HueDiscoveryService`.
     func discoverBridges() async -> [BridgeInfo] {
-        var discoveredBridges: [BridgeInfo] = []
-        var seenIPs = Set<String>()
-        let semaphore = DispatchSemaphore(value: 0)
-        
-        let serviceBrowser = NetServiceBrowser()
-        let mdnsDelegate = MDNSDelegate(
-            onFound: { [weak self] name, ip, port in
-                if !seenIPs.contains(ip) {
-                    seenIPs.insert(ip)
-                    discoveredBridges.append(BridgeInfo(name: name, ip: ip, port: port))
-                    self?.logger.info("Found Hue bridge: \(name) at \(ip):\(port)")
-                }
-            },
-            onFinished: { semaphore.signal() }
-        )
-        serviceBrowser.delegate = mdnsDelegate
-        
-        serviceBrowser.searchForServices(ofType: "_hue._tcp.", inDomain: "local.")
-        
-        // Wait up to 3 seconds for discovery
-        try? await Task.sleep(for: .seconds(3))
-        serviceBrowser.stop()
-        
-        if discoveredBridges.isEmpty {
-            await stateStream?.reportError(HueError.noBridgeConfigured, severity: .warning, source: "HueClient.discover")
-        }
-        
-        return discoveredBridges
+        await discoveryService.discoverBridges(stateStream: stateStream)
     }
     
     // MARK: - Authentication
@@ -238,242 +211,103 @@ final class HueClient: ObservableObject, HueClientProtocol {
     // MARK: - SpatialAware API (Spring 2026)
     
     /// Check if the connected bridge supports SpatialAware features.
-    /// Returns true if firmware version >= 1.976 (Bridge Pro or v2 Bridge with 2026 Spring update).
-    var isSpatialAwareSupported: Bool {
-        guard let bridgeState = stateStream?.bridgeConfig else { return false }
-        // Check if we have firmware version info available through resources
-        return true // Checked at sync time via API response
-    }
+    /// Delegates to `HueSpatialService`.
+    var isSpatialAwareSupported: Bool { spatialService.isSpatialAwareSupported }
     
     /// Verify firmware compatibility before attempting SpatialAware sync.
-    /// Returns the bridge spatial info if supported, throws otherwise.
+    /// Delegates to `HueSpatialService`.
     func verifySpatialAwareCompatibility() async throws -> BridgeSpatialInfo {
-        guard let username = apiKey else {
-            throw HueError.noApiKey
-        }
-        
-        guard let ip = bridgeIP else {
-            throw HueError.noBridgeConfigured
-        }
-        
-        let url = URL(string: "https://\(ip):\(bridgePort)/api/\(username)/config")!
-        
-        let (data, _) = try await authenticatedRequest(url: url, method: "GET", body: nil as HueBridgeState?)
-        
-        // Decode bridge config to extract firmware version
-        // The bridge returns firmware_version as part of the config response
-        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let firmwareVersion = json["software_version"] as? [String: String],
-           let main = firmwareVersion["main"] {
-            
-            let parts = main.split(separator: ".").compactMap { Int($0) }
-            let major = parts.first ?? 0
-            let minor = parts.count > 1 ? parts[1] : 0
-            
-            let supportsSpatial = major > SpatialAwareFirmwareRequirement.minimumMajor ||
-                (major == SpatialAwareFirmwareRequirement.minimumMajor && minor >= SpatialAwareFirmwareRequirement.minimumMinor)
-            
-            guard supportsSpatial else {
-                throw HueError.spatialAwareNotSupported(
-                    currentFirmware: main,
-                    requiredFirmware: "\(SpatialAwareFirmwareRequirement.minimumMajor).\(SpatialAwareFirmwareRequirement.minimumMinor)"
-                )
-            }
-            
-            return BridgeSpatialInfo(
-                firmwareVersion: main,
-                supportsSpatialAware: true,
-                supportsRoomMapping: true,
-                supportedMaterialLabels: ["Glass", "Metal", "Wood", "Fabric", "Plaster", "Concrete"]
-            )
-        }
-        
-        // Fallback: assume supported if we can reach the endpoint
-        return BridgeSpatialInfo(
-            firmwareVersion: "unknown",
-            supportsSpatialAware: true,
-            supportsRoomMapping: false,
-            supportedMaterialLabels: []
-        )
+        try await spatialService.verifySpatialAwareCompatibility()
     }
     
     /// Map ARKit local space coordinates to Bridge Room Space coordinates.
-    /// Uses the Kabsch algorithm when calibrated, falling back
-    /// to a single-point origin offset when calibration is unavailable.
-    /// The bridge requires room_offset to be calibrated against the room's
-    /// primary entrance or a "Bridge Origin" defined in the Hue App.
-    func mapARKitToBridgeSpace(
-        arKitPosition: SIMD3<Float>,
-        arKitOrientation: simd_quatf,
-        referencePoint: SIMD3<Float>? = nil
-    ) -> (position: SpatialAwarePosition.Position3D, roomOffset: SpatialAwarePosition.RoomOffset?) {
-        let bridgePosition: SIMD3<Float>
-        
-        if isCalibrated {
-            // Apply Kabsch transformation for large-room accuracy
-            bridgePosition = calibrationEngine.mapToBridgeSpace(arKitPosition)
-        } else if let origin = referencePoint {
-            // Fallback: single-point origin offset
-            bridgePosition = origin + (arKitPosition - origin)
-        } else {
-            // Default: identity mapping
-            bridgePosition = arKitPosition
-        }
-        
-        let position = SpatialAwarePosition.Position3D(simd: bridgePosition)
-        let roomOffset = SpatialAwarePosition.RoomOffset(
-            relativeX: Double(bridgePosition.x),
-            relativeY: Double(bridgePosition.y),
-            relativeZ: Double(bridgePosition.z)
+    /// Delegates to `HueSpatialService`.
+    func mapARKitToBridgeSpace(arKitPosition: SIMD3<Float>, arKitOrientation: simd_quatf, referencePoint: SIMD3<Float>?) -> (position: SpatialAwarePosition.Position3D, roomOffset: SpatialAwarePosition.RoomOffset?) {
+        let result = spatialService.mapARKitToBridgeSpace(
+            arKitPosition: arKitPosition,
+            arKitOrientation: arKitOrientation,
+            referencePoint: referencePoint
         )
-        
-        return (position, roomOffset)
+        return (result.position, result.roomOffset)
     }
     
     /// Add a calibration point to the affine transformation solver.
-    /// Requires at least 3 points for a valid calibration.
-    /// Points are stored in FIFO order with a maximum of 6 points.
+    /// Delegates to `HueSpatialService`.
     func addCalibrationPoint(arKit: SIMD3<Float>, bridge: SIMD3<Float>) {
-        calibrationEngine.addCalibrationPoint(arKit: arKit, bridge: bridge)
+        spatialService.addCalibrationPoint(arKit: arKit, bridge: bridge)
     }
     
     /// Clear all calibration points.
+    /// Delegates to `HueSpatialService`.
     func clearCalibration() {
-        calibrationEngine.clearCalibration()
+        spatialService.clearCalibration()
     }
     
     /// Get the current calibration points for inspection.
+    /// Delegates to `HueSpatialService`.
     func getCalibrationPoints() -> [(arKit: SIMD3<Float>, bridge: SIMD3<Float>)] {
-        calibrationEngine.getCalibrationPoints()
+        spatialService.getCalibrationPoints()
     }
     
-    /// Create a full SpatialAwarePosition from ARKit detection data with
-    /// room-relative coordinate mapping.
+    /// Create a full SpatialAwarePosition from ARKit detection data.
+    /// Delegates to `HueSpatialService`.
     func createSpatialAwarePosition(
         lightId: String,
         arKitPosition: SIMD3<Float>,
         arKitOrientation: simd_quatf,
         confidence: Double,
         fixtureType: String,
-        materialLabel: String? = nil,
-        roomId: String? = nil,
-        areaId: String? = nil,
-        origin: SIMD3<Float>? = nil
+        materialLabel: String?,
+        roomId: String?,
+        areaId: String?,
+        origin: SIMD3<Float>?
     ) -> SpatialAwarePosition {
-        let (position, roomOffset) = mapARKitToBridgeSpace(
+        spatialService.createSpatialAwarePosition(
+            lightId: lightId,
             arKitPosition: arKitPosition,
             arKitOrientation: arKitOrientation,
-            referencePoint: origin
-        )
-        
-        return SpatialAwarePosition(
-            id: lightId,
-            position: position,
             confidence: confidence,
             fixtureType: fixtureType,
+            materialLabel: materialLabel,
             roomId: roomId,
             areaId: areaId,
-            timestamp: Date(),
-            orientation: SpatialAwarePosition.Orientation(simd: arKitOrientation),
-            materialLabel: materialLabel,
-            roomOffset: roomOffset
+            origin: origin
         )
     }
     
     /// Sync AR-detected fixture positions back to the Hue Bridge.
-    /// Bridges Pro firmware v1976+ supports room-relative coordinate offsets.
-    /// Automatically verifies firmware compatibility before syncing.
-    /// Maps ARKit local space to Bridge Room Space using the first fixture as origin.
+    /// Delegates to `HueSpatialService`.
     func syncSpatialAwareness(fixtures: [SpatialAwarePosition]) async throws {
-        guard let username = apiKey else {
-            throw HueError.noApiKey
-        }
-        
-        guard let ip = bridgeIP else {
-            throw HueError.noBridgeConfigured
-        }
-        
-        // Verify firmware compatibility before sync
-        _ = try await verifySpatialAwareCompatibility()
-        
-        let url = URL(string: "https://\(ip):\(bridgePort)/api/\(username)/spatial_awareness")!
-        
-        let request = SpatialAwareSyncRequest(fixtures: fixtures)
-        
-        let (data, response) = try await authenticatedRequest(url: url, method: "POST", body: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            throw HueError.invalidResponse
-        }
-        
-        let syncResponse = try JSONDecoder().decode(SpatialAwareSyncResponse.self, from: data)
-        
-        if let errors = syncResponse.errors, !errors.isEmpty {
-            let errorMessages = errors.map { "[$( $0.code)] \($0.message)" }.joined(separator: ", ")
-            logger.error("SpatialAware sync errors: \(errorMessages)")
-            throw HueError.spatialAwareSyncFailed(errors: errors.map { SpatialAwareSyncError(code: $0.code, message: $0.message) })
-        }
-        
-        if let warnings = syncResponse.warnings, !warnings.isEmpty {
-            let warningMessages = warnings.map { $0.message }.joined(separator: ", ")
-            logger.warning("SpatialAware sync warnings: \(warningMessages)")
-        }
-        
-        logger.info("Synced \(syncResponse.success.count) fixture positions to bridge")
+        try await spatialService.syncSpatialAwareness(fixtures: fixtures)
     }
     
     /// Sync a single fixture's spatial awareness data.
+    /// Delegates to `HueSpatialService`.
     func syncSpatialAwareness(fixture: SpatialAwarePosition) async throws {
-        try await syncSpatialAwareness(fixtures: [fixture])
+        try await spatialService.syncSpatialAwareness(fixture: fixture)
     }
     
     /// Get current spatial awareness data from the bridge.
+    /// Delegates to `HueSpatialService`.
     func fetchSpatialAwareness() async throws -> [SpatialAwarePosition] {
-        guard let username = apiKey else {
-            throw HueError.noApiKey
-        }
-        
-        guard let ip = bridgeIP else {
-            throw HueError.noBridgeConfigured
-        }
-        
-        let url = URL(string: "https://\(ip):\(bridgePort)/api/\(username)/resources/spatial_awareness")!
-        
-        let (data, _) = try await authenticatedRequest(url: url, method: "GET", body: nil as HueBridgeState?)
-        
-        let response = try JSONDecoder().decode(SpatialAwareSyncResponse.self, from: data)
-        
-        return response.success.compactMap { success in
-            // Reconstruct positions from bridge response
-            guard let light = stateStream?.light(by: success.id) else { return nil }
-            
-            return SpatialAwarePosition(
-                id: success.id,
-                position: SpatialAwarePosition.Position3D(x: 0, y: 0, z: 0),
-                confidence: success.confidence ?? 0.0,
-                fixtureType: light.metadata.archetypeValue.rawValue,
-                roomId: success.roomId,
-                areaId: nil,
-                timestamp: Date(),
-                orientation: nil,
-                materialLabel: nil,
-                roomOffset: nil
-            )
-        }
+        try await spatialService.fetchSpatialAwareness()
     }
+    
+    /// Whether a valid 3+ point calibration has been established.
+    /// Delegates to `HueSpatialService`.
+    var isCalibrated: Bool { spatialService.isCalibrated }
     
     // MARK: - SSE Event Stream
     
     /// Start the SSE connection to the bridge event stream using incremental streaming.
     func startEventStream() {
         guard let username = apiKey else {
-            lastError = "No API key configured"
+            stateStream?.reportError(HueError.noApiKey, severity: .error, source: "HueClient.startEventStream")
             return
         }
         
         guard let ip = bridgeIP else {
-            lastError = "No bridge configured"
+            stateStream?.reportError(HueError.noBridgeConfigured, severity: .error, source: "HueClient.startEventStream")
             return
         }
         
@@ -539,7 +373,6 @@ final class HueClient: ObservableObject, HueClientProtocol {
             if let first = bridges.first {
                 await connect(to: first)
             } else {
-                lastError = "No bridge found for reconnection"
                 Task { [stateStream] in
                     await stateStream?.reportError(HueError.noBridgeConfigured, severity: .error, source: "HueClient.reconnect")
                 }
@@ -587,7 +420,9 @@ final class HueClient: ObservableObject, HueClientProtocol {
     
     // MARK: - Authenticated Request Helper
     
-    private func authenticatedRequest<T: Codable>(
+    /// Perform an authenticated REST API request.
+    /// Used internally by `HueSpatialService` for spatial-aware API calls.
+    func authenticatedRequest<T: Codable>(
         url: URL,
         method: String,
         body: T?
@@ -616,53 +451,6 @@ final class HueClient: ObservableObject, HueClientProtocol {
         }
         
         return (data, response)
-    }
-}
-
-// MARK: - mDNS Delegate
-
-/// Simple NetServiceBrowser delegate for Hue bridge discovery.
-private final class MDNSDelegate: NSObject, NetServiceBrowserDelegate, NetServiceDelegate {
-    let onFound: (String, String, Int) -> Void
-    let onFinished: () -> Void
-    
-    init(onFound: @escaping (String, String, Int) -> Void, onFinished: @escaping () -> Void) {
-        self.onFound = onFound
-        self.onFinished = onFinished
-    }
-    
-    func netServiceBrowser(_ browser: NetServiceBrowser, didFind service: NetService, moreComing: Bool) {
-        service.delegate = self
-        service.resolve(withTimeout: 2.0)
-    }
-    
-    func netServiceBrowser(_ browser: NetServiceBrowser, didNotSearch errorDict: [String: Int]) {
-        onFinished()
-    }
-    
-    func netService(_ service: NetService, didResolve address: NetService) {
-        if let addresses = service.addresses, !addresses.isEmpty {
-            let addrData = addresses[0]
-            var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-            
-            addrData.withUnsafeBytes { ptr in
-                let addrPtr = ptr.baseAddress?.assumingMemoryBound(to: sockaddr.self)
-                if let addrPtr {
-                    let result = getnameinfo(
-                        addrPtr,
-                        socklen_t(addrData.count),
-                        &hostname,
-                        socklen_t(hostname.count),
-                        nil,
-                        0,
-                        NI_NUMERICHOST
-                    )
-                    
-                    let ip = result == 0 ? String(cString: hostname) : "unknown"
-                    onFound(service.name, ip, service.port)
-                }
-            }
-        }
     }
 }
 

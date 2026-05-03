@@ -8,8 +8,8 @@ import os
 /// persistence operations.
 final class FixturePersistence: @unchecked Sendable {
     
-    private let modelContainer: ModelContainer
-    private let modelContext: ModelContext
+    let modelContainer: ModelContainer
+    let modelContext: ModelContext
     private let logger = Logger(
         subsystem: "com.tomwolfe.visionlinkhue",
         category: "FixturePersistence"
@@ -29,6 +29,12 @@ final class FixturePersistence: @unchecked Sendable {
         } catch {
             fatalError("Failed to create FixturePersistence container: \(error.localizedDescription)")
         }
+    }
+    
+    /// Initialize with a custom ModelContainer (for testing).
+    init(container: ModelContainer) {
+        self.modelContainer = container
+        self.modelContext = ModelContext(container)
     }
     
     /// Load all persisted fixture mappings from SwiftData.
