@@ -212,18 +212,27 @@ final class HueClient: ObservableObject, HueClientProtocol {
     
     /// Check if the connected bridge supports SpatialAware features.
     /// Delegates to `HueSpatialService`.
-    var isSpatialAwareSupported: Bool { spatialService!.isSpatialAwareSupported }
+    var isSpatialAwareSupported: Bool { spatialService?.isSpatialAwareSupported ?? false }
     
     /// Verify firmware compatibility before attempting SpatialAware sync.
     /// Delegates to `HueSpatialService`.
     func verifySpatialAwareCompatibility() async throws -> BridgeSpatialInfo {
-        try await spatialService!.verifySpatialAwareCompatibility()
+        guard let spatialService else {
+            throw HueError.spatialServiceUnavailable
+        }
+        return try await spatialService.verifySpatialAwareCompatibility()
     }
     
     /// Map ARKit local space coordinates to Bridge Room Space coordinates.
     /// Delegates to `HueSpatialService`.
     func mapARKitToBridgeSpace(arKitPosition: SIMD3<Float>, arKitOrientation: simd_quatf, referencePoint: SIMD3<Float>?) -> (position: SpatialAwarePosition.Position3D, roomOffset: SpatialAwarePosition.RoomOffset?) {
-        let result = spatialService!.mapARKitToBridgeSpace(
+        guard let spatialService else {
+            return (
+                position: SpatialAwarePosition.Position3D(x: 0, y: 0, z: 0),
+                roomOffset: nil
+            )
+        }
+        let result = spatialService.mapARKitToBridgeSpace(
             arKitPosition: arKitPosition,
             arKitOrientation: arKitOrientation,
             referencePoint: referencePoint
@@ -234,19 +243,19 @@ final class HueClient: ObservableObject, HueClientProtocol {
     /// Add a calibration point to the affine transformation solver.
     /// Delegates to `HueSpatialService`.
     func addCalibrationPoint(arKit: SIMD3<Float>, bridge: SIMD3<Float>) {
-        spatialService!.addCalibrationPoint(arKit: arKit, bridge: bridge)
+        spatialService?.addCalibrationPoint(arKit: arKit, bridge: bridge)
     }
     
     /// Clear all calibration points.
     /// Delegates to `HueSpatialService`.
     func clearCalibration() {
-        spatialService!.clearCalibration()
+        spatialService?.clearCalibration()
     }
     
     /// Get the current calibration points for inspection.
     /// Delegates to `HueSpatialService`.
     func getCalibrationPoints() -> [(arKit: SIMD3<Float>, bridge: SIMD3<Float>)] {
-        spatialService!.getCalibrationPoints()
+        spatialService?.getCalibrationPoints() ?? []
     }
     
     /// Create a full SpatialAwarePosition from ARKit detection data.
@@ -262,7 +271,21 @@ final class HueClient: ObservableObject, HueClientProtocol {
         areaId: String?,
         origin: SIMD3<Float>?
     ) -> SpatialAwarePosition {
-        spatialService!.createSpatialAwarePosition(
+        guard let spatialService else {
+            return SpatialAwarePosition(
+                id: lightId,
+                position: SpatialAwarePosition.Position3D(x: 0, y: 0, z: 0),
+                confidence: confidence,
+                fixtureType: fixtureType,
+                roomId: roomId,
+                areaId: areaId,
+                timestamp: Date(),
+                orientation: nil,
+                materialLabel: materialLabel,
+                roomOffset: nil
+            )
+        }
+        return spatialService.createSpatialAwarePosition(
             lightId: lightId,
             arKitPosition: arKitPosition,
             arKitOrientation: arKitOrientation,
@@ -278,24 +301,33 @@ final class HueClient: ObservableObject, HueClientProtocol {
     /// Sync AR-detected fixture positions back to the Hue Bridge.
     /// Delegates to `HueSpatialService`.
     func syncSpatialAwareness(fixtures: [SpatialAwarePosition]) async throws {
-        try await spatialService!.syncSpatialAwareness(fixtures: fixtures)
+        guard let spatialService else {
+            throw HueError.spatialServiceUnavailable
+        }
+        try await spatialService.syncSpatialAwareness(fixtures: fixtures)
     }
     
     /// Sync a single fixture's spatial awareness data.
     /// Delegates to `HueSpatialService`.
     func syncSpatialAwareness(fixture: SpatialAwarePosition) async throws {
-        try await spatialService!.syncSpatialAwareness(fixture: fixture)
+        guard let spatialService else {
+            throw HueError.spatialServiceUnavailable
+        }
+        try await spatialService.syncSpatialAwareness(fixture: fixture)
     }
     
     /// Get current spatial awareness data from the bridge.
     /// Delegates to `HueSpatialService`.
     func fetchSpatialAwareness() async throws -> [SpatialAwarePosition] {
-        try await spatialService!.fetchSpatialAwareness()
+        guard let spatialService else {
+            throw HueError.spatialServiceUnavailable
+        }
+        return try await spatialService.fetchSpatialAwareness()
     }
     
     /// Whether a valid 3+ point calibration has been established.
     /// Delegates to `HueSpatialService`.
-    var isCalibrated: Bool { spatialService!.isCalibrated }
+    var isCalibrated: Bool { spatialService?.isCalibrated ?? false }
     
     // MARK: - SSE Event Stream
     
@@ -484,11 +516,13 @@ enum HueError: Error, LocalizedError {
     case authenticationFailed
     case noUsernameReturned
     case invalidResponse
+    case invalidURL
     case apiError(statusCode: Int, message: String)
     case certificatePinningFailed
     case sseConnectionLost
     case spatialAwareNotSupported(currentFirmware: String, requiredFirmware: String)
     case spatialAwareSyncFailed(errors: [SpatialAwareSyncError])
+    case spatialServiceUnavailable
     
     var errorDescription: String? {
         switch self {
@@ -497,6 +531,7 @@ enum HueError: Error, LocalizedError {
         case .authenticationFailed: return "Failed to authenticate with bridge"
         case .noUsernameReturned: return "Bridge did not return an API username"
         case .invalidResponse: return "Invalid response from bridge"
+        case .invalidURL: return "Failed to construct a valid URL"
         case .apiError(let code, let msg): return "API error \(code): \(msg)"
         case .certificatePinningFailed: return "Certificate pinning verification failed"
         case .sseConnectionLost: return "SSE connection lost"
@@ -505,6 +540,8 @@ enum HueError: Error, LocalizedError {
         case .spatialAwareSyncFailed(let errors):
             let messages = errors.map { $0.message }.joined(separator: ", ")
             return "SpatialAware sync failed: \(messages)"
+        case .spatialServiceUnavailable:
+            return "Spatial service is not available"
         }
     }
 }

@@ -143,43 +143,46 @@ final class HueSpatialService {
             throw HueError.noBridgeConfigured
         }
         
-        let url = URL(string: "https://\(ip):\(hueClient.bridgePort)/api/\(username)/config")!
+        let url = URL(string: "https://\(ip):\(hueClient.bridgePort)/api/\(username)/config")
+        
+        guard let url else {
+            throw HueError.invalidURL
+        }
         
         let (data, _) = try await hueClient.authenticatedRequest(url: url, method: "GET", body: nil as HueBridgeState?)
         
-        // Decode bridge config to extract firmware version
-        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let firmwareVersion = json["software_version"] as? [String: String],
-           let main = firmwareVersion["main"] {
-            
-            let parts = main.split(separator: ".").compactMap { Int($0) }
-            let major = parts.first ?? 0
-            let minor = parts.count > 1 ? parts[1] : 0
-            
-            let supportsSpatial = major > SpatialAwareFirmwareRequirement.minimumMajor ||
-                (major == SpatialAwareFirmwareRequirement.minimumMajor && minor >= SpatialAwareFirmwareRequirement.minimumMinor)
-            
-            guard supportsSpatial else {
-                throw HueError.spatialAwareNotSupported(
-                    currentFirmware: main,
-                    requiredFirmware: "\(SpatialAwareFirmwareRequirement.minimumMajor).\(SpatialAwareFirmwareRequirement.minimumMinor)"
-                )
-            }
-            
+        // Decode bridge config to extract firmware version using type-safe Codable
+        let bridgeConfig = try JSONDecoder().decode(BridgeConfigResponse.self, from: data)
+        
+        guard let firmwareString = bridgeConfig.softwareVersion?.main else {
+            // Fallback: assume supported if we can reach the endpoint
             return BridgeSpatialInfo(
-                firmwareVersion: main,
+                firmwareVersion: "unknown",
                 supportsSpatialAware: true,
-                supportsRoomMapping: true,
-                supportedMaterialLabels: ["Glass", "Metal", "Wood", "Fabric", "Plaster", "Concrete"]
+                supportsRoomMapping: false,
+                supportedMaterialLabels: []
             )
         }
         
-        // Fallback: assume supported if we can reach the endpoint
+        let parts = firmwareString.split(separator: ".").compactMap { Int($0) }
+        let major = parts.first ?? 0
+        let minor = parts.count > 1 ? parts[1] : 0
+        
+        let supportsSpatial = major > SpatialAwareFirmwareRequirement.minimumMajor ||
+            (major == SpatialAwareFirmwareRequirement.minimumMajor && minor >= SpatialAwareFirmwareRequirement.minimumMinor)
+        
+        guard supportsSpatial else {
+            throw HueError.spatialAwareNotSupported(
+                currentFirmware: firmwareString,
+                requiredFirmware: "\(SpatialAwareFirmwareRequirement.minimumMajor).\(SpatialAwareFirmwareRequirement.minimumMinor)"
+            )
+        }
+        
         return BridgeSpatialInfo(
-            firmwareVersion: "unknown",
+            firmwareVersion: firmwareString,
             supportsSpatialAware: true,
-            supportsRoomMapping: false,
-            supportedMaterialLabels: []
+            supportsRoomMapping: true,
+            supportedMaterialLabels: ["Glass", "Metal", "Wood", "Fabric", "Plaster", "Concrete"]
         )
     }
     

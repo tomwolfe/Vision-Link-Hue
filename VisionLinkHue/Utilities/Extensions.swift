@@ -64,6 +64,6 @@ extension Optional where Wrapped: RangeReplaceableCollection {
     /// Safely append to an optional collection.
     mutating func safeAppend(_ element: Wrapped.Element) {
         if self == nil { self = .init() }
-        self!.append(element)
+        self?.append(element)
     }
 }

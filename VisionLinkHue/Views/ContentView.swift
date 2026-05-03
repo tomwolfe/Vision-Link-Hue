@@ -12,25 +12,12 @@ struct ContentView: View {
     @State private var arSessionManager: ARSessionManager
     @State private var spatialProjector: SpatialProjector
     
-    init() {
-        let persistence = FixturePersistence.shared
-        let stream = HueStateStream(persistence: persistence)
-        stream.configure()
-        let client = HueClient(stateStream: stream)
-        let detector = DetectionEngine()
-        let projector = SpatialProjector()
-        let manager = ARSessionManager(
-            detectionEngine: detector,
-            spatialProjector: projector,
-            hueClient: client,
-            stateStream: stream
-        )
-        
-        _stateStream = State(initialValue: stream)
-        _hueClient = State(initialValue: client)
-        _detectionEngine = State(initialValue: detector)
-        _arSessionManager = State(initialValue: manager)
-        _spatialProjector = State(initialValue: projector)
+    init(container: AppContainer = .shared) {
+        _stateStream = State(initialValue: container.stateStream)
+        _hueClient = State(initialValue: container.hueClient)
+        _detectionEngine = State(initialValue: container.detectionEngine)
+        _arSessionManager = State(initialValue: container.arSessionManager)
+        _spatialProjector = State(initialValue: container.spatialProjector)
     }
     
     @State private var showSettings: Bool = false

@@ -100,13 +100,13 @@ actor AppNotificationSystem {
         // Skip if we already have this exact error from the same source
         // within the cooldown period
         if let lastTime = lastNotificationTimeBySource[source],
-           Date().timeIntervalSince(lastTime) < AppNotificationSystem.cooldownInterval {
+           Date().timeIntervalSince(lastTime) < AppNotificationSystem.sourceCooldownInterval {
             return
         }
         
         // Skip if we're at the maximum notification limit and this is
         // not a critical error
-        if activeNotifications.count >= AppNotificationSystem.maxNotifications,
+        if activeNotifications.count >= AppNotificationSystem.maxActiveNotifications,
            severity != .critical {
             return
         }
@@ -144,18 +144,6 @@ actor AppNotificationSystem {
     /// Get notifications for a specific source.
     func notifications(fromSource source: String) -> [AppError] {
         activeNotifications.filter { $0.source == source }
-    }
-}
-
-extension AppNotificationSystem {
-    /// Convenience alias for the cooldown interval constant.
-    private static var cooldownInterval: TimeInterval {
-        Self.sourceCooldownInterval
-    }
-    
-    /// Convenience alias for the max notifications constant.
-    private static var maxNotifications: Int {
-        Self.maxActiveNotifications
     }
 }
 
@@ -235,10 +223,11 @@ final class HueStateStream: @unchecked Sendable {
         let incomingById = Dictionary(grouping: incoming) { $0.id }
         
         for (id, newItems) in incomingById {
+            guard let newItem = newItems.last else { continue }
             if let idx = result.firstIndex(where: { $0.id == id }) {
-                result[idx] = newItems.last!
+                result[idx] = newItem
             } else {
-                result.append(newItems.last!)
+                result.append(newItem)
             }
         }
         

@@ -100,7 +100,11 @@ actor HueEventStreamActor {
                 request.setValue("keep-alive", forHTTPHeaderField: "Connection")
                 request.timeoutInterval = 300
                 
-                let (data, response) = try await urlSession!.data(for: request)
+                guard let urlSession else {
+                    await handleDisconnect(error: HueError.invalidResponse)
+                    return
+                }
+                let (data, response) = try await urlSession.data(for: request)
                 
                 guard let httpResponse = response as? HTTPURLResponse,
                       (200...299).contains(httpResponse.statusCode) else {

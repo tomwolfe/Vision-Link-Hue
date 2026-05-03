@@ -213,6 +213,15 @@ struct BridgeConfig: Codable, Sendable {
     let username: String?
 }
 
+/// Response from the bridge /config endpoint for firmware verification.
+struct BridgeConfigResponse: Codable, Sendable {
+    let softwareVersion: SoftwareVersion?
+    
+    struct SoftwareVersion: Codable, Sendable {
+        let main: String?
+    }
+}
+
 // MARK: - SpatialAware API (Spring 2026)
 
 /// Firmware version threshold required for SpatialAware features.
