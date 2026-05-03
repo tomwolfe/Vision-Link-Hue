@@ -68,7 +68,7 @@ struct ScoringConfig {
 }
 
 /// JSON-serializable representation of a scoring rule for config file loading.
-struct JSONScoringRule: Sendable {
+struct JSONScoringRule: Sendable, Codable {
     let type: String
     let aspectRange: [Double]?
     let yRange: [Double]?

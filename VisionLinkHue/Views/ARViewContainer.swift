@@ -9,12 +9,13 @@ struct ARViewContainer: View {
     
     @Bindable var sessionManager: ARSessionManager
     let onFrameUpdate: (ARFrame) -> Void
-    let onARViewReady: (ARView) -> Void = { _ in }
+    let onARViewReady: (ARView) -> Void
     
     var body: some View {
         ARViewRepresentable(
             sessionManager: sessionManager,
-            onFrameUpdate: onFrameUpdate
+            onFrameUpdate: onFrameUpdate,
+            onARViewReady: onARViewReady
         )
         .ignoresSafeArea()
     }
@@ -27,6 +28,7 @@ struct ARViewRepresentable: UIViewRepresentable {
     
     @Bindable var sessionManager: ARSessionManager
     let onFrameUpdate: (ARFrame) -> Void
+    let onARViewReady: (ARView) -> Void
     
     func makeUIView(context: Context) -> ARView {
         let arView = ARView(frame: .zero)
@@ -43,7 +45,7 @@ struct ARViewRepresentable: UIViewRepresentable {
         arView.session.run(configuration)
         arView.session.delegate = context.coordinator
         
-        parent.onARViewReady(arView)
+        self.onARViewReady(arView)
         
         return arView
     }

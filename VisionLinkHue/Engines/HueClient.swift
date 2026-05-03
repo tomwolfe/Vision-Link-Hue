@@ -55,19 +55,19 @@ final class HueClient: ObservableObject, HueClientProtocol {
     let discoveryService: HueDiscoveryService
     
     /// Service for spatial awareness and coordinate transformation.
-    let spatialService: HueSpatialService
+    var spatialService: HueSpatialService?
     
     // MARK: - Initialization
     
     init(stateStream: HueStateStream) {
         self.stateStream = stateStream
         self.discoveryService = HueDiscoveryService()
-        self.spatialService = HueSpatialService(hueClient: self, stateStream: stateStream)
         setupURLSession()
+        self.spatialService = HueSpatialService(hueClient: self, stateStream: stateStream)
     }
     
     deinit {
-        browser?.cancel()
+        // Discovery service cleanup handled by its own lifecycle
     }
     
     // MARK: - Bridge Discovery
@@ -212,18 +212,18 @@ final class HueClient: ObservableObject, HueClientProtocol {
     
     /// Check if the connected bridge supports SpatialAware features.
     /// Delegates to `HueSpatialService`.
-    var isSpatialAwareSupported: Bool { spatialService.isSpatialAwareSupported }
+    var isSpatialAwareSupported: Bool { spatialService!.isSpatialAwareSupported }
     
     /// Verify firmware compatibility before attempting SpatialAware sync.
     /// Delegates to `HueSpatialService`.
     func verifySpatialAwareCompatibility() async throws -> BridgeSpatialInfo {
-        try await spatialService.verifySpatialAwareCompatibility()
+        try await spatialService!.verifySpatialAwareCompatibility()
     }
     
     /// Map ARKit local space coordinates to Bridge Room Space coordinates.
     /// Delegates to `HueSpatialService`.
     func mapARKitToBridgeSpace(arKitPosition: SIMD3<Float>, arKitOrientation: simd_quatf, referencePoint: SIMD3<Float>?) -> (position: SpatialAwarePosition.Position3D, roomOffset: SpatialAwarePosition.RoomOffset?) {
-        let result = spatialService.mapARKitToBridgeSpace(
+        let result = spatialService!.mapARKitToBridgeSpace(
             arKitPosition: arKitPosition,
             arKitOrientation: arKitOrientation,
             referencePoint: referencePoint
@@ -234,19 +234,19 @@ final class HueClient: ObservableObject, HueClientProtocol {
     /// Add a calibration point to the affine transformation solver.
     /// Delegates to `HueSpatialService`.
     func addCalibrationPoint(arKit: SIMD3<Float>, bridge: SIMD3<Float>) {
-        spatialService.addCalibrationPoint(arKit: arKit, bridge: bridge)
+        spatialService!.addCalibrationPoint(arKit: arKit, bridge: bridge)
     }
     
     /// Clear all calibration points.
     /// Delegates to `HueSpatialService`.
     func clearCalibration() {
-        spatialService.clearCalibration()
+        spatialService!.clearCalibration()
     }
     
     /// Get the current calibration points for inspection.
     /// Delegates to `HueSpatialService`.
     func getCalibrationPoints() -> [(arKit: SIMD3<Float>, bridge: SIMD3<Float>)] {
-        spatialService.getCalibrationPoints()
+        spatialService!.getCalibrationPoints()
     }
     
     /// Create a full SpatialAwarePosition from ARKit detection data.
@@ -262,7 +262,7 @@ final class HueClient: ObservableObject, HueClientProtocol {
         areaId: String?,
         origin: SIMD3<Float>?
     ) -> SpatialAwarePosition {
-        spatialService.createSpatialAwarePosition(
+        spatialService!.createSpatialAwarePosition(
             lightId: lightId,
             arKitPosition: arKitPosition,
             arKitOrientation: arKitOrientation,
@@ -278,24 +278,24 @@ final class HueClient: ObservableObject, HueClientProtocol {
     /// Sync AR-detected fixture positions back to the Hue Bridge.
     /// Delegates to `HueSpatialService`.
     func syncSpatialAwareness(fixtures: [SpatialAwarePosition]) async throws {
-        try await spatialService.syncSpatialAwareness(fixtures: fixtures)
+        try await spatialService!.syncSpatialAwareness(fixtures: fixtures)
     }
     
     /// Sync a single fixture's spatial awareness data.
     /// Delegates to `HueSpatialService`.
     func syncSpatialAwareness(fixture: SpatialAwarePosition) async throws {
-        try await spatialService.syncSpatialAwareness(fixture: fixture)
+        try await spatialService!.syncSpatialAwareness(fixture: fixture)
     }
     
     /// Get current spatial awareness data from the bridge.
     /// Delegates to `HueSpatialService`.
     func fetchSpatialAwareness() async throws -> [SpatialAwarePosition] {
-        try await spatialService.fetchSpatialAwareness()
+        try await spatialService!.fetchSpatialAwareness()
     }
     
     /// Whether a valid 3+ point calibration has been established.
     /// Delegates to `HueSpatialService`.
-    var isCalibrated: Bool { spatialService.isCalibrated }
+    var isCalibrated: Bool { spatialService!.isCalibrated }
     
     // MARK: - SSE Event Stream
     
