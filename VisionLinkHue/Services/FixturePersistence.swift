@@ -6,8 +6,7 @@ import os
 /// Service that manages SwiftData persistence for fixture-light mappings
 /// and spatial coordinates. Provides atomic transactions for all
 /// persistence operations.
-@MainActor
-final class FixturePersistence {
+final class FixturePersistence: @unchecked Sendable {
     
     private let modelContainer: ModelContainer
     private let modelContext: ModelContext
@@ -25,7 +24,7 @@ final class FixturePersistence {
         
         do {
             modelContainer = try ModelContainer(for: schema, configurations: [ModelConfiguration()])
-            modelContext = modelContainer.mainContext
+            modelContext = ModelContext(modelContainer)
             logger.info("FixturePersistence initialized with SwiftData")
         } catch {
             fatalError("Failed to create FixturePersistence container: \(error.localizedDescription)")
@@ -66,7 +65,7 @@ final class FixturePersistence {
         do {
             // Check if a mapping already exists for this fixture
             let descriptor = FetchDescriptor<FixtureMapping>(
-                predicate: ##Predicate<FixtureMapping> { $0.fixtureId == fixtureId.uuidString }
+                predicate: #Predicate<FixtureMapping> { $0.fixtureId == fixtureId.uuidString }
             )
             
             let results = try modelContext.fetch(descriptor)

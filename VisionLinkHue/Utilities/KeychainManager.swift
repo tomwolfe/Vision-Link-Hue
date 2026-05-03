@@ -4,7 +4,7 @@ import CommonCrypto
 
 // MARK: - Keychain Keys
 
-private enum KeychainKeys {
+enum KeychainKeys {
     static let service = "com.tomwolfe.visionlinkhue.certpins"
     static func key(for bridgeIP: String) -> String { "certpin_\(bridgeIP)" }
 }

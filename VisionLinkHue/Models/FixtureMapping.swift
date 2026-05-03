@@ -6,7 +6,6 @@ import simd
 /// spatial coordinates. Ensures atomic integrity for spatial
 /// coordinate persistence and light ID associations.
 @Model
-@MainActor
 final class FixtureMapping {
     /// Local UUID for the detected fixture.
     var fixtureId: String
@@ -54,10 +53,10 @@ final class FixtureMapping {
         self.positionX = position.x
         self.positionY = position.y
         self.positionZ = position.z
-        self.orientationX = orientation.x
-        self.orientationY = orientation.y
-        self.orientationZ = orientation.z
-        self.orientationW = orientation.w
+        self.orientationX = orientation.vector.x
+        self.orientationY = orientation.vector.y
+        self.orientationZ = orientation.vector.z
+        self.orientationW = orientation.vector.w
         self.distanceMeters = distanceMeters
         self.fixtureType = fixtureType
         self.confidence = confidence
@@ -75,6 +74,6 @@ final class FixtureMapping {
     
     /// Convenience accessor for the orientation quaternion.
     var orientation: simd_quatf {
-        simd_quatf(x: orientationX, y: orientationY, z: orientationZ, w: orientationW)
+        simd_quatf(real: orientationW, imag: SIMD3<Float>(orientationX, orientationY, orientationZ))
     }
 }

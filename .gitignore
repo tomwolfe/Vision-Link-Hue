@@ -1,3 +1,17 @@
 .build/
 .swiftpm/
 **/xcuserdata/
+**/xcuserdata/
+DerivedData/
+**/*.xcworkspace/contents.xcworkspacedata
+**/project.xcworkspace/xcuserdata/
+**/xcshareddata/
+**/*.pbxproj.user/
+**/*.mode1v3
+**/*.mode2v3
+**/*.perspectivev3
+**/*.pbxproj.xcworkspace/contents.xcworkspacedata
+**/user.dtBaseData
+**/user.dtControlStripState
+**/*.xcworkspace/xcshareddata/
+.DS_Store

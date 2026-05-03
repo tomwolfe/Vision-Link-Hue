@@ -21,8 +21,8 @@ extension simd_float4x4 {
 
 extension ARFrame {
     /// Get the captured image as a CVPixelBuffer.
-    var capturedImage: CVPixelBuffer {
-        pixelBuffer
+    var imageBuffer: CVPixelBuffer {
+        self.capturedImage
     }
 }
 

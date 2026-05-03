@@ -55,6 +55,9 @@ actor HueEventStreamActor {
     /// Track parse failures for degradation detection.
     private var parseFailures = 0
     
+    /// TOFU callback for certificate pinning.
+    private var tofuCallback: @Sendable (Data) async -> Void = { _ in }
+    
     // MARK: - Connection Management
     
     /// Start the SSE connection to the bridge event stream.
@@ -70,6 +73,8 @@ actor HueEventStreamActor {
         }
         
         disconnect()
+        
+        self.tofuCallback = tofuCallback
         
         let sessionDelegate = CertificatePinningDelegate(
             pinnedHash: pinnedHash,
@@ -90,7 +95,7 @@ actor HueEventStreamActor {
             guard let self else { return }
             
             do {
-                let request = URLRequest(url: url)
+                var request = URLRequest(url: url)
                 request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
                 request.setValue("keep-alive", forHTTPHeaderField: "Connection")
                 request.timeoutInterval = 300
@@ -112,6 +117,16 @@ actor HueEventStreamActor {
         
         state = .connected
         logger.info("SSE event stream started")
+    }
+    
+    /// Set the event handler for parsed resource updates.
+    func setEventHandler(_ handler: @escaping @Sendable ((ResourceUpdate) async -> Void)) {
+        onEvent = handler
+    }
+    
+    /// Set the error handler for stream-level errors.
+    func setErrorHandler(_ handler: @escaping @Sendable ((any Error) async -> Void)) {
+        onError = handler
     }
     
     /// Stream SSE events from the data.
@@ -136,7 +151,7 @@ actor HueEventStreamActor {
                         parseFailures += 1
                         if parseFailures >= maxParseFailures {
                             state = .degraded
-                            logger.warning("Entered degraded mode after \(parseFailures) parse failures")
+                            logger.warning("Entered degraded mode after \(self.parseFailures) parse failures")
                         }
                     }
                 }
@@ -145,7 +160,7 @@ actor HueEventStreamActor {
             
             // Accumulate data lines for multi-line SSE events
             if line.hasPrefix("data: ") {
-                sseDataBuffer.append(line.dropFirst(6))
+                sseDataBuffer += String(line.dropFirst(6))
             }
         }
         
@@ -154,7 +169,7 @@ actor HueEventStreamActor {
             try? await parseAndDispatchEvent(sseDataBuffer)
         }
         
-        state = .disconnected
+        state = .idle
     }
     
     /// Parse an SSE event and dispatch it to the event handler.
@@ -186,16 +201,17 @@ actor HueEventStreamActor {
     private func scheduleReconnection() {
         // Exponential backoff: double the delay each time, capped at max
         reconnectDelay = min(reconnectDelay * 2, maxReconnectDelay)
+        let delay = reconnectDelay
         
         Task { [weak self] in
             guard let self else { return }
             
-            try? await Task.sleep(for: .seconds(reconnectDelay))
+            try? await Task.sleep(for: .seconds(delay))
             
             // Check if we were cancelled during the wait
             guard !Task.isCancelled else { return }
             
-            await self.logger.info("Attempting SSE reconnection (delay: \(String(format: "%.1f", self.reconnectDelay))s)...")
+            await self.logger.info("Attempting SSE reconnection (delay: \(String(format: "%.1f", delay))s)...")
         }
     }
     

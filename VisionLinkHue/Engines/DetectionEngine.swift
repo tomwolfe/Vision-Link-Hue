@@ -1,6 +1,7 @@
 import Foundation
 import AVFoundation
 import Vision
+import ARKit
 import os
 
 /// Engine that performs on-device lighting fixture detection using
@@ -14,7 +15,7 @@ import os
 /// fixture classification (Glass, Metal, Wood, etc.) via ARMeshMaterialLabel.
 /// Uses low-power mode to prevent thermal throttling on device.
 @Observable
-final class DetectionEngine {
+final class DetectionEngine: @unchecked Sendable {
     
     var lastDetections: [FixtureDetection] = []
     var isRunning: Bool = false
@@ -237,7 +238,7 @@ final class DetectionEngine {
     private func updateThermalState() {
         let systemThermalState = ProcessInfo.processInfo.thermalState
         switch systemThermalState {
-        case .normal:
+        case .nominal:
             self.thermalState = .nominal
         case .fair:
             self.thermalState = .fair
@@ -282,8 +283,11 @@ final class DetectionEngine {
     /// Returns material labels like "Glass", "Metal", "Wood" based on
     /// the ARMeshMaterialLabel of the detected surface.
     func classifyMaterial(from frame: ARFrame, at region: NormalizedRect? = nil) -> String? {
-        guard let sceneDepth = frame.sceneDepth,
-              let materialLabel = sceneDepth.materialLabel else {
+        #if !targetEnvironment(simulator)
+        guard let sceneDepth = frame.sceneDepth else {
+            return nil
+        }
+        guard let materialLabel = sceneDepth.materialLabel else {
             return nil
         }
         
@@ -295,6 +299,9 @@ final class DetectionEngine {
         }
         
         return materialClassifier.sampleMaterial(at: samplePoint, in: frame, materialLabel: materialLabel)
+        #else
+        return nil
+        #endif
     }
 }
 

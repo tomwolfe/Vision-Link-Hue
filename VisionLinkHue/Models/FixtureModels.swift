@@ -56,10 +56,10 @@ struct NormalizedRect: Sendable {
     /// Convert to SwiftUI `Rect` for a given frame size.
     func toRect(in frameSize: CGSize) -> CGRect {
         CGRect(
-            x: topLeft.x * frameSize.width,
-            y: topLeft.y * frameSize.height,
-            width: width * frameSize.width,
-            height: height * frameSize.height
+            x: Double(topLeft.x) * frameSize.width,
+            y: Double(topLeft.y) * frameSize.height,
+            width: Double(width) * frameSize.width,
+            height: Double(height) * frameSize.height
         )
     }
 }

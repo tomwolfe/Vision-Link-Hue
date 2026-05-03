@@ -64,14 +64,22 @@ final class ARSessionManager {
         self.arView = arView
         
         let configuration = ARWorldTrackingConfiguration()
+        #if !targetEnvironment(simulator)
         configuration.worldReconstructionMode = ARWorldTrackingConfiguration.WorldReconstructionMode.automatic
         configuration.planeDetection = [.horizontal, .vertical]
         configuration.lightEstimation = .automatic
+        #else
+        configuration.planeDetection = [.horizontal, .vertical]
+        #endif
         
         isSessionActive = true
         
         // Create root anchor
+        #if !targetEnvironment(simulator)
         anchorEntity = AnchorEntity(.world)
+        #else
+        anchorEntity = AnchorEntity(.anchor(identifier: UUID()))
+        #endif
         if let anchor = anchorEntity {
             arView.scene.addAnchor(anchor)
         }
@@ -101,11 +109,18 @@ final class ARSessionManager {
     func didUpdateFrame(_ frame: ARFrame) async {
         await MainActor.run {
             self.frameTimestamp = frame.timestamp
+            #if !targetEnvironment(simulator)
             self.worldMapAvailable = frame.worldMap != nil
-            
+            #else
+            self.worldMapAvailable = false
+            #endif
+            #if !targetEnvironment(simulator)
             if let state = frame.trackingState {
                 self.trackingState = state == .limited ? .limited : .tracking
             }
+            #else
+            self.trackingState = .notAvailable
+            #endif
         }
         
         // Throttle inference to DetectionConstants.inferenceInterval
@@ -117,7 +132,7 @@ final class ARSessionManager {
         Task.detached { [detectionEngine = self.detectionEngine, spatialProjector = self.spatialProjector, anchor = self.anchorEntity] in
             do {
                 let detections = try await detectionEngine.processFrame(
-                    frame.capturedImage,
+                    frame.imageBuffer,
                     timestamp: frame.timestamp
                 )
                 
@@ -134,7 +149,7 @@ final class ARSessionManager {
                             
                             // Spawn parallel task for material sampling
                             taskGroup.addTask {
-                                let material = self.classifyMaterial(from: frame, at: detection.region)
+                                let material = self.detectionEngine.classifyMaterial(from: frame, at: detection.region)
                                 return nil // Material result is logged but doesn't block fixture creation
                             }
                             

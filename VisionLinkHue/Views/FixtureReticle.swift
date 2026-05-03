@@ -101,7 +101,7 @@ struct FixtureReticle: View {
                         ),
                         style: StrokeStyle(lineWidth: 3, lineCap: .round)
                     )
-                    .rotation(.degrees(-90))
+                    .rotation3DEffect(.degrees(-90), axis: (x: 0, y: 1, z: 0))
                     .frame(width: 70, height: 70)
                     .opacity(0.7)
             }
@@ -112,7 +112,9 @@ struct FixtureReticle: View {
                 .opacity(isLowCertainty ? 0.5 + phase * 0.5 : 1.0)
         } animation: { phase in
             if isLowCertainty {
-                .easeInOut(duration: 1.5).repeatForever(autoreverses: true)
+                .easeInOut(duration: 1.5)
+            } else {
+                .easeInOut(duration: 0.5)
             }
         }
         .onTapGesture(count: 1) {
@@ -122,6 +124,8 @@ struct FixtureReticle: View {
             .degrees(0),
             axis: (x: 0, y: 1, z: 0)
         )
+        #if !targetEnvironment(simulator)
         .glassEffect(.liquid, alignment: .center)
+        #endif
     }
 }

@@ -95,12 +95,12 @@ struct HueSceneResource: Codable, Sendable, Identifiable, Equatable {
     let data: SceneData?
     let lights: [String]?
     
-    struct Metadata: Codable, Sendable {
+    struct Metadata: Codable, Sendable, Equatable {
         var name: String?
         var archetype: String?
     }
     
-    struct SceneData: Codable, Sendable {
+    struct SceneData: Codable, Sendable, Equatable {
         var group: String?
         var lightlevel: Int?
     }
@@ -281,10 +281,10 @@ struct SpatialAwarePosition: Codable, Sendable {
         let w: Double
         
         init(simd: simd_quatf) {
-            self.x = Double(simd.x)
-            self.y = Double(simd.y)
-            self.z = Double(simd.z)
-            self.w = Double(simd.w)
+            self.x = Double(simd.vector.x)
+            self.y = Double(simd.vector.y)
+            self.z = Double(simd.vector.z)
+            self.w = Double(simd.vector.w)
         }
         
         init(x: Double, y: Double, z: Double, w: Double) {

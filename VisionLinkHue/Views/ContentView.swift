@@ -144,9 +144,7 @@ struct SettingsView: View {
                         Text("IP: \(ip)")
                     }
                     
-                    if let port = hueClient.bridgePort {
-                        Text("Port: \(port)")
-                    }
+                    Text("Port: \(hueClient.bridgePort)")
                 }
                 
                 // API Key
@@ -196,9 +194,12 @@ struct SettingsView: View {
                         HStack {
                             Text(light.metadata.name ?? light.id)
                             Spacer()
-                            if let state = light.state, let on = state.on {
-                                Image(systemName: on ? "lightbulb.fill" : "lightbulb")
-                                    .foregroundStyle(on ? .yellow : .secondary)
+                            if light.state.on ?? false {
+                                Image(systemName: "lightbulb.fill")
+                                    .foregroundStyle(.yellow)
+                            } else {
+                                Image(systemName: "lightbulb")
+                                    .foregroundStyle(.secondary)
                             }
                         }
                     }

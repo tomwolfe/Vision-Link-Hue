@@ -2,6 +2,10 @@ import Foundation
 import Network
 import os
 import simd
+import CommonCrypto
+#if canImport(Darwin)
+import Darwin
+#endif
 
 /// Network client that manages all communication with the Philips Hue Bridge
 /// using CLIP v2 API, mDNS discovery, mTLS with Trust-On-First-Use certificate
@@ -71,61 +75,28 @@ final class HueClient: ObservableObject, HueClientProtocol {
     /// Discover Hue bridges on the local network using mDNS.
     /// Uses a synchronous browser with a 3-second timeout.
     func discoverBridges() async -> [BridgeInfo] {
-        let params = NWParameters.tcp
-        params.includePeerToPeer = true
-        
-        let browser = NWBrowser(
-            for: .bonjour(type: "_hue._tcp", domain: nil),
-            using: params
-        )
-        
         var discoveredBridges: [BridgeInfo] = []
+        var seenIPs = Set<String>()
         let semaphore = DispatchSemaphore(value: 0)
         
-        browser.stateUpdateHandler = { [weak self] newState in
-            switch newState {
-            case .ready:
-                self?.logger.info("mDNS browser ready - discovering bridges")
-            case .failed(let error):
-                self?.logger.error("mDNS browser failed: \(error.localizedDescription)")
-                self?.lastError = "Discovery failed: \(error.localizedDescription)"
-            case .cancelled:
-                self?.logger.info("mDNS browser cancelled")
-            default:
-                break
-            }
-        }
-        
-        // Use the results property to get discovered services
-        browser.start(queue: .main)
-        
-        // Wait for discovery to complete
-        DispatchQueue.global().asyncAfter(deadline: .now() + 3) {
-            browser.cancel()
-            semaphore.signal()
-        }
-        
-        semaphore.wait()
-        
-        // Collect results from the browser
-        if let results = browser.results as? [NWBrowser.Result] {
-            for result in results {
-                guard case .service(let service) = result.endpoint else { continue }
-                
-                let name = service.name
-                let port = UInt(service.port)
-                
-                for interface in result.interfaces {
-                    let ip = interface.ipv4Address ?? interface.ipv6Address
-                    if let ip {
-                        let bridge = BridgeInfo(name: name, ip: ip.description, port: Int(port))
-                        guard !discoveredBridges.contains(where: { $0.ip == bridge.ip }) else { continue }
-                        discoveredBridges.append(bridge)
-                        self?.logger.info("Found Hue bridge: \(name) at \(ip.description):\(port)")
-                    }
+        let serviceBrowser = NetServiceBrowser()
+        let mdnsDelegate = MDNSDelegate(
+            onFound: { [weak self] name, ip, port in
+                if !seenIPs.contains(ip) {
+                    seenIPs.insert(ip)
+                    discoveredBridges.append(BridgeInfo(name: name, ip: ip, port: port))
+                    self?.logger.info("Found Hue bridge: \(name) at \(ip):\(port)")
                 }
-            }
-        }
+            },
+            onFinished: { semaphore.signal() }
+        )
+        serviceBrowser.delegate = mdnsDelegate
+        
+        serviceBrowser.searchForServices(ofType: "_hue._tcp.", inDomain: "local.")
+        
+        // Wait up to 3 seconds for discovery
+        try? await Task.sleep(for: .seconds(3))
+        serviceBrowser.stop()
         
         if discoveredBridges.isEmpty {
             await stateStream?.reportError(HueError.noBridgeConfigured, severity: .warning, source: "HueClient.discover")
@@ -281,11 +252,11 @@ final class HueClient: ObservableObject, HueClientProtocol {
             throw HueError.noApiKey
         }
         
-        guard let ip = bridgeIP, let port = bridgePort else {
+        guard let ip = bridgeIP else {
             throw HueError.noBridgeConfigured
         }
         
-        let url = URL(string: "https://\(ip):\(port)/api/\(username)/config")!
+        let url = URL(string: "https://\(ip):\(bridgePort)/api/\(username)/config")!
         
         let (data, _) = try await authenticatedRequest(url: url, method: "GET", body: nil as HueBridgeState?)
         
@@ -418,14 +389,14 @@ final class HueClient: ObservableObject, HueClientProtocol {
             throw HueError.noApiKey
         }
         
-        guard let ip = bridgeIP, let port = bridgePort else {
+        guard let ip = bridgeIP else {
             throw HueError.noBridgeConfigured
         }
         
         // Verify firmware compatibility before sync
         _ = try await verifySpatialAwareCompatibility()
         
-        let url = URL(string: "https://\(ip):\(port)/api/\(username)/spatial_awareness")!
+        let url = URL(string: "https://\(ip):\(bridgePort)/api/\(username)/spatial_awareness")!
         
         let request = SpatialAwareSyncRequest(fixtures: fixtures)
         
@@ -463,11 +434,11 @@ final class HueClient: ObservableObject, HueClientProtocol {
             throw HueError.noApiKey
         }
         
-        guard let ip = bridgeIP, let port = bridgePort else {
+        guard let ip = bridgeIP else {
             throw HueError.noBridgeConfigured
         }
         
-        let url = URL(string: "https://\(ip):\(port)/api/\(username)/resources/spatial_awareness")!
+        let url = URL(string: "https://\(ip):\(bridgePort)/api/\(username)/resources/spatial_awareness")!
         
         let (data, _) = try await authenticatedRequest(url: url, method: "GET", body: nil as HueBridgeState?)
         
@@ -501,27 +472,28 @@ final class HueClient: ObservableObject, HueClientProtocol {
             return
         }
         
-        guard let ip = bridgeIP, let port = bridgePort else {
+        guard let ip = bridgeIP else {
             lastError = "No bridge configured"
             return
         }
         
         disconnect()
         
-        let url = URL(string: "https://\(ip):\(port)/api/\(username)/eventstream/clip/v2")!
-        let keychainKey = ip.map { KeychainKeys.key(for: $0) }
+        let url = URL(string: "https://\(ip):\(bridgePort)/api/\(username)/eventstream/clip/v2")!
+        let keychainKey = KeychainKeys.key(for: ip)
         
         stateStream?.setIsConnected(true)
         
         Task { [weak self] in
             guard let self else { return }
             
-            await self.eventStream.onEvent = { [weak self] update in
-                await self?.stateStream?.applyUpdate(update)
+            let stateStream = self.stateStream
+            await self.eventStream.setEventHandler { @Sendable update in
+                stateStream?.applyUpdate(update)
             }
             
-            await self.eventStream.onError = { [weak self] error in
-                await self?.stateStream?.reportError(error, severity: .error, source: "HueClient.sse")
+            await self.eventStream.setErrorHandler { @Sendable error in
+                stateStream?.reportError(error, severity: .error, source: "HueClient.sse")
             }
             
             await self.eventStream.start(
@@ -568,7 +540,7 @@ final class HueClient: ObservableObject, HueClientProtocol {
                 await connect(to: first)
             } else {
                 lastError = "No bridge found for reconnection"
-                Task {
+                Task { [stateStream] in
                     await stateStream?.reportError(HueError.noBridgeConfigured, severity: .error, source: "HueClient.reconnect")
                 }
                 return
@@ -582,11 +554,10 @@ final class HueClient: ObservableObject, HueClientProtocol {
     
     private func setupURLSession() {
         let config = URLSessionConfiguration.default
-        config.tlsMinimumProtocolVersion = .tls12
-        config.tlsMaximumProtocolVersion = .tls13
         
         // Load pinned hash from Keychain for TOFU.
-        if let ip = bridgeIP, let key = KeychainKeys.key(for: ip) {
+        if let ip = bridgeIP {
+            let key = KeychainKeys.key(for: ip)
             Task {
                 if let hash = try? await KeychainManager.shared.loadCertPin(from: key) {
                     self.pinnedHash = hash
@@ -645,6 +616,53 @@ final class HueClient: ObservableObject, HueClientProtocol {
         }
         
         return (data, response)
+    }
+}
+
+// MARK: - mDNS Delegate
+
+/// Simple NetServiceBrowser delegate for Hue bridge discovery.
+private final class MDNSDelegate: NSObject, NetServiceBrowserDelegate, NetServiceDelegate {
+    let onFound: (String, String, Int) -> Void
+    let onFinished: () -> Void
+    
+    init(onFound: @escaping (String, String, Int) -> Void, onFinished: @escaping () -> Void) {
+        self.onFound = onFound
+        self.onFinished = onFinished
+    }
+    
+    func netServiceBrowser(_ browser: NetServiceBrowser, didFind service: NetService, moreComing: Bool) {
+        service.delegate = self
+        service.resolve(withTimeout: 2.0)
+    }
+    
+    func netServiceBrowser(_ browser: NetServiceBrowser, didNotSearch errorDict: [String: Int]) {
+        onFinished()
+    }
+    
+    func netService(_ service: NetService, didResolve address: NetService) {
+        if let addresses = service.addresses, !addresses.isEmpty {
+            let addrData = addresses[0]
+            var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+            
+            addrData.withUnsafeBytes { ptr in
+                let addrPtr = ptr.baseAddress?.assumingMemoryBound(to: sockaddr.self)
+                if let addrPtr {
+                    let result = getnameinfo(
+                        addrPtr,
+                        socklen_t(addrData.count),
+                        &hostname,
+                        socklen_t(hostname.count),
+                        nil,
+                        0,
+                        NI_NUMERICHOST
+                    )
+                    
+                    let ip = result == 0 ? String(cString: hostname) : "unknown"
+                    onFound(service.name, ip, service.port)
+                }
+            }
+        }
     }
 }
 

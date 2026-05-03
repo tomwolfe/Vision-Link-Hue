@@ -198,7 +198,7 @@ struct FixtureHeuristicClassifier {
             guard let type = FixtureType(from: jsonRule.type) else { continue }
             
             let aspectRange = jsonRule.aspectRange.map {
-                ClosedRange<Float>(uncheckedBounds: (Float($0[0]), Float($0[1])))
+                ClosedRange<Double>(uncheckedBounds: ($0[0], $0[1]))
             }
             
             let yRange = jsonRule.yRange.map {
@@ -255,15 +255,15 @@ struct FixtureHeuristicClassifier {
             var matches = true
             
             if let aspectRange = rule.aspectRange {
-                guard aspectRange.contains(aspectRatio) else { matches = false }
+                guard aspectRange.contains(aspectRatio) else { matches = false; continue }
             }
             
             if matches, let yRange = rule.yRange {
-                guard yRange.contains(normalizedY) else { matches = false }
+                guard yRange.contains(normalizedY) else { matches = false; continue }
             }
             
             if matches, let areaRange = rule.areaRange {
-                guard areaRange.contains(area) else { matches = false }
+                guard areaRange.contains(area) else { matches = false; continue }
             }
             
             if matches {

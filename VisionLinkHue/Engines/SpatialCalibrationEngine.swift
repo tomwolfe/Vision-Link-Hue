@@ -59,7 +59,7 @@ final class SpatialCalibrationEngine {
         }
         
         logger.info(
-            "Calibration point added (\(calibrationPoints.count)/\(Self.minCalibrationPoints) minimum). Calibrated: \(isCalibrated)"
+            "Calibration point added (\(self.calibrationPoints.count)/\(Self.minCalibrationPoints) minimum). Calibrated: \(self.isCalibrated)"
         )
         
         if isCalibrated {
@@ -207,7 +207,7 @@ final class SpatialCalibrationEngine {
     /// Orthogonalize a 3x3 matrix using Gram-Schmidt process.
     private func orthogonalize(_ M: simd_float3x3) -> simd_float3x3 {
         var c0 = normalize(M.columns.0)
-        var c1 = M.columns.1 - c0 * (c0 .dot M.columns.1)
+        var c1 = M.columns.1 - c0 * dot(c0, M.columns.1)
         c1 = normalize(c1)
         var c2 = cross(M.columns.0, M.columns.1)
         c2 = normalize(c2)

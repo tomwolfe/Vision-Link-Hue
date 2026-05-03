@@ -47,10 +47,12 @@ final class SpatialProjector {
         anchor: AnchorEntity
     ) -> ProjectionResult {
         
-        guard let intrinsics = frame.camera.intrinsics else {
-            return .failure("Failed to compute camera direction vector")
-        }
-        
+        #if !targetEnvironment(simulator)
+        let intrinsics = frame.camera.intrinsics
+        #else
+        let intrinsics = CameraIntrinsics(k0: 1.0, k4: 1.0, k2: 0.5, k5: 0.5)
+        #endif
+
         guard let cameraDirection = SpatialMath.unprojectDirection(
             normalized: normalizedPoint,
             intrinsics: intrinsics,
@@ -64,15 +66,15 @@ final class SpatialProjector {
             in: frame,
             anchor: anchor
         ) {
-            return .success(meshResult)
+            return .anchored(meshResult)
         }
         
-        if let depthResult = unprojectViaDepthMap(
+        if let fixture = unprojectViaDepthMap(
             normalizedPoint,
             frame: frame,
             anchor: anchor
-        ) {
-            return .success(depthResult)
+        )?.anchoredFixture {
+            return .anchored(fixture)
         }
         
         let fallbackPosition = SpatialMath.fallbackPosition(
@@ -82,7 +84,7 @@ final class SpatialProjector {
         )
         
         let rotationMatrix = SpatialMath.rotationMatrix(from: frame.camera.transform)
-        let fallbackOrientation = simd_quatf(rotationMatrix: rotationMatrix)
+        let fallbackOrientation = simd_quatf(rotationMatrix)
         
         return .anchored(
             TrackedFixture(
@@ -111,10 +113,12 @@ final class SpatialProjector {
         
         let center = region.center
         
-        guard let intrinsics = frame.camera.intrinsics else {
-            return .failure("Camera intrinsics unavailable")
-        }
-        
+        #if !targetEnvironment(simulator)
+        let intrinsics = frame.camera.intrinsics
+        #else
+        let intrinsics = CameraIntrinsics(k0: 1.0, k4: 1.0, k2: 0.5, k5: 0.5)
+        #endif
+
         let direction = SpatialMath.unprojectDirection(
             normalized: center,
             intrinsics: intrinsics,
@@ -152,7 +156,7 @@ final class SpatialProjector {
                     ),
                     position: adjustedPosition,
                     orientation: orientation,
-                    distanceMeters: meshResult.distance
+                    distanceMeters: meshResult.distanceMeters
                 )
             )
         }
@@ -178,15 +182,17 @@ final class SpatialProjector {
         anchor: AnchorEntity
     ) -> TrackedFixture? {
         
-        guard let intrinsics = frame.camera.intrinsics else {
-            return nil
-        }
-        
+        #if !targetEnvironment(simulator)
+        let intrinsics = frame.camera.intrinsics
+        #else
+        let intrinsics = CameraIntrinsics(k0: 1.0, k4: 1.0, k2: 0.5, k5: 0.5)
+        #endif
+
         guard let ray = SpatialMath.cameraRay(
             normalized: normalizedPoint,
             intrinsics: intrinsics,
             cameraTransform: frame.camera.transform,
-            imageSize: frame.capturedImageSize
+            imageSize: CGSize(width: CVPixelBufferGetWidth(frame.capturedImage), height: CVPixelBufferGetHeight(frame.capturedImage))
         ) else {
             return nil
         }
@@ -195,13 +201,11 @@ final class SpatialProjector {
             return nil
         }
         
-        let raycastQuery = RaycastQuery(
+        let raycastQuery = ARRaycastQuery(
             origin: ray.origin,
             direction: ray.direction,
-            length: configuration.maxRaycastDistance,
-            originalAnchor: .none,
-            type: .existingPlaneExtent,
-            filter: .mesh
+            allowing: .estimatedPlane,
+            alignment: .horizontal
         )
         
         let results = activeSession.raycast(raycastQuery)
@@ -217,7 +221,7 @@ final class SpatialProjector {
         )
         
         let orientation = simd_quatf(hit.worldTransform)
-        let distance = Float(hit.distance)
+        let distance = length(position)
         
         let adjustedPosition = position + configuration.hudOffset
         
@@ -245,14 +249,13 @@ final class SpatialProjector {
         anchor: AnchorEntity
     ) -> ProjectionResult? {
         
+        #if !targetEnvironment(simulator)
         guard let sceneDepth = frame.sceneDepth,
               let depthMap = sceneDepth.depthMap else {
             return nil
         }
-        
-        guard let intrinsics = frame.camera.intrinsics else {
-            return nil
-        }
+
+        let intrinsics = frame.camera.intrinsics
         
         let pixelWidth = Int(depthMap.width)
         let pixelHeight = Int(depthMap.height)
@@ -299,7 +302,7 @@ final class SpatialProjector {
         }
         
         let rotationMatrix = SpatialMath.rotationMatrix(from: frame.camera.transform)
-        let orientation = simd_quatf(rotationMatrix: rotationMatrix)
+        let orientation = simd_quatf(rotationMatrix)
         
         let adjustedPosition = position + configuration.hudOffset
         
@@ -319,6 +322,9 @@ final class SpatialProjector {
                 distanceMeters: depthMeters
             )
         )
+        #else
+        return nil
+        #endif
     }
 }
 

@@ -9,7 +9,7 @@ import ARKit
 /// entity updates.
 struct ARViewContainer: View {
     
-    @ObservedObject var sessionManager: ARSessionManager
+    @Bindable var sessionManager: ARSessionManager
     let onFrameUpdate: (ARFrame) -> Void
     let onARViewReady: (ARView) -> Void
     
@@ -30,14 +30,14 @@ struct ARViewContainer: View {
             // Fixture HUDs are created directly on RealityKit entities using
             // the native ViewAttachmentComponent(rootView:) API, so no
             // additional RealityViewContent registration is needed.
-            RealityView { content, attachments in
+            RealityView { content in
                 guard let arView = arViewRef else { return }
                 
                 // Add a root entity for HUD overlays
                 let hudRoot = Entity()
                 hudRoot.name = "HUDRoot"
-                arView.scene.addEntity(hudRoot)
-            } update: { content, attachments in
+                content.add(hudRoot)
+            } update: { content in
                 // Fixture HUD entities are managed directly via
                 // ViewAttachmentComponent(rootView:) on each entity.
                 // No additional update logic needed.
@@ -70,7 +70,6 @@ struct ARViewRepresentable: UIViewRepresentable {
         Coordinator(self)
     }
     
-    @MainActor
     final class Coordinator: NSObject, ARSessionDelegate {
         let parent: ARViewRepresentable
         
@@ -79,7 +78,10 @@ struct ARViewRepresentable: UIViewRepresentable {
         }
         
         func session(_ session: ARSession, didUpdate frame: ARFrame) {
-            parent.onFrameUpdate(frame)
+            let parentRef = parent
+            DispatchQueue.main.async {
+                parentRef.onFrameUpdate(frame)
+            }
         }
     }
 }

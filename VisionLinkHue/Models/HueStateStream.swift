@@ -78,6 +78,11 @@ actor AppNotificationSystem {
     /// Notification event publisher for UI consumption.
     var onNotification: (([AppError]) -> Void)?
     
+    /// Set the notification event handler.
+    func setNotificationHandler(_ handler: @escaping ([AppError]) -> Void) {
+        onNotification = handler
+    }
+    
     /// Number of active notifications.
     var notificationCount: Int {
         activeNotifications.count
@@ -163,7 +168,7 @@ extension AppNotificationSystem {
 /// Delegates error notification handling to the `AppNotificationSystem`
 /// actor to prevent main-thread hangs during SSE reconnection bursts.
 @Observable
-final class HueStateStream {
+final class HueStateStream: @unchecked Sendable {
     
     private(set) var lights: [HueLightResource] = []
     private(set) var scenes: [HueSceneResource] = []
@@ -193,8 +198,10 @@ final class HueStateStream {
     }
     
     func configure() {
-        onNotification = { [weak self] notifications in
-            self?.activeErrors = notifications
+        Task { [notificationSystem] in
+            await notificationSystem.setNotificationHandler { [weak self] notifications in
+                self?.activeErrors = notifications
+            }
         }
     }
     
@@ -253,14 +260,18 @@ final class HueStateStream {
     /// Persists the mapping atomically via SwiftData.
     func linkFixture(_ fixtureId: UUID, toLight lightId: String) {
         fixtureLightMapping[fixtureId] = lightId
-        persistence.linkFixture(fixtureId, toLight: lightId)
+        Task {
+            await persistence.linkFixture(fixtureId, toLight: lightId)
+        }
     }
     
     /// Unlink a local fixture from its mapped Hue light.
     /// Persists the change atomically via SwiftData.
     func unlinkFixture(_ fixtureId: UUID) {
         fixtureLightMapping.removeValue(forKey: fixtureId)
-        persistence.unlinkFixture(fixtureId)
+        Task {
+            await persistence.unlinkFixture(fixtureId)
+        }
     }
     
     /// Resolve a scene by its ID.
@@ -301,12 +312,14 @@ final class HueStateStream {
     
     /// Load persisted fixture-light mappings from SwiftData.
     private func loadPersistedState() {
-        let mappings = persistence.loadMappings()
-        self.fixtureLightMapping = mappings.compactMap { mapping in
-            guard let lightId = mapping.lightId else { return nil }
-            return (mapping.uuid, lightId)
-        }.reduce(into: [:]) { result, pair in
-            result[pair.0] = pair.1
+        Task {
+            let mappings = await persistence.loadMappings()
+            self.fixtureLightMapping = Dictionary(
+                uniqueKeysWithValues: mappings.compactMap { mapping in
+                    guard let lightId = mapping.lightId else { return nil }
+                    return (mapping.uuid, lightId)
+                }
+            )
         }
     }
     
@@ -320,25 +333,31 @@ final class HueStateStream {
         fixtureType: String,
         confidence: Double
     ) {
-        persistence.saveMapping(
-            fixtureId: fixtureId,
-            lightId: lightId,
-            position: position,
-            orientation: orientation,
-            distanceMeters: distanceMeters,
-            fixtureType: fixtureType,
-            confidence: confidence
-        )
+        Task {
+            await persistence.saveMapping(
+                fixtureId: fixtureId,
+                lightId: lightId,
+                position: position,
+                orientation: orientation,
+                distanceMeters: distanceMeters,
+                fixtureType: fixtureType,
+                confidence: confidence
+            )
+        }
     }
     
     /// Mark a fixture mapping as synced to the Hue Bridge.
     func markFixtureSynced(_ fixtureId: UUID) {
-        persistence.markSynced(fixtureId)
+        Task {
+            await persistence.markSynced(fixtureId)
+        }
     }
     
     /// Clear all persisted fixture mappings.
     func clearPersistedState() {
-        persistence.clearAllMappings()
+        Task {
+            await persistence.clearAllMappings()
+        }
         fixtureLightMapping.removeAll()
     }
 }

@@ -87,14 +87,14 @@
 		9E5E8EEB1B69F992D330E955 /* FixtureMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureMapping.swift; sourceTree = "<group>"; };
 		A58A999810DADAC4665355D9 /* CertificatePinningDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertificatePinningDelegate.swift; sourceTree = "<group>"; };
 		B1A3088B6BD175CE1AE5D13D /* HueEventStreamActor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueEventStreamActor.swift; sourceTree = "<group>"; };
-		B6CC7C6072CFA6D940C3DBA3 /* VisionLinkHueTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = VisionLinkHueTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B6CC7C6072CFA6D940C3DBA3 /* VisionLinkHueTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VisionLinkHueTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C3773D6FD40A1D0C05AB37AA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		CE3AF9C2519C92FD05483887 /* FixtureModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureModels.swift; sourceTree = "<group>"; };
 		D2EB75B6F6438D47B0DC3518 /* DetectionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectionEngine.swift; sourceTree = "<group>"; };
 		D342A7DCA82DC0F175310AAD /* QuaternionAttributeTransformer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuaternionAttributeTransformer.swift; sourceTree = "<group>"; };
 		D7A6864D4800313E5E637629 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		DA918F1B394BBC49BD3E7292 /* HueClientProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueClientProtocol.swift; sourceTree = "<group>"; };
-		DAFFF1902C936FFC20B66AAD /* VisionLinkHue.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = VisionLinkHue.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		DAFFF1902C936FFC20B66AAD /* VisionLinkHue.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VisionLinkHue.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DCCF3CBE0E6613D3E9DF0DFB /* FixturePersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixturePersistence.swift; sourceTree = "<group>"; };
 		DF9FF5ED8521E57492B18C2B /* SpatialMathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialMathTests.swift; sourceTree = "<group>"; };
 		E47BA61F9090C83D7B16D92D /* SpatialCalibrationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialCalibrationEngine.swift; sourceTree = "<group>"; };
@@ -295,8 +295,6 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1600;
-				TargetAttributes = {
-				};
 			};
 			buildConfigurationList = E6C8BBA3F05C332272A66BAF /* Build configuration list for PBXProject "VisionLinkHue" */;
 			developmentRegion = en;
@@ -396,6 +394,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				DEVELOPMENT_TEAM = YBXGDD5754;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -414,6 +413,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = YBXGDD5754;
 				ENTITLEMENTS_DIRECTORY = .;
 				ENTITLEMENTS_FILENAME = VisionLinkHue.entitlements;
 				INFOPLIST_FILE = Info.plist;
@@ -551,6 +551,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				DEVELOPMENT_TEAM = YBXGDD5754;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -569,6 +570,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = YBXGDD5754;
 				ENTITLEMENTS_DIRECTORY = .;
 				ENTITLEMENTS_FILENAME = VisionLinkHue.entitlements;
 				INFOPLIST_FILE = Info.plist;
