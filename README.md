@@ -76,7 +76,7 @@ Vision-Link Hue
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-org/vision-link-hue.git
+   git clone https://github.com/tomwolfe/Vision-Link-Hue.git
    cd vision-link-hue
    ```
 
