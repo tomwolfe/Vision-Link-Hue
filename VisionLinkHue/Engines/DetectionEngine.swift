@@ -41,7 +41,7 @@ final class DetectionEngine: Sendable {
     private let requestID = UUID()
     
     /// Heuristic classifier for fixture type and confidence.
-    private let classifier = FixtureHeuristicClassifier()
+    private var classifier = FixtureHeuristicClassifier()
     
     /// Neural surface material classifier for ARKit 2026 material detection.
     private let materialClassifier: NeuralSurfaceMaterialClassifier
@@ -148,7 +148,7 @@ final class DetectionEngine: Sendable {
         let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
         
         let request = VNDetectRectanglesRequest()
-        request.minimumConfidence = 0.2
+        request.minimumConfidence = DetectionConstants.rectangleMinimumConfidence
         
         return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<[FixtureDetection], Error>) in
             // In low-power mode, use .utility QoS to reduce CPU/GPU load
@@ -183,8 +183,8 @@ final class DetectionEngine: Sendable {
         var detections: [FixtureDetection] = []
         
         for observation in observations {
-            guard observation.boundingBox.minY < 0.8 else { continue }
-            guard observation.boundingBox.width > 0.05 && observation.boundingBox.height > 0.05 else { continue }
+            guard observation.boundingBox.minY < DetectionConstants.maxDetectionY else { continue }
+            guard observation.boundingBox.width > DetectionConstants.minBoundingBoxSize && observation.boundingBox.height > DetectionConstants.minBoundingBoxSize else { continue }
             
             let region = NormalizedRect(
                 topLeft: SIMD2<Float>(Float(observation.boundingBox.minX), Float(observation.boundingBox.minY)),
@@ -197,7 +197,7 @@ final class DetectionEngine: Sendable {
             detections.append(FixtureDetection(type: type, region: region, confidence: confidence))
         }
         
-        return nonMaxSuppression(detections, iouThreshold: 0.3)
+        return nonMaxSuppression(detections, iouThreshold: DetectionConstants.nmsIoUThreshold)
     }
     
     /// Non-maximum suppression to remove overlapping detections.
@@ -227,6 +227,23 @@ final class DetectionEngine: Sendable {
         }
         
         return keep
+    }
+    
+    // MARK: - Classifier Rules
+    
+    /// Reload classification rules from a JSON config file.
+    /// Enables OTA updates to detection logic without recompiling.
+    /// - Parameter url: URL pointing to the JSON config file.
+    /// - Throws: `ClassificationConfigError` if the config is invalid.
+    func reloadRules(from url: URL) throws {
+        try classifier.loadRules(from: url)
+        logger.info("Classification rules reloaded from \(url.path)")
+    }
+    
+    /// Reset classifier rules to the bundled defaults.
+    func resetRulesToDefaults() {
+        classifier.resetToDefaults()
+        logger.info("Classification rules reset to defaults")
     }
     
     // MARK: - Neural Surface Material Detection

@@ -75,6 +75,22 @@ final class MockHueClient: HueClientProtocol {
         toggleCalls.append((resourceId: resourceId, on: on))
     }
     
+    func togglePower(groupId: String, on: Bool) async throws {
+        toggleCalls.append((resourceId: groupId, on: on))
+    }
+    
+    func setBrightness(groupId: String, brightness: Int, transitionDuration: Int = 4) async throws {
+        brightnessCalls.append((resourceId: groupId, brightness: brightness))
+    }
+    
+    func setColorTemperature(groupId: String, mireds: Int, transitionDuration: Int = 4) async throws {
+        colorTempCalls.append((resourceId: groupId, mireds: mireds))
+    }
+    
+    func setColorXY(groupId: String, x: Double, y: Double, transitionDuration: Int = 4) async throws {
+        colorXycalls.append((resourceId: groupId, x: x, y: y))
+    }
+    
     func syncSpatialAwareness(fixtures: [SpatialAwarePosition]) async throws {
         spatialSyncCalls.append(fixtures.count)
     }

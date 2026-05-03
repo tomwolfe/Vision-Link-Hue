@@ -42,6 +42,18 @@ protocol HueClientProtocol: AnyObject {
     /// Toggle power state for a light or group resource.
     func togglePower(resourceId: String, on: Bool) async throws
     
+    /// Toggle power state for a specific group.
+    func togglePower(groupId: String, on: Bool) async throws
+    
+    /// Set brightness for a specific group.
+    func setBrightness(groupId: String, brightness: Int, transitionDuration: Int) async throws
+    
+    /// Set color temperature for a specific group.
+    func setColorTemperature(groupId: String, mireds: Int, transitionDuration: Int) async throws
+    
+    /// Set XY color for a specific group.
+    func setColorXY(groupId: String, x: Double, y: Double, transitionDuration: Int) async throws
+    
     /// Sync AR-detected fixture positions back to the Hue Bridge.
     func syncSpatialAwareness(fixtures: [SpatialAwarePosition]) async throws
     

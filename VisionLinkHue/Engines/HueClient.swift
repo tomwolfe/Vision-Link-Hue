@@ -87,7 +87,9 @@ final class HueClient: ObservableObject, HueClientProtocol {
             throw HueError.noBridgeConfigured
         }
         
-        let url = URL(string: "https://\(ip)/api")!
+        guard let url = URL(string: "https://\(ip)/api") else {
+            throw HueError.invalidURL
+        }
         let requestBody = CreateApiKeyRequest(devicetype: "Vision-Link-Hue-\(UUID().uuidString.prefix(8))")
         
         let (data, response) = try await authenticatedRequest(url: url, method: "POST", body: requestBody)
@@ -119,9 +121,11 @@ final class HueClient: ObservableObject, HueClientProtocol {
             throw HueError.noBridgeConfigured
         }
         
-        let url = URL(string: "https://\(ip):\(bridgePort)/api/\(username)/resources")!
+        guard let url = URL(string: "https://\(ip):\(bridgePort)/api/\(username)/resources") else {
+            throw HueError.invalidURL
+        }
         
-        let (data, _) = try await authenticatedRequest(url: url, method: "GET", body: nil as HueBridgeState?)
+        let (data, _) = try await authenticatedRequest(url: url, method: "GET")
         
         return try JSONDecoder().decode(HueBridgeState.self, from: data)
     }
@@ -136,7 +140,9 @@ final class HueClient: ObservableObject, HueClientProtocol {
             throw HueError.noBridgeConfigured
         }
         
-        let url = URL(string: "https://\(ip):\(bridgePort)/api/\(username)/resources/\(resourceId)/action")!
+        guard let url = URL(string: "https://\(ip):\(bridgePort)/api/\(username)/resources/\(resourceId)/action") else {
+            throw HueError.invalidURL
+        }
         
         _ = try await authenticatedRequest(url: url, method: "PUT", body: state)
     }
@@ -151,7 +157,9 @@ final class HueClient: ObservableObject, HueClientProtocol {
             throw HueError.noBridgeConfigured
         }
         
-        let url = URL(string: "https://\(ip):\(bridgePort)/api/\(username)/groups/\(groupId)/action")!
+        guard let url = URL(string: "https://\(ip):\(bridgePort)/api/\(username)/groups/\(groupId)/action") else {
+            throw HueError.invalidURL
+        }
         
         let patch = ScenePatch(on: true, scene: sceneId)
         
@@ -325,7 +333,10 @@ final class HueClient: ObservableObject, HueClientProtocol {
         
         disconnect()
         
-        let url = URL(string: "https://\(ip):\(bridgePort)/api/\(username)/eventstream/clip/v2")!
+        guard let url = URL(string: "https://\(ip):\(bridgePort)/api/\(username)/eventstream/clip/v2") else {
+            stateStream?.reportError(HueError.invalidURL, severity: .error, source: "HueClient.startEventStream")
+            return
+        }
         let keychainKey = KeychainKeys.key(for: ip)
         
         stateStream?.setIsConnected(true)
@@ -435,26 +446,47 @@ final class HueClient: ObservableObject, HueClientProtocol {
     
     // MARK: - Authenticated Request Helper
     
-    /// Perform an authenticated REST API request.
+    /// Perform an authenticated REST API request with a JSON body.
     /// Used internally by `HueSpatialService` for spatial-aware API calls.
     func authenticatedRequest<T: Codable>(
         url: URL,
         method: String,
-        body: T?
+        body: T
     ) async throws -> (data: Data, response: URLResponse) {
         
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        
-        if let body {
-            request.httpBody = try JSONEncoder().encode(body)
-        }
+        request.httpBody = try JSONEncoder().encode(body)
         
         let session = urlSession ?? URLSession.shared
         
         let (data, response) = try await session.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw HueError.invalidResponse
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let errorMsg = String(data: data, encoding: .utf8) ?? "Unknown error (\(httpResponse.statusCode))"
+            throw HueError.apiError(statusCode: httpResponse.statusCode, message: errorMsg)
+        }
+        
+        return (data, response)
+    }
+    
+    /// Perform an authenticated REST API request without a body.
+    func authenticatedRequest(
+        url: URL,
+        method: String
+    ) async throws -> (data: Data, response: URLResponse) {
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        
+        let session = urlSession ?? URLSession.shared
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw HueError.invalidResponse

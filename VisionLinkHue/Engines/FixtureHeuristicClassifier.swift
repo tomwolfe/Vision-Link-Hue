@@ -333,14 +333,14 @@ struct FixtureHeuristicClassifier {
     
     /// Calculate detection confidence from observation quality metrics.
     func calculateConfidence(from observation: VNRectangleObservation) -> Double {
-        var confidence: Double = 0.7
+        var confidence: Double = DetectionConstants.baseConfidence
         
         let area = observation.boundingBox.width * observation.boundingBox.height
-        if area > 0.01 && area < 0.5 {
-            confidence += 0.15
+        if area > DetectionConstants.areaBonusLowerBound && area < DetectionConstants.areaBonusUpperBoundLarge {
+            confidence += DetectionConstants.areaBonusWellSized
         }
-        if area > 0.05 && area < 0.3 {
-            confidence += 0.05
+        if area > DetectionConstants.areaBonusMediumLowerBound && area < DetectionConstants.areaBonusMediumUpperBound {
+            confidence += DetectionConstants.proximityBonus
         }
         
         let centerX = observation.boundingBox.midX
@@ -348,23 +348,23 @@ struct FixtureHeuristicClassifier {
         let distanceFromCenter = sqrt(
             pow(centerX - 0.5, 2) + pow(centerY - 0.5, 2)
         )
-        if distanceFromCenter < 0.3 {
-            confidence += 0.05
+        if distanceFromCenter < DetectionConstants.centerProximityThreshold {
+            confidence += DetectionConstants.proximityBonus
         }
         
-        return min(confidence, 0.99)
+        return min(confidence, DetectionConstants.maxConfidence)
     }
     
     /// Calculate detection confidence from observation data.
     func calculateConfidence(from data: ObservationData) -> Double {
-        var confidence: Double = 0.7
+        var confidence: Double = DetectionConstants.baseConfidence
         
         let area = data.boundingBox.width * data.boundingBox.height
-        if area > 0.01 && area < 0.5 {
-            confidence += 0.15
+        if area > DetectionConstants.areaBonusLowerBound && area < DetectionConstants.areaBonusUpperBoundLarge {
+            confidence += DetectionConstants.areaBonusWellSized
         }
-        if area > 0.05 && area < 0.3 {
-            confidence += 0.05
+        if area > DetectionConstants.areaBonusMediumLowerBound && area < DetectionConstants.areaBonusMediumUpperBound {
+            confidence += DetectionConstants.proximityBonus
         }
         
         let centerX = data.boundingBox.midX
@@ -372,11 +372,11 @@ struct FixtureHeuristicClassifier {
         let distanceFromCenter = sqrt(
             pow(centerX - 0.5, 2) + pow(centerY - 0.5, 2)
         )
-        if distanceFromCenter < 0.3 {
-            confidence += 0.05
+        if distanceFromCenter < DetectionConstants.centerProximityThreshold {
+            confidence += DetectionConstants.proximityBonus
         }
         
-        return min(confidence, 0.99)
+        return min(confidence, DetectionConstants.maxConfidence)
     }
 }
 

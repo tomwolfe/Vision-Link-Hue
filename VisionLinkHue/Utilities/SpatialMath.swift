@@ -258,7 +258,7 @@ enum SpatialMath {
         let crossProduct = cross(worldUp, forward)
         
         let crossLength = length(crossProduct)
-        guard crossLength > 1e-6 else {
+        guard crossLength > Double(DetectionConstants.singularityThreshold) else {
             return nil
         }
         

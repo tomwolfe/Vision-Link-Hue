@@ -139,18 +139,18 @@ final class FixturePersistence: Sendable {
             return false
         }
         let normDelta = abs(quatNorm - 1.0)
-        if normDelta > 0.01 {
+        if normDelta > DetectionConstants.maxQuaternionNormDelta {
             return false
         }
         
-        // Reject unreasonable distances (0 to 100 meters)
-        if distanceMeters <= 0 || distanceMeters > 100 {
+        // Reject unreasonable distances (0 to max)
+        if distanceMeters <= 0 || distanceMeters > DetectionConstants.maxDistanceMeters {
             return false
         }
         
-        // Reject extreme position values (> 1km from origin)
+        // Reject extreme position values (beyond max range)
         let positionMagnitude = simd_length(position)
-        if positionMagnitude > 1000 {
+        if positionMagnitude > DetectionConstants.maxPositionMagnitude {
             return false
         }
         
