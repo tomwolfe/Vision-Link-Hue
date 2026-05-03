@@ -21,7 +21,7 @@ jobs:
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '16.5'
+          xcode-version: '26.3.0'
 
       - name: Build
         run: xcodebuild build-for-testing \
@@ -49,7 +49,7 @@ jobs:
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '16.5'
+          xcode-version: '26.3.0'
 
       - name: Generate SBOM
         run: swift package generate-sbom --format json
@@ -72,7 +72,7 @@ jobs:
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '16.5'
+          xcode-version: '26.3.0'
 
       - name: Swift Format Check
         run: swift package --allow-writing-to-package-descriptor lint 2>&1 || true
