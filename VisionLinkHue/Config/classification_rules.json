@@ -1,0 +1,62 @@
+{
+    "version": "1.0.0",
+    "description": "Fixture classification scoring rules for OTA updates",
+    "config": {
+        "aspectRanges": {
+            "squareRange": [0.2, 0.8],
+            "moderateRange": [0.5, 1.5],
+            "wideRange": [1.2, 3.0],
+            "stripRange": [2.0, 8.0]
+        },
+        "verticalPositionRanges": {
+            "ceilingRange": [0.0, 0.25],
+            "midCeilingRange": [0.25, 0.5],
+            "midRange": [0.5, 0.75]
+        },
+        "areaRanges": {
+            "largeThreshold": 0.15,
+            "mediumThreshold": 0.05,
+            "largeAreaRange": [0.15, 1.0],
+            "mediumAreaRange": [0.05, 0.15],
+            "smallAreaRange": [0.0, 0.05]
+        },
+        "specificity": {
+            "ceiling": 4,
+            "recessed": 3,
+            "pendant": 2,
+            "strip": 1,
+            "lamp": 0
+        }
+    },
+    "rules": [
+        {"type": "ceiling", "aspectRange": [0.2, 0.8], "yRange": null, "areaRange": null, "weight": 3.0},
+        {"type": "recessed", "aspectRange": [0.2, 0.8], "yRange": null, "areaRange": null, "weight": 2.5},
+        {"type": "pendant", "aspectRange": [0.2, 0.8], "yRange": null, "areaRange": null, "weight": 1.0},
+        {"type": "pendant", "aspectRange": [0.5, 1.5], "yRange": null, "areaRange": null, "weight": 3.0},
+        {"type": "lamp", "aspectRange": [0.5, 1.5], "yRange": null, "areaRange": null, "weight": 2.5},
+        {"type": "ceiling", "aspectRange": [0.5, 1.5], "yRange": null, "areaRange": null, "weight": 1.0},
+        {"type": "lamp", "aspectRange": [1.2, 3.0], "yRange": null, "areaRange": null, "weight": 2.0},
+        {"type": "pendant", "aspectRange": [1.2, 3.0], "yRange": null, "areaRange": null, "weight": 1.5},
+        {"type": "strip", "aspectRange": [2.0, 8.0], "yRange": null, "areaRange": null, "weight": 4.0},
+        {"type": "lamp", "aspectRange": [2.0, 8.0], "yRange": null, "areaRange": null, "weight": 0.5},
+        {"type": "lamp", "aspectRange": null, "yRange": null, "areaRange": null, "weight": 1.0},
+        {"type": "ceiling", "aspectRange": null, "yRange": [0.0, 0.25], "areaRange": null, "weight": 3.0},
+        {"type": "pendant", "aspectRange": null, "yRange": [0.0, 0.25], "areaRange": null, "weight": 2.0},
+        {"type": "recessed", "aspectRange": null, "yRange": [0.0, 0.25], "areaRange": null, "weight": 1.5},
+        {"type": "pendant", "aspectRange": null, "yRange": [0.25, 0.5], "areaRange": null, "weight": 2.0},
+        {"type": "recessed", "aspectRange": null, "yRange": [0.25, 0.5], "areaRange": null, "weight": 2.0},
+        {"type": "lamp", "aspectRange": null, "yRange": [0.25, 0.5], "areaRange": null, "weight": 1.0},
+        {"type": "lamp", "aspectRange": null, "yRange": [0.5, 0.75], "areaRange": null, "weight": 2.5},
+        {"type": "recessed", "aspectRange": null, "yRange": [0.5, 0.75], "areaRange": null, "weight": 2.0},
+        {"type": "strip", "aspectRange": null, "yRange": [0.5, 0.75], "areaRange": null, "weight": 0.5},
+        {"type": "lamp", "aspectRange": null, "yRange": [0.75, 1.0], "areaRange": null, "weight": 3.0},
+        {"type": "strip", "aspectRange": null, "yRange": [0.75, 1.0], "areaRange": null, "weight": 1.5},
+        {"type": "ceiling", "aspectRange": null, "yRange": null, "areaRange": [0.15, 1.0], "weight": 1.5},
+        {"type": "strip", "aspectRange": null, "yRange": null, "areaRange": [0.15, 1.0], "weight": 1.0},
+        {"type": "pendant", "aspectRange": null, "yRange": null, "areaRange": [0.05, 0.15], "weight": 1.0},
+        {"type": "lamp", "aspectRange": null, "yRange": null, "areaRange": [0.05, 0.15], "weight": 1.0},
+        {"type": "recessed", "aspectRange": null, "yRange": null, "areaRange": [0.05, 0.15], "weight": 1.0},
+        {"type": "recessed", "aspectRange": null, "yRange": null, "areaRange": [0.0, 0.05], "weight": 1.5},
+        {"type": "lamp", "aspectRange": null, "yRange": null, "areaRange": [0.0, 0.05], "weight": 0.5}
+    ]
+}

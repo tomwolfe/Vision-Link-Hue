@@ -11,8 +11,15 @@ extension simd_float4x4 {
     }
     
     /// Extract the translation (4th column) as a SIMD3 vector.
+    /// Uses native .position accessor available since iOS 19/26.
     var translation: SIMD3<Float> {
+        #if swift(>=5.9.2)
+        // iOS 19+ provides native .position accessor
+        self.position
+        #else
+        // Fallback for older compilers
         SIMD3<Float>(columns.3.x, columns.3.y, columns.3.z)
+        #endif
     }
 }
 

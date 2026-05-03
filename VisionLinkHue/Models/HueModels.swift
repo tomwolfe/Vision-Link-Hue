@@ -117,6 +117,11 @@ struct HueBridgeState: Codable, Sendable {
     let scenes: [HueSceneResource]?
     let groups: [BridgeGroup]?
     let resources: ResourceUpdate?
+    
+    /// Convenience accessor for bridge spatial capabilities.
+    var spatialInfo: BridgeSpatialInfo {
+        BridgeSpatialInfo.from(bridgeState: self)
+    }
 }
 
 /// Partial resource update from SSE fragment.
@@ -202,6 +207,13 @@ struct BridgeConfig: Codable, Sendable {
 
 // MARK: - SpatialAware API (Spring 2026)
 
+/// Firmware version threshold required for SpatialAware features.
+/// Bridge Pro firmware v1976+ or v2 Bridge with 2026 Spring update.
+enum SpatialAwareFirmwareRequirement {
+    static let minimumMajor = 1
+    static let minimumMinor = 976
+}
+
 /// Spatial awareness data for a detected fixture, used to sync
 /// AR-detected positions back to the Hue Bridge for accurate
 /// preset scene rendering.
@@ -221,8 +233,20 @@ struct SpatialAwarePosition: Codable, Sendable {
     /// Optional room/area assignment from the bridge.
     let roomId: String?
     
+    /// Optional area/zone assignment from the bridge.
+    let areaId: String?
+    
     /// Spatial calibration timestamp.
     let timestamp: Date
+    
+    /// Orientation quaternion for accurate light beam direction.
+    let orientation: Orientation?
+    
+    /// Material label from ARKit Neural Surface Synthesis (e.g., "Glass", "Metal", "Wood").
+    let materialLabel: String?
+    
+    /// Room-relative offset within the assigned room.
+    let roomOffset: RoomOffset?
     
     struct Position3D: Codable, Sendable {
         let x: Double
@@ -241,26 +265,92 @@ struct SpatialAwarePosition: Codable, Sendable {
             self.z = Double(simd.z)
         }
     }
+    
+    struct Orientation: Codable, Sendable {
+        let x: Double
+        let y: Double
+        let z: Double
+        let w: Double
+        
+        init(simd: simd_quatf) {
+            self.x = Double(simd.x)
+            self.y = Double(simd.y)
+            self.z = Double(simd.z)
+            self.w = Double(simd.w)
+        }
+        
+        init(x: Double, y: Double, z: Double, w: Double) {
+            self.x = x
+            self.y = y
+            self.z = z
+            self.w = w
+        }
+    }
+    
+    /// Room-relative offset for precise fixture placement within a room.
+    struct RoomOffset: Codable, Sendable {
+        /// Offset X from room origin in meters.
+        let relativeX: Double
+        /// Offset Y from room origin in meters.
+        let relativeY: Double
+        /// Offset Z from room origin in meters.
+        let relativeZ: Double
+        
+        init(relativeX: Double, relativeY: Double, relativeZ: Double) {
+            self.relativeX = relativeX
+            self.relativeY = relativeY
+            self.relativeZ = relativeZ
+        }
+        
+        init(simd: SIMD3<Float>) {
+            self.relativeX = Double(simd.x)
+            self.relativeY = Double(simd.y)
+            self.relativeZ = Double(simd.z)
+        }
+    }
 }
 
 /// Request body for syncing spatial awareness data to the bridge.
 struct SpatialAwareSyncRequest: Codable, Sendable {
     let fixtures: [SpatialAwarePosition]
+    let coordinateSystem: CoordinateSystem
+    let calibrationTimestamp: Date
+    
+    enum CoordinateSystem: String, Codable, Sendable {
+        case bridgeRoomSpace = "bridge_room_space"
+        case localRoomSpace = "local_room_space"
+    }
+    
+    init(fixtures: [SpatialAwarePosition]) {
+        self.fixtures = fixtures
+        self.coordinateSystem = .bridgeRoomSpace
+        self.calibrationTimestamp = Date()
+    }
 }
 
 /// Response from the SpatialAware sync endpoint.
 struct SpatialAwareSyncResponse: Codable, Sendable {
     let success: [SpatialAwareSuccess]
     let warnings: [SpatialAwareWarning]?
+    let errors: [SpatialAwareError]?
     
     struct SpatialAwareSuccess: Codable, Sendable {
         let id: String
         let status: String
+        let roomId: String?
+        let confidence: Double?
     }
     
     struct SpatialAwareWarning: Codable, Sendable {
         let id: String
         let message: String
+        let code: String?
+    }
+    
+    struct SpatialAwareError: Codable, Sendable {
+        let id: String
+        let message: String
+        let code: String
     }
 }
 
@@ -273,6 +363,33 @@ struct SpatialAwareUpdate: Codable, Sendable {
         let position: SpatialAwarePosition.Position3D?
         let confidence: Double?
         let last_seen: Date?
+        let roomId: String?
+        let areaId: String?
+    }
+}
+
+/// Bridge firmware and spatial capabilities info.
+struct BridgeSpatialInfo: Sendable {
+    let firmwareVersion: String
+    let supportsSpatialAware: Bool
+    let supportsRoomMapping: Bool
+    let supportedMaterialLabels: [String]
+    
+    static func from(bridgeState: HueBridgeState) -> BridgeSpatialInfo {
+        let fw = bridgeState.resources?.spatial_awareness?.firmware_version ?? "0.0"
+        let parts = fw.split(separator: ".").compactMap { Int($0) }
+        let major = parts.first ?? 0
+        let minor = parts.count > 1 ? parts[1] : 0
+        
+        let supportsSpatial = major > SpatialAwareFirmwareRequirement.minimumMajor ||
+            (major == SpatialAwareFirmwareRequirement.minimumMajor && minor >= SpatialAwareFirmwareRequirement.minimumMinor)
+        
+        return BridgeSpatialInfo(
+            firmwareVersion: fw,
+            supportsSpatialAware: supportsSpatial,
+            supportsRoomMapping: supportsSpatial,
+            supportedMaterialLabels: ["Glass", "Metal", "Wood", "Fabric", "Plaster", "Concrete"]
+        )
     }
 }
 

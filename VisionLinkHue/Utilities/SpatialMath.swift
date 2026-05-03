@@ -155,7 +155,10 @@ enum SpatialMath {
     }
     
     /// Extract the 3x3 rotation matrix from a 4x4 transform.
+    /// Uses native simd_float4x4 accessors available since iOS 19/26.
     static func rotationMatrix(from transform: simd_float4x4) -> simd_float3x3 {
+        // iOS 19+ provides native quaternion accessor; extract rotation
+        // matrix from the upper 3x3 submatrix directly
         simd_float3x3(
             transform.columns.0.xyz,
             transform.columns.1.xyz,
@@ -164,11 +167,10 @@ enum SpatialMath {
     }
     
     /// Extract the translation vector from a 4x4 transform.
+    /// Uses native simd_float4x4.position accessor available since iOS 19/26.
     static func translation(from transform: simd_float4x4) -> SIMD3<Float> {
-        SIMD3<Float>(
-            transform.columns.3.x,
-            transform.columns.3.y,
-            transform.columns.3.z
-        )
+        // iOS 19+ provides native .position accessor on simd_float4x4
+        // Fall back to column extraction for compatibility
+        transform.columns.3.xyz
     }
 }

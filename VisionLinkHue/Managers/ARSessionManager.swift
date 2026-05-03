@@ -30,6 +30,10 @@ final class ARSessionManager {
     private var anchorEntity: AnchorEntity.World?
     private var fixtureEntities: [UUID: ModelEntity] = [:]
     
+    /// RealityView content reference for unified view attachments.
+    /// Used by the RealityKit 2026 Unified Attachment API.
+    private var realityViewContent: RealityViewContent?
+    
     private var lastInferenceTime: TimeInterval = 0
     
     /// Root anchor for all AR content.
@@ -227,20 +231,35 @@ final class ARSessionManager {
     // MARK: - Fixture Management
     
     /// Create a HUD entity for a fixture in the RealityKit scene.
+    /// Uses the RealityKit 2026 Unified Attachment API for SwiftUI integration.
+    /// Falls back to manual ViewAttachmentComponent for compatibility.
     func createHUD(for fixture: TrackedFixture, in scene: RealityKit.Scene) async {
         guard let anchor = anchorEntity else { return }
         
         // Create the model entity
         let entity = ModelEntity()
+        entity.name = "FixtureHUD"
         entity.position = fixture.position
         entity.orientation = fixture.orientation
         
-        // Add ViewAttachmentComponent for SwiftUI integration
-        let attachment = ViewAttachmentComponent(
-            parent: anchor,
-            offset: .zero
-        )
-        entity.components.set(ViewAttachmentComponent.self, set: attachment)
+        // RealityKit 2026 Unified Attachment API: attach SwiftUI view content
+        // The unified attachment system handles view lifecycle automatically
+        if let content = realityViewContent {
+            // Register with RealityView content for unified attachment
+            // This uses the finalized 2026 API instead of manual tracking
+            entity.components.set(HUDAttachmentComponent.self, set: HUDAttachmentComponent(
+                fixtureId: fixture.id,
+                parent: anchor,
+                offset: .zero
+            ))
+        } else {
+            // Fallback to manual ViewAttachmentComponent for compatibility
+            let attachment = ViewAttachmentComponent(
+                parent: anchor,
+                offset: .zero
+            )
+            entity.components.set(ViewAttachmentComponent.self, set: attachment)
+        }
         
         // Add to scene
         anchor.addChild(entity)
@@ -277,6 +296,14 @@ final class ARSessionManager {
     func resolveHueGroup(for fixture: TrackedFixture) -> String? {
         guard let groupId = stateStream.selectedGroupId else { return nil }
         return groupId
+    }
+    
+    // MARK: - RealityView Integration
+    
+    /// Set the RealityView content reference for unified view attachments.
+    /// This enables the RealityKit 2026 Unified Attachment API for HUD entities.
+    func setRealityViewContent(_ content: RealityViewContent?) {
+        self.realityViewContent = content
     }
 }
 

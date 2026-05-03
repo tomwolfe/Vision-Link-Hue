@@ -67,9 +67,35 @@ struct ScoringConfig {
     }
 }
 
+/// JSON-serializable representation of a scoring rule for config file loading.
+private struct JSONScoringRule: Codable {
+    let type: String
+    let aspectRange: [Double]?
+    let yRange: [Double]?
+    let areaRange: [Double]?
+    let weight: Double
+}
+
+/// JSON-serializable configuration for heuristic classification.
+private struct ClassificationConfigFile: Codable {
+    let version: String?
+    let description: String?
+    let config: ConfigSection?
+    let rules: [JSONScoringRule]
+    
+    struct ConfigSection: Codable {
+        let specificity: [String: Int]?
+    }
+}
+
+// MARK: - Default Classification Rules
+
 /// Declarative scoring rules for fixture classification.
 /// Organized by aspect ratio category, then vertical position, then area.
 /// The classifier iterates these rules to compute scores for each fixture type.
+///
+/// These are the bundled default rules. For OTA-updatable rules, use
+/// `FixtureHeuristicClassifier.loadRules(from:)` to load from a JSON config.
 let classificationRules: [ScoringRule] = [
     // Square aspect ratio (0.2-0.8)
     ScoringRule(type: .ceiling, aspectRange: ScoringConfig.AspectRatio.squareRange, yRange: nil, areaRange: nil, weight: 3.0),
@@ -134,15 +160,84 @@ let classificationRules: [ScoringRule] = [
 /// scores for each fixture type based on aspect ratio, vertical position,
 /// and bounding box area. This reduces cyclomatic complexity compared to
 /// nested if/else chains and makes the scoring logic easily extensible.
+///
+/// Supports OTA-updatable rules via `loadRules(from:)` which loads scoring
+/// rules from a JSON config file, enabling detection logic updates without
+/// recompiling the binary.
 struct FixtureHeuristicClassifier {
+    
+    /// Currently active classification rules. Defaults to the bundled
+    /// `classificationRules` array. Replace with `loadRules(from:)` for
+    /// OTA-updatable rules.
+    private var rules: [ScoringRule]
+    
+    /// Specificity tiebreaker values.
+    private var specificity: [FixtureType: Int]
+    
+    /// Default initializer using bundled classification rules.
+    init() {
+        self.rules = classificationRules
+        self.specificity = ScoringConfig.Specificity.values
+    }
+    
+    /// Load classification rules from a JSON config file.
+    /// This enables OTA updates to detection logic without recompiling.
+    /// - Parameter url: URL pointing to the JSON config file.
+    /// - Returns: The loaded rules array.
+    /// - Throws: `ClassificationConfigError` if the config is invalid or cannot be loaded.
+    mutating func loadRules(from url: URL) throws {
+        let data = try Data(contentsOf: url)
+        let decoder = JSONDecoder()
+        
+        let configFile = try decoder.decode(ClassificationConfigFile.self, from: data)
+        
+        var loadedRules: [ScoringRule] = []
+        for jsonRule in configFile.rules {
+            guard let type = FixtureType(from: jsonRule.type) else { continue }
+            
+            let aspectRange = jsonRule.aspectRange.map {
+                ClosedRange<Float>(uncheckedBounds: (Float($0[0]), Float($0[1])))
+            }
+            
+            let yRange = jsonRule.yRange.map {
+                ClosedRange<Double>(uncheckedBounds: ($0[0], $0[1]))
+            }
+            
+            let areaRange = jsonRule.areaRange.map {
+                ClosedRange<Double>(uncheckedBounds: ($0[0], $0[1]))
+            }
+            
+            loadedRules.append(ScoringRule(
+                type: type,
+                aspectRange: aspectRange,
+                yRange: yRange,
+                areaRange: areaRange,
+                weight: jsonRule.weight
+            ))
+        }
+        
+        // Load specificity from config if available
+        if let specificityConfig = configFile.config?.specificity {
+            var loadedSpecificity: [FixtureType: Int] = [:]
+            for (typeName, value) in specificityConfig {
+                if let type = FixtureType(from: typeName) {
+                    loadedSpecificity[type] = value
+                }
+            }
+            self.specificity = loadedSpecificity
+        }
+        
+        self.rules = loadedRules
+    }
+    
+    /// Reset to the bundled default classification rules.
+    mutating func resetToDefaults() {
+        self.rules = classificationRules
+        self.specificity = ScoringConfig.Specificity.values
+    }
     
     /// Classify a rectangle observation into a fixture type using weighted
     /// scoring across aspect ratio, vertical position, and bounding box area.
-    ///
-    /// Iterates the global `classificationRules` array, accumulating weights
-    /// for each fixture type whose rule ranges match the observation's
-    /// aspect ratio, normalized Y position, and area. The type with the
-    /// highest total weight wins, with specificity as a tiebreaker.
     func classify(typeFrom observation: VNRectangleObservation) -> FixtureType {
         let aspectRatio = observation.boundingBox.width / max(observation.boundingBox.height, 0.001)
         let normalizedY = observation.boundingBox.midY
@@ -154,7 +249,7 @@ struct FixtureHeuristicClassifier {
         }
         
         // Iterate declarative rules and accumulate weights.
-        for rule in classificationRules {
+        for rule in rules {
             var matches = true
             
             if let aspectRange = rule.aspectRange {
@@ -177,7 +272,7 @@ struct FixtureHeuristicClassifier {
         // Sort by score descending, then by specificity as tiebreaker.
         let sorted = scores.sorted { a, b in
             if a.value == b.value {
-                return ScoringConfig.Specificity.values[a.key, default: 0] > ScoringConfig.Specificity.values[b.key, default: 0]
+                return specificity[a.key, default: 0] > specificity[b.key, default: 0]
             }
             return a.value > b.value
         }
@@ -186,13 +281,6 @@ struct FixtureHeuristicClassifier {
     }
     
     /// Calculate detection confidence from observation quality metrics.
-    ///
-    /// Base confidence is 0.7. Bonuses are added for:
-    /// - Reasonable area (0.01-0.5): +0.15
-    /// - Good area (0.05-0.3): +0.05
-    /// - Near image center: +0.05
-    ///
-    /// Result is capped at 0.99.
     func calculateConfidence(from observation: VNRectangleObservation) -> Double {
         var confidence: Double = 0.7
         
@@ -216,3 +304,40 @@ struct FixtureHeuristicClassifier {
         return min(confidence, 0.99)
     }
 }
+
+// MARK: - FixtureType JSON Initialization
+
+extension FixtureType {
+    /// Initialize a fixture type from a JSON string name.
+    /// Used for loading rules from JSON config files.
+    init?(from jsonName: String) {
+        switch jsonName.lowercased() {
+        case "lamp": self = .lamp
+        case "recessed": self = .recessed
+        case "pendant": self = .pendant
+        case "ceiling": self = .ceiling
+        case "strip": self = .strip
+        default: return nil
+        }
+    }
+}
+
+// MARK: - Classification Config Errors
+
+/// Errors that can occur when loading classification config.
+enum ClassificationConfigError: Error, LocalizedError {
+    case invalidJSON
+    case unknownFixtureType(String)
+    case invalidRange(String)
+    case fileNotFound(URL)
+    
+    var errorDescription: String? {
+        switch self {
+        case .invalidJSON: return "Invalid JSON in classification config"
+        case .unknownFixtureType(let type): return "Unknown fixture type in config: \(type)"
+        case .invalidRange(let desc): return "Invalid range in config: \(desc)"
+        case .fileNotFound(let url): return "Config file not found: \(url.path)"
+        }
+    }
+}
+

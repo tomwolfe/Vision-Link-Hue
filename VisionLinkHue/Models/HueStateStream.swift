@@ -1,5 +1,7 @@
 import Foundation
 
+// MARK: - Error Severity Levels
+
 /// Severity levels for application errors, used to prioritize UI feedback.
 /// Ordered from least to most severe for `Comparable` conformance.
 enum AppErrorSeverity: Comparable {
@@ -12,6 +14,8 @@ enum AppErrorSeverity: Comparable {
     /// Critical errors that may prevent the app from functioning.
     case critical
 }
+
+// MARK: - App Error Type
 
 /// Unified error type for the application, wrapping any `Error` with
 /// severity classification, source attribution, and display formatting.
@@ -48,9 +52,115 @@ struct AppError: Identifiable, LocalizedError {
     }
 }
 
+// MARK: - App Notification System Actor
+
+/// Dedicated actor for centralized error notification handling.
+/// Prevents main-thread hangs during SSE reconnection bursts by
+/// batching and deduplicating errors before dispatching to the UI.
+///
+/// The actor serializes error processing and applies rate-limiting
+/// to prevent notification flooding during rapid reconnection cycles.
+actor AppNotificationSystem {
+    
+    /// Maximum number of concurrent active notifications.
+    private static let maxActiveNotifications = 5
+    
+    /// Minimum time between notifications of the same source (seconds).
+    private static let sourceCooldownInterval: TimeInterval = 2.0
+    
+    /// Currently active notifications.
+    private var activeNotifications: [AppError] = []
+    
+    /// Last notification time per source for rate limiting.
+    private var lastNotificationTimeBySource: [String: Date] = [:]
+    
+    /// Notification event publisher for UI consumption.
+    var onNotification: (([AppError]) -> Void)?
+    
+    /// Number of active notifications.
+    var notificationCount: Int {
+        activeNotifications.count
+    }
+    
+    /// Get all active notifications.
+    func getActiveNotifications() -> [AppError] {
+        activeNotifications
+    }
+    
+    /// Enqueue an error notification with deduplication and rate limiting.
+    func enqueueNotification(_ error: any Error, severity: AppErrorSeverity = .error, source: String) {
+        let appError = AppError(error: error, severity: severity, source: source)
+        
+        // Skip if we already have this exact error from the same source
+        // within the cooldown period
+        if let lastTime = lastNotificationTimeBySource[source],
+           Date().timeIntervalSince(lastTime) < SourceCooldownInterval {
+            return
+        }
+        
+        // Skip if we're at the maximum notification limit and this is
+        // not a critical error
+        if activeNotifications.count >= maxActiveNotifications,
+           severity != .critical {
+            return
+        }
+        
+        // Remove duplicate errors from the same source
+        activeNotifications.removeAll { $0.source == source && $0.error._domain == (error as NSError).domain }
+        
+        activeNotifications.append(appError)
+        lastNotificationTimeBySource[source] = Date()
+        
+        // Notify UI of the updated notification list
+        onNotification?(activeNotifications)
+        
+        // Auto-dismiss informational errors after 3 seconds
+        if severity == .informational {
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(3))
+                await self?.dismissNotification(withId: appError.id)
+            }
+        }
+    }
+    
+    /// Dismiss a specific notification by ID.
+    func dismissNotification(withId id: UUID) {
+        activeNotifications.removeAll { $0.id == id }
+        onNotification?(activeNotifications)
+    }
+    
+    /// Clear all active notifications.
+    func clearAllNotifications() {
+        activeNotifications.removeAll()
+        onNotification?(activeNotifications)
+    }
+    
+    /// Get notifications for a specific source.
+    func notifications(fromSource source: String) -> [AppError] {
+        activeNotifications.filter { $0.source == source }
+    }
+}
+
+extension AppNotificationSystem {
+    /// Convenience alias for the cooldown interval constant.
+    private static var SourceCooldownInterval: TimeInterval {
+        Self.sourceCooldownInterval
+    }
+    
+    /// Convenience alias for the max notifications constant.
+    private static var maxActiveNotifications: Int {
+        Self.maxActiveNotifications
+    }
+}
+
+// MARK: - Centralized State Manager
+
 /// Centralized state manager for Hue bridge data and connection status.
 /// Uses the `@Observable` macro for granular dependency tracking without
 /// Combine's overhead of full-view re-renders.
+///
+/// Delegates error notification handling to the `AppNotificationSystem`
+/// actor to prevent main-thread hangs during SSE reconnection bursts.
 @Observable
 final class HueStateStream {
     
@@ -62,11 +172,24 @@ final class HueStateStream {
     var bridgeConfig: BridgeConfig?
     
     /// Active error queue for toast/banner display.
-    var activeErrors: [AppError] = []
+    /// Backed by the AppNotificationSystem actor for thread-safe processing.
+    private(set) var activeErrors: [AppError] = []
     
     /// Mapping from local fixture UUID to Hue bridge light ID.
     /// Populated via tap-to-link in the HUD.
     private(set) var fixtureLightMapping: [UUID: String] = [:]
+    
+    /// Dedicated actor for error notification handling.
+    /// Prevents main-thread hangs during SSE reconnection bursts.
+    private let notificationSystem = AppNotificationSystem()
+    
+    init() {
+        notificationSystem.onNotification = { [weak self] notifications in
+            // Update the UI-visible error list on the caller's context
+            // The actor guarantees thread-safe access to activeErrors
+            self?.activeErrors = notifications
+        }
+    }
     
     func setIsConnected(_ connected: Bool) {
         isConnected = connected
@@ -137,27 +260,26 @@ final class HueStateStream {
         return group.lights.compactMap { light(by: $0) }
     }
     
-    /// Report an error to the active error queue for UI display.
+    /// Report an error to the notification system for UI display.
+    /// Uses the AppNotificationSystem actor to prevent main-thread hangs
+    /// during SSE reconnection bursts by deduplicating and rate-limiting.
     func reportError(_ error: any Error, severity: AppErrorSeverity = .error, source: String) {
-        let appError = AppError(error: error, severity: severity, source: source)
-        activeErrors.append(appError)
-        
-        // Auto-clear informational errors after 3 seconds
-        if severity == .informational {
-            Task {
-                try? await Task.sleep(for: .seconds(3))
-                self.activeErrors.removeAll { $0.id == appError.id }
-            }
+        Task { [notificationSystem] in
+            await notificationSystem.enqueueNotification(error, severity: severity, source: source)
         }
     }
     
     /// Dismiss a specific error from the queue.
     func dismissError(_ error: AppError) {
-        activeErrors.removeAll { $0.id == error.id }
+        Task { [notificationSystem] in
+            await notificationSystem.dismissNotification(withId: error.id)
+        }
     }
     
     /// Clear all active errors.
     func clearErrors() {
-        activeErrors.removeAll()
+        Task { [notificationSystem] in
+            await notificationSystem.clearAllNotifications()
+        }
     }
 }

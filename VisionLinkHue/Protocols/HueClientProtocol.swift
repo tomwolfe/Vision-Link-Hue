@@ -52,6 +52,28 @@ protocol HueClientProtocol: AnyObject {
     /// Get current spatial awareness data from the bridge.
     func fetchSpatialAwareness() async throws -> [SpatialAwarePosition]
     
+    /// Verify firmware compatibility for SpatialAware features before sync.
+    func verifySpatialAwareCompatibility() async throws -> BridgeSpatialInfo
+    
+    /// Map ARKit local space coordinates to Bridge Room Space coordinates.
+    func mapARKitToBridgeSpace(arKitPosition: SIMD3<Float>, arKitOrientation: simd_quatf, referencePoint: SIMD3<Float>?) -> (position: SpatialAwarePosition.Position3D, roomOffset: SpatialAwarePosition.RoomOffset?)
+    
+    /// Create a full SpatialAwarePosition from ARKit detection data with room-relative mapping.
+    func createSpatialAwarePosition(
+        lightId: String,
+        arKitPosition: SIMD3<Float>,
+        arKitOrientation: simd_quatf,
+        confidence: Double,
+        fixtureType: String,
+        materialLabel: String?,
+        roomId: String?,
+        areaId: String?,
+        origin: SIMD3<Float>?
+    ) -> SpatialAwarePosition
+    
+    /// Check if the connected bridge supports SpatialAware features.
+    var isSpatialAwareSupported: Bool { get }
+    
     /// Start the SSE connection to the bridge event stream.
     func startEventStream()
     

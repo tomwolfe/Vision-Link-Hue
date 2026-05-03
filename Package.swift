@@ -1,4 +1,4 @@
-// swift-tools-version: 6.1
+// swift-tools-version: 6.3
 import PackageDescription
 
 let package = Package(
@@ -10,12 +10,18 @@ let package = Package(
     targets: [
         .target(
             name: "VisionLinkHue",
-            path: "VisionLinkHue"
+            path: "VisionLinkHue",
+            swiftSettings: [
+                .enableExperimentalFeature("StrictConcurrency")
+            ]
         ),
         .testTarget(
             name: "VisionLinkHueTests",
             dependencies: ["VisionLinkHue"],
-            path: "Tests/VisionLinkHueTests"
+            path: "Tests/VisionLinkHueTests",
+            swiftSettings: [
+                .enableExperimentalFeature("StrictConcurrency")
+            ]
         )
     ]
 )

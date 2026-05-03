@@ -78,6 +78,62 @@ final class MockHueClient: HueClientProtocol {
         return []
     }
     
+    func verifySpatialAwareCompatibility() async throws -> BridgeSpatialInfo {
+        return BridgeSpatialInfo(
+            firmwareVersion: "1.976",
+            supportsSpatialAware: true,
+            supportsRoomMapping: true,
+            supportedMaterialLabels: ["Glass", "Metal", "Wood"]
+        )
+    }
+    
+    func mapARKitToBridgeSpace(arKitPosition: SIMD3<Float>, arKitOrientation: simd_quatf, referencePoint: SIMD3<Float>?) -> (position: SpatialAwarePosition.Position3D, roomOffset: SpatialAwarePosition.RoomOffset?) {
+        let origin = referencePoint ?? SIMD3<Float>(0, 0, 0)
+        let roomOffset = SIMD3<Float>(
+            arKitPosition.x - origin.x,
+            arKitPosition.y - origin.y,
+            arKitPosition.z - origin.z
+        )
+        return (
+            SpatialAwarePosition.Position3D(simd: arKitPosition),
+            SpatialAwarePosition.RoomOffset(simd: roomOffset)
+        )
+    }
+    
+    func createSpatialAwarePosition(
+        lightId: String,
+        arKitPosition: SIMD3<Float>,
+        arKitOrientation: simd_quatf,
+        confidence: Double,
+        fixtureType: String,
+        materialLabel: String?,
+        roomId: String?,
+        areaId: String?,
+        origin: SIMD3<Float>?
+    ) -> SpatialAwarePosition {
+        let (position, roomOffset) = mapARKitToBridgeSpace(
+            arKitPosition: arKitPosition,
+            arKitOrientation: arKitOrientation,
+            referencePoint: origin
+        )
+        return SpatialAwarePosition(
+            id: lightId,
+            position: position,
+            confidence: confidence,
+            fixtureType: fixtureType,
+            roomId: roomId,
+            areaId: areaId,
+            timestamp: Date(),
+            orientation: SpatialAwarePosition.Orientation(simd: arKitOrientation),
+            materialLabel: materialLabel,
+            roomOffset: roomOffset
+        )
+    }
+    
+    var isSpatialAwareSupported: Bool {
+        return true
+    }
+    
     func startEventStream() {
         didStartEventStream = true
     }
