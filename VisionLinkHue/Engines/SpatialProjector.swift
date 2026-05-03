@@ -8,6 +8,7 @@ import simd
 /// All methods execute on the MainActor since ARKit raycast APIs are
 /// strictly main-thread bound.
 @MainActor
+@Observable
 final class SpatialProjector {
     
     /// Configuration for the projector.
@@ -26,10 +27,12 @@ final class SpatialProjector {
     }
     
     private let configuration: Configuration
+    private let provider: CameraConfigurationProvider
     private weak var session: ARSession?
     
-    init(session: ARSession? = nil, configuration: Configuration = .init()) {
+    init(session: ARSession? = nil, configuration: Configuration = .init(), provider: CameraConfigurationProvider? = nil) {
         self.configuration = configuration
+        self.provider = provider ?? DefaultCameraConfigurationProvider()
         self.session = session
     }
     
@@ -47,13 +50,9 @@ final class SpatialProjector {
         anchor: AnchorEntity
     ) -> ProjectionResult {
         
-        #if !targetEnvironment(simulator)
-        let intrinsics = frame.camera.intrinsics
-        #else
-        let intrinsics = CameraIntrinsics(k0: 1.0, k4: 1.0, k2: 0.5, k5: 0.5)
-        #endif
+        let intrinsics = provider.intrinsics
 
-        guard let cameraDirection = SpatialMath.unprojectDirection(
+        guard let _ = SpatialMath.unprojectDirection(
             normalized: normalizedPoint,
             intrinsics: intrinsics,
             cameraTransform: frame.camera.transform
@@ -99,7 +98,8 @@ final class SpatialProjector {
                 ),
                 position: fallbackPosition,
                 orientation: fallbackOrientation,
-                distanceMeters: 2.0
+                distanceMeters: 2.0,
+                material: nil
             )
         )
     }
@@ -113,11 +113,7 @@ final class SpatialProjector {
         
         let center = region.center
         
-        #if !targetEnvironment(simulator)
-        let intrinsics = frame.camera.intrinsics
-        #else
-        let intrinsics = CameraIntrinsics(k0: 1.0, k4: 1.0, k2: 0.5, k5: 0.5)
-        #endif
+        let intrinsics = provider.intrinsics
 
         let direction = SpatialMath.unprojectDirection(
             normalized: center,
@@ -156,7 +152,8 @@ final class SpatialProjector {
                     ),
                     position: adjustedPosition,
                     orientation: orientation,
-                    distanceMeters: meshResult.distanceMeters
+                    distanceMeters: meshResult.distanceMeters,
+                    material: nil
                 )
             )
         }
@@ -182,11 +179,7 @@ final class SpatialProjector {
         anchor: AnchorEntity
     ) -> TrackedFixture? {
         
-        #if !targetEnvironment(simulator)
-        let intrinsics = frame.camera.intrinsics
-        #else
-        let intrinsics = CameraIntrinsics(k0: 1.0, k4: 1.0, k2: 0.5, k5: 0.5)
-        #endif
+        let intrinsics = provider.intrinsics
 
         guard let ray = SpatialMath.cameraRay(
             normalized: normalizedPoint,
@@ -237,7 +230,8 @@ final class SpatialProjector {
             ),
             position: adjustedPosition,
             orientation: orientation,
-            distanceMeters: distance
+            distanceMeters: distance,
+            material: nil
         )
     }
     
@@ -255,7 +249,7 @@ final class SpatialProjector {
             return nil
         }
 
-        let intrinsics = frame.camera.intrinsics
+        let intrinsics = provider.intrinsics
         
         let pixelWidth = Int(depthMap.width)
         let pixelHeight = Int(depthMap.height)
@@ -304,7 +298,8 @@ final class SpatialProjector {
                 ),
                 position: adjustedPosition,
                 orientation: orientation,
-                distanceMeters: depthMeters
+                distanceMeters: depthMeters,
+                material: nil
             )
         )
         #else
@@ -327,13 +322,17 @@ final class SpatialProjector {
         
         let depthIndex = py * pixelWidth + px
         
-        let depthBytes = depthMap.data.bindMemory(to: UInt16.self, capacity: depthMap.data.count)
+        CVPixelBufferLockBaseAddress(depthMap, .readOnly)
+        let baseAddress = CVPixelBufferGetBaseAddress(depthMap)!
+        let bytesPerRow = CVPixelBufferGetBytesPerRow(depthMap)
+        let pointer = baseAddress.advanced(by: Int(py) * bytesPerRow + Int(px) * MemoryLayout<UInt16>.stride)
+        let depthValue = pointer.assumingMemoryBound(to: UInt16.self).pointee
+        CVPixelBufferUnlockBaseAddress(depthMap, [])
         
-        guard depthIndex >= 0, depthIndex < depthMap.data.count / MemoryLayout<UInt16>.stride else {
+        guard depthIndex >= 0, depthIndex < pixelWidth * pixelHeight else {
             return nil
         }
         
-        let depthValue = depthBytes[depthIndex]
         let depthMeters = Float(depthValue) / 1000.0
         
         guard depthMeters >= configuration.minDepthMeters,
@@ -343,8 +342,13 @@ final class SpatialProjector {
         
         if let confidenceMap = confidenceMap {
             let confidenceIndex = py * pixelWidth + px
-            if confidenceIndex >= 0, confidenceIndex < confidenceMap.data.count {
-                let confidenceByte = confidenceMap.data[confidenceIndex]
+            if confidenceIndex >= 0, confidenceIndex < pixelWidth * pixelHeight {
+                CVPixelBufferLockBaseAddress(confidenceMap, .readOnly)
+                let confBase = CVPixelBufferGetBaseAddress(confidenceMap)!
+                let confBytesPerRow = CVPixelBufferGetBytesPerRow(confidenceMap)
+                let confPointer = confBase.advanced(by: Int(py) * confBytesPerRow + Int(px))
+                let confidenceByte = confPointer.assumingMemoryBound(to: UInt8.self).pointee
+                CVPixelBufferUnlockBaseAddress(confidenceMap, [])
                 if confidenceByte == 0 {
                     return nil
                 }

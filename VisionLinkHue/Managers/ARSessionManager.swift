@@ -26,6 +26,7 @@ final class ARSessionManager {
     private let hueClient: HueClient
     private let stateStream: HueStateStream
     private let hudFactory: FixtureHUDFactory
+    private let provider: CameraConfigurationProvider
     
     private var arView: ARView?
     private var anchorEntity: AnchorEntity?
@@ -48,13 +49,15 @@ final class ARSessionManager {
         spatialProjector: SpatialProjector,
         hueClient: HueClient,
         stateStream: HueStateStream,
-        hudFactory: FixtureHUDFactory = FixtureHUDFactory()
+        hudFactory: FixtureHUDFactory = FixtureHUDFactory(),
+        provider: CameraConfigurationProvider = DefaultCameraConfigurationProvider()
     ) {
         self.detectionEngine = detectionEngine
         self.spatialProjector = spatialProjector
         self.hueClient = hueClient
         self.stateStream = stateStream
         self.hudFactory = hudFactory
+        self.provider = provider
     }
     
     // MARK: - Session Lifecycle
@@ -68,11 +71,7 @@ final class ARSessionManager {
         isSessionActive = true
         
         // Create root anchor
-        #if !targetEnvironment(simulator)
-        anchorEntity = AnchorEntity(.world)
-        #else
-        anchorEntity = AnchorEntity(.anchor(identifier: UUID()))
-        #endif
+        anchorEntity = provider.makeWorldAnchor()
         if let anchor = anchorEntity {
             arView.scene.addAnchor(anchor)
         }
@@ -104,14 +103,11 @@ final class ARSessionManager {
             self.frameTimestamp = frame.timestamp
             #if !targetEnvironment(simulator)
             self.worldMapAvailable = frame.worldMap != nil
-            #else
-            self.worldMapAvailable = false
-            #endif
-            #if !targetEnvironment(simulator)
             if let state = frame.trackingState {
                 self.trackingState = state == .limited ? .limited : .tracking
             }
             #else
+            self.worldMapAvailable = false
             self.trackingState = .notAvailable
             #endif
         }
@@ -134,16 +130,12 @@ final class ARSessionManager {
                 for detection in detections {
                     if let anchor {
                         // Use TaskGroup for parallel detection processing and material sampling
+                        let material = await self.detectionEngine.classifyMaterial(from: frame, at: detection.region)
+                        
                         let fixture = await withTaskGroup(of: TrackedFixture?.self) { taskGroup in
-                            // Spawn task for spatial projection
+                            // Spawn task for spatial projection with material info
                             taskGroup.addTask {
-                                await self.processDetectionOffMain(detection, in: frame, anchor: anchor)
-                            }
-                            
-                            // Spawn parallel task for material sampling
-                            taskGroup.addTask {
-                                let material = await self.detectionEngine.classifyMaterial(from: frame, at: detection.region)
-                                return nil // Material result is logged but doesn't block fixture creation
+                                await self.processDetectionOffMain(detection, in: frame, anchor: anchor, material: material)
                             }
                             
                             // Wait for all tasks to complete
@@ -183,7 +175,8 @@ final class ARSessionManager {
     func processDetectionOffMain(
         _ detection: FixtureDetection,
         in frame: ARFrame,
-        anchor: AnchorEntity
+        anchor: AnchorEntity,
+        material: String?
     ) async -> TrackedFixture? {
         // Check if we already have this detection
         if trackedFixtures.first(where: { $0.id == detection.id }) != nil {
@@ -209,7 +202,8 @@ final class ARSessionManager {
             detection: fixture.detection,
             position: fixture.position,
             orientation: fixture.orientation,
-            distanceMeters: fixture.distanceMeters
+            distanceMeters: fixture.distanceMeters,
+            material: material
         )
     }
     
@@ -220,7 +214,7 @@ final class ARSessionManager {
     ) async {
         guard let anchor = anchorEntity else { return }
         
-        let fixture = await processDetectionOffMain(detection, in: frame, anchor: anchor)
+        let fixture = await processDetectionOffMain(detection, in: frame, anchor: anchor, material: nil)
         
         guard let trackedFixture = fixture else { return }
         

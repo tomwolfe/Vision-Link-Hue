@@ -106,6 +106,7 @@ struct TrackedFixture: Identifiable, Sendable {
     let position: SIMD3<Float>
     let orientation: simd_quatf
     let distanceMeters: Float
+    let material: String?
     
     /// The RealityKit entity ID that represents this fixture's HUD.
     var hudEntityID: Entity.ID?

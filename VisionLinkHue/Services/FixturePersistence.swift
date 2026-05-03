@@ -20,6 +20,7 @@ final class FixturePersistence: Sendable {
     static let shared = FixturePersistence()
     
     /// Create a new ModelContainer with the FixtureMapping schema.
+    /// Falls back to an in-memory container if persistent storage fails.
     private init() {
         let schema = Schema([FixtureMapping.self])
         
@@ -28,7 +29,16 @@ final class FixturePersistence: Sendable {
             modelContext = ModelContext(modelContainer)
             logger.info("FixturePersistence initialized with SwiftData")
         } catch {
-            fatalError("Failed to create FixturePersistence container: \(error.localizedDescription)")
+            logger.warning("Failed to create persistent SwiftData container, falling back to in-memory: \(error.localizedDescription)")
+            do {
+                modelContainer = try ModelContainer(for: schema, configurations: [ModelConfiguration(isStoredInMemoryOnly: true)])
+                modelContext = ModelContext(modelContainer)
+                logger.info("Fallback to in-memory SwiftData succeeded")
+            } catch {
+                logger.error("In-memory fallback also failed: \(error.localizedDescription)")
+                modelContainer = try! ModelContainer(for: schema, configurations: [ModelConfiguration(isStoredInMemoryOnly: true)])
+                modelContext = ModelContext(modelContainer)
+            }
         }
     }
     

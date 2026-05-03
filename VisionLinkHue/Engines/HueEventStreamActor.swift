@@ -204,6 +204,8 @@ actor HueEventStreamActor {
         let decoder = JSONDecoder()
         let update = try decoder.decode(ResourceUpdate.self, from: trimmed.data(using: .utf8)!)
         
+        parseFailures = 0
+        
         onEvent?(update)
     }
     
@@ -223,6 +225,7 @@ actor HueEventStreamActor {
         // Exponential backoff: double the delay each time, capped at max
         reconnectDelay = min(reconnectDelay * 2, maxReconnectDelay)
         let delay = reconnectDelay
+        let params = pendingReconnection
         
         Task { [weak self] in
             guard let self else { return }
@@ -234,7 +237,7 @@ actor HueEventStreamActor {
             
             await self.logger.info("Attempting SSE reconnection (delay: \(String(format: "%.1f", delay))s)...")
             
-            guard let params = self.pendingReconnection else {
+            guard let params else {
                 await self.logger.warning("SSE reconnection aborted: no saved connection parameters")
                 return
             }
@@ -247,8 +250,13 @@ actor HueEventStreamActor {
             )
             
             // Reset backoff delay on successful reconnection attempt
-            self.reconnectDelay = minReconnectDelay
+            await self.resetReconnectDelay()
         }
+    }
+    
+    /// Reset the backoff delay after a successful reconnection attempt.
+    private func resetReconnectDelay() {
+        reconnectDelay = minReconnectDelay
     }
     
     /// Disconnect from the SSE stream and reset state.

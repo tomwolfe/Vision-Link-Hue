@@ -253,41 +253,7 @@ struct FixtureHeuristicClassifier {
         let normalizedY = observation.boundingBox.midY
         let area = observation.boundingBox.width * observation.boundingBox.height
         
-        var scores: [FixtureType: Double] = [:]
-        for fixture in FixtureType.allCases {
-            scores[fixture] = 0.0
-        }
-        
-        // Iterate declarative rules and accumulate weights.
-        for rule in rules {
-            var matches = true
-            
-            if let aspectRange = rule.aspectRange {
-                guard aspectRange.contains(aspectRatio) else { matches = false; continue }
-            }
-            
-            if matches, let yRange = rule.yRange {
-                guard yRange.contains(normalizedY) else { matches = false; continue }
-            }
-            
-            if matches, let areaRange = rule.areaRange {
-                guard areaRange.contains(area) else { matches = false; continue }
-            }
-            
-            if matches {
-                scores[rule.type]! += rule.weight
-            }
-        }
-        
-        // Sort by score descending, then by specificity as tiebreaker.
-        let sorted = scores.sorted { a, b in
-            if a.value == b.value {
-                return specificity[a.key, default: 0] > specificity[b.key, default: 0]
-            }
-            return a.value > b.value
-        }
-        
-        return sorted.first?.key ?? .lamp
+        return scoreObservation(aspectRatio: aspectRatio, normalizedY: normalizedY, area: area)
     }
     
     /// Classify observation data into a fixture type using weighted scoring.
@@ -296,6 +262,28 @@ struct FixtureHeuristicClassifier {
         let normalizedY = data.boundingBox.midY
         let area = data.boundingBox.width * data.boundingBox.height
         
+        return scoreObservation(aspectRatio: aspectRatio, normalizedY: normalizedY, area: area)
+    }
+    
+    /// Calculate detection confidence from observation quality metrics.
+    func calculateConfidence(from observation: VNRectangleObservation) -> Double {
+        let area = observation.boundingBox.width * observation.boundingBox.height
+        let centerX = observation.boundingBox.midX
+        let centerY = observation.boundingBox.midY
+        
+        return computeConfidence(area: area, centerX: centerX, centerY: centerY)
+    }
+    
+    /// Calculate detection confidence from observation data.
+    func calculateConfidence(from data: ObservationData) -> Double {
+        let area = data.boundingBox.width * data.boundingBox.height
+        let centerX = data.boundingBox.midX
+        let centerY = data.boundingBox.midY
+        
+        return computeConfidence(area: area, centerX: centerX, centerY: centerY)
+    }
+    
+    private func scoreObservation(aspectRatio: Double, normalizedY: Double, area: Double) -> FixtureType {
         var scores: [FixtureType: Double] = [:]
         for fixture in FixtureType.allCases {
             scores[fixture] = 0.0
@@ -331,11 +319,9 @@ struct FixtureHeuristicClassifier {
         return sorted.first?.key ?? .lamp
     }
     
-    /// Calculate detection confidence from observation quality metrics.
-    func calculateConfidence(from observation: VNRectangleObservation) -> Double {
+    private func computeConfidence(area: Double, centerX: Double, centerY: Double) -> Double {
         var confidence: Double = DetectionConstants.baseConfidence
         
-        let area = observation.boundingBox.width * observation.boundingBox.height
         if area > DetectionConstants.areaBonusLowerBound && area < DetectionConstants.areaBonusUpperBoundLarge {
             confidence += DetectionConstants.areaBonusWellSized
         }
@@ -343,32 +329,6 @@ struct FixtureHeuristicClassifier {
             confidence += DetectionConstants.proximityBonus
         }
         
-        let centerX = observation.boundingBox.midX
-        let centerY = observation.boundingBox.midY
-        let distanceFromCenter = sqrt(
-            pow(centerX - 0.5, 2) + pow(centerY - 0.5, 2)
-        )
-        if distanceFromCenter < DetectionConstants.centerProximityThreshold {
-            confidence += DetectionConstants.proximityBonus
-        }
-        
-        return min(confidence, DetectionConstants.maxConfidence)
-    }
-    
-    /// Calculate detection confidence from observation data.
-    func calculateConfidence(from data: ObservationData) -> Double {
-        var confidence: Double = DetectionConstants.baseConfidence
-        
-        let area = data.boundingBox.width * data.boundingBox.height
-        if area > DetectionConstants.areaBonusLowerBound && area < DetectionConstants.areaBonusUpperBoundLarge {
-            confidence += DetectionConstants.areaBonusWellSized
-        }
-        if area > DetectionConstants.areaBonusMediumLowerBound && area < DetectionConstants.areaBonusMediumUpperBound {
-            confidence += DetectionConstants.proximityBonus
-        }
-        
-        let centerX = data.boundingBox.midX
-        let centerY = data.boundingBox.midY
         let distanceFromCenter = sqrt(
             pow(centerX - 0.5, 2) + pow(centerY - 0.5, 2)
         )

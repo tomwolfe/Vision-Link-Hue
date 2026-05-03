@@ -131,8 +131,6 @@ enum SpatialMath {
             return normalize(normalize(rotationMatrix(from: cameraTransform) * SIMD3<Float>(0, 0, -1)))
         }
         
-        let fx = intrinsics.k0
-        let fy = intrinsics.k4
         let cx = intrinsics.k2
         let cy = intrinsics.k5
         
@@ -258,7 +256,7 @@ enum SpatialMath {
         let crossProduct = cross(worldUp, forward)
         
         let crossLength = length(crossProduct)
-        guard crossLength > Double(DetectionConstants.singularityThreshold) else {
+        guard crossLength > Float(DetectionConstants.singularityThreshold) else {
             return nil
         }
         

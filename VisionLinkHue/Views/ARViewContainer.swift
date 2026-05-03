@@ -33,14 +33,7 @@ struct ARViewRepresentable: UIViewRepresentable {
     func makeUIView(context: Context) -> ARView {
         let arView = ARView(frame: .zero)
         
-        let configuration = ARWorldTrackingConfiguration()
-        #if !targetEnvironment(simulator)
-        configuration.worldReconstructionMode = ARWorldTrackingConfiguration.WorldReconstructionMode.automatic
-        configuration.planeDetection = [.horizontal, .vertical]
-        configuration.lightEstimation = .automatic
-        #else
-        configuration.planeDetection = [.horizontal, .vertical]
-        #endif
+        let configuration = ARWorldTrackingConfiguration().configuredWithEnvironment()
         
         arView.session.run(configuration)
         arView.session.delegate = context.coordinator
@@ -55,14 +48,7 @@ struct ARViewRepresentable: UIViewRepresentable {
         // to the ARView's session
         if sessionManager.isSessionActive {
             if !context.coordinator.isSessionRunning {
-                let configuration = ARWorldTrackingConfiguration()
-                #if !targetEnvironment(simulator)
-                configuration.worldReconstructionMode = ARWorldTrackingConfiguration.WorldReconstructionMode.automatic
-                configuration.planeDetection = [.horizontal, .vertical]
-                configuration.lightEstimation = .automatic
-                #else
-                configuration.planeDetection = [.horizontal, .vertical]
-                #endif
+                let configuration = ARWorldTrackingConfiguration().configuredWithEnvironment()
                 arView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
                 context.coordinator.isSessionRunning = true
             }

@@ -44,7 +44,8 @@ final class SpatialProjectorTests: XCTestCase {
             ),
             position: SIMD3<Float>(1, 1, -1),
             orientation: simd_quatf(angle: 0, axis: SIMD3<Float>(0, 1, 0)),
-            distanceMeters: 1.5
+            distanceMeters: 1.5,
+            material: nil
         )
         
         let result: ProjectionResult = .anchored(fixture)
@@ -73,7 +74,8 @@ final class SpatialProjectorTests: XCTestCase {
             ),
             position: SIMD3<Float>(0, 0, -1),
             orientation: .identity,
-            distanceMeters: 1.0
+            distanceMeters: 1.0,
+            material: nil
         )
         
         let result: ProjectionResult = .anchored(fixture)

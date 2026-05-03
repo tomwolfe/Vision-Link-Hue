@@ -14,14 +14,15 @@ import Darwin
 /// Acts as the authenticated transport layer, composing `HueDiscoveryService`
 /// for bridge discovery and `HueSpatialService` for spatial awareness operations.
 @MainActor
-final class HueClient: ObservableObject, HueClientProtocol {
+@Observable
+final class HueClient: HueClientProtocol {
     
-    // MARK: - Published State
+    // MARK: - State
     
-    @Published var bridgeIP: String?
-    @Published var bridgePort: Int = 80
-    @Published var apiKey: String?
-    @Published var bridgeConfig: BridgeConfig?
+    var bridgeIP: String?
+    var bridgePort: Int = 80
+    var apiKey: String?
+    var bridgeConfig: BridgeConfig?
     
     /// The authenticated username (API key) for bridge communication.
     var username: String? { apiKey }
@@ -487,6 +488,8 @@ final class HueClient: ObservableObject, HueClientProtocol {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         
         let session = urlSession ?? URLSession.shared
+        
+        let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw HueError.invalidResponse

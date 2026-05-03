@@ -10,18 +10,12 @@ let package = Package(
     targets: [
         .target(
             name: "VisionLinkHue",
-            path: "VisionLinkHue",
-            swiftSettings: [
-                .enableExperimentalFeature("StrictConcurrency")
-            ]
+            path: "VisionLinkHue"
         ),
         .testTarget(
             name: "VisionLinkHueTests",
             dependencies: ["VisionLinkHue"],
-            path: "Tests/VisionLinkHueTests",
-            swiftSettings: [
-                .enableExperimentalFeature("StrictConcurrency")
-            ]
+            path: "Tests/VisionLinkHueTests"
         )
     ],
     // Enable SBOM generation for April 2026 App Store security compliance.

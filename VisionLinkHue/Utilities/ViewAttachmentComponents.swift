@@ -3,8 +3,9 @@ import SwiftUI
 import Foundation
 
 /// RealityKit 2026 fixture HUD entity factory.
-/// Uses the native ViewAttachmentComponent(rootView:) API for automatic
-/// SwiftUI view lifecycle management and @Observable-driven entity updates.
+/// Uses a BillboardComponent for automatic viewport-facing orientation.
+/// The FixtureHUDView SwiftUI view is available for future integration
+/// with RealityKit's ViewAttachmentComponent when the API becomes available.
 ///
 /// This replaces the deprecated manual ViewAttachmentComponent and
 /// HUDAttachmentComponent components. All new fixture HUDs use the
@@ -12,11 +13,9 @@ import Foundation
 @MainActor
 final class FixtureHUDFactory {
     
-    /// Create a HUD entity for a tracked fixture using the native
-    /// RealityKit 26 ViewAttachmentComponent API.
-    ///
-    /// The native ViewAttachmentComponent(rootView:) handles view lifecycle
-    /// automatically and drives SwiftUI updates through @Observable entity properties.
+    /// Create a HUD entity for a tracked fixture using a billboard component
+    /// that always faces the camera. The FixtureHUDView SwiftUI view is
+    /// available for future integration with RealityKit's ViewAttachmentComponent.
     ///
     /// - Parameters:
     ///   - fixture: The tracked fixture to create a HUD for.
