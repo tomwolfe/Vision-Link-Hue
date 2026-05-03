@@ -33,39 +33,7 @@ struct CameraIntrinsics {
 /// All methods are pure functions suitable for unit testing.
 enum SpatialMath {
     
-    #if !targetEnvironment(simulator)
     /// Convert normalized [0,1] coordinates to a camera-space ray using intrinsics.
-    static func cameraRay(
-        normalized: SIMD2<Float>,
-        intrinsics: ARCamera.Intrinsics,
-        cameraTransform: simd_float4x4,
-        imageSize: CGSize
-    ) -> (origin: SIMD3<Float>, direction: SIMD3<Float>)? {
-        let fx = Float(intrinsics.k0)
-        let fy = Float(intrinsics.k4)
-        let cx = Float(intrinsics.k2)
-        let cy = Float(intrinsics.k5)
-        
-        let pixelX = normalized.x * Float(imageSize.width)
-        let pixelY = normalized.y * Float(imageSize.height)
-        
-        let dirX = (pixelX - cx) / fx
-        let dirY = (pixelY - cy) / fy
-        
-        var direction = SIMD3<Float>(dirX, dirY, 1.0)
-        direction = normalize(direction)
-        
-        let rotationMatrix = rotationMatrix(from: cameraTransform)
-        direction = rotationMatrix * direction
-        
-        let cameraPos = translation(from: cameraTransform)
-        
-        return (origin: cameraPos, direction: direction)
-    }
-    #endif
-    
-    /// Convert normalized [0,1] coordinates to a camera-space ray using intrinsics.
-    /// Simulator-compatible version using lightweight CameraIntrinsics.
     static func cameraRay(
         normalized: SIMD2<Float>,
         intrinsics: CameraIntrinsics,
@@ -94,34 +62,7 @@ enum SpatialMath {
         return (origin: cameraPos, direction: direction)
     }
     
-    #if !targetEnvironment(simulator)
     /// Unproject a normalized 2D point into a camera-space direction vector.
-    static func unprojectDirection(
-        normalized: SIMD2<Float>,
-        intrinsics: ARCamera.Intrinsics?,
-        cameraTransform: simd_float4x4
-    ) -> SIMD3<Float>? {
-        guard let intrinsics else {
-            return normalize(normalize(rotationMatrix(from: cameraTransform) * SIMD3<Float>(0, 0, -1)))
-        }
-        
-        let fx = Float(intrinsics.k0)
-        let fy = Float(intrinsics.k4)
-        let cx = Float(intrinsics.k2)
-        let cy = Float(intrinsics.k5)
-        
-        let dirX = (normalized.x - cx)
-        let dirY = (normalized.y - cy)
-        
-        var direction = SIMD3<Float>(dirX, dirY, 1.0)
-        direction = normalize(direction)
-        
-        let rotationMatrix = rotationMatrix(from: cameraTransform)
-        return normalize(rotationMatrix * direction)
-    }
-    #endif
-    
-    /// Simulator-compatible unproject using lightweight CameraIntrinsics.
     static func unprojectDirection(
         normalized: SIMD2<Float>,
         intrinsics: CameraIntrinsics?,
@@ -144,41 +85,7 @@ enum SpatialMath {
         return normalize(rotationMatrix * direction)
     }
     
-    #if !targetEnvironment(simulator)
     /// Unproject a pixel coordinate with depth into a world-space position.
-    static func depthUnproject(
-        pixelX: Int,
-        pixelY: Int,
-        depthMeters: Float,
-        intrinsics: ARCamera.Intrinsics,
-        cameraTransform: simd_float4x4,
-        imageWidth: Int,
-        imageHeight: Int
-    ) -> SIMD3<Float>? {
-        let clampedPx = min(max(pixelX, 0), imageWidth - 1)
-        let clampedPy = min(max(pixelY, 0), imageHeight - 1)
-        
-        let fx = Float(intrinsics.k0)
-        let fy = Float(intrinsics.k4)
-        let cx = Float(intrinsics.k2)
-        let cy = Float(intrinsics.k5)
-        
-        let pixelXf = Float(clampedPx)
-        let pixelYf = Float(clampedPy)
-        
-        let dirX = (pixelXf - cx) / fx
-        let dirY = (pixelYf - cy) / fy
-        
-        let direction = SIMD3<Float>(dirX, dirY, 1.0)
-        let rotationMatrix = rotationMatrix(from: cameraTransform)
-        let rotatedDirection = rotationMatrix * direction
-        
-        let cameraPosition = translation(from: cameraTransform)
-        return cameraPosition + rotatedDirection * depthMeters
-    }
-    #endif
-    
-    /// Simulator-compatible depth unproject using lightweight CameraIntrinsics.
     static func depthUnproject(
         pixelX: Int,
         pixelY: Int,

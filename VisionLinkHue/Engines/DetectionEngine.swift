@@ -16,7 +16,7 @@ import os
 /// Uses low-power mode to prevent thermal throttling on device.
 @Observable
 @MainActor
-final class DetectionEngine: Sendable {
+final class DetectionEngine {
     
     var lastDetections: [FixtureDetection] = []
     var isRunning: Bool = false
@@ -150,32 +150,21 @@ final class DetectionEngine: Sendable {
         let request = VNDetectRectanglesRequest()
         request.minimumConfidence = DetectionConstants.rectangleMinimumConfidence
         
-        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<[FixtureDetection], Error>) in
-            // In low-power mode, use .utility QoS to reduce CPU/GPU load
-            // and prevent thermal throttling that forces LiDAR shut-off
-            let qos: DispatchQoS.QoSClass = lowPower ? .utility : .userInitiated
+        // Use structured concurrency with Task for proper cancellation support.
+        // In low-power mode, lower the task priority to reduce CPU/GPU load
+        // and prevent thermal throttling that forces LiDAR shut-off.
+        let priority: TaskPriority = lowPower ? .utility : .userInitiated
+        
+        return try await Task(priority: priority) {
+            try handler.perform([request])
             
-            DispatchQueue.global(qos: qos).async {
-                do {
-                    try handler.perform([request])
-                    
-                    guard let results = request.results as? [VNRectangleObservation] else {
-                        continuation.resume(returning: [])
-                        return
-                    }
-                    
-                    let observations = results.map { ObservationData(boundingBox: $0.boundingBox) }
-                    
-                    Task {
-                        let detections = await self.classifyFixtures(from: observations)
-                        continuation.resume(returning: detections)
-                    }
-                } catch {
-                    self.logger.error("Vision detection failed: \(error.localizedDescription)")
-                    continuation.resume(throwing: error)
-                }
+            guard let results = request.results as? [VNRectangleObservation] else {
+                return []
             }
-        }
+            
+            let observations = results.map { ObservationData(boundingBox: $0.boundingBox) }
+            return await classifyFixtures(from: observations)
+        }.value
     }
     
     /// Classify detected objects into fixture types using heuristic scoring.

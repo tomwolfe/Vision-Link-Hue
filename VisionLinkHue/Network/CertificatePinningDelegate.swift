@@ -8,14 +8,14 @@ import os
 ///
 /// Properly `Sendable` - all stored properties are Sendable and the delegate
 /// methods only read state (no mutations), making it thread-safe.
-final class CertificatePinningDelegate: NSObject, Sendable, URLSessionDelegate {
+final class CertificatePinningDelegate: NSObject, @unchecked Sendable, URLSessionDelegate {
     
     private let logger = Logger(
         subsystem: "com.tomwolfe.visionlinkhue",
         category: "CertificatePinning"
     )
     
-    let pinnedHash: Data?
+    var pinnedHash: Data?
     let keychainKey: String?
     let tofuCallback: @Sendable (Data) async -> Void
     

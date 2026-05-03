@@ -15,7 +15,7 @@ import Darwin
 /// for bridge discovery and `HueSpatialService` for spatial awareness operations.
 @MainActor
 @Observable
-final class HueClient: HueClientProtocol {
+final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
     
     // MARK: - State
     
@@ -42,6 +42,10 @@ final class HueClient: HueClientProtocol {
     
     /// Network connection for REST API calls.
     private var urlSession: URLSession?
+    
+    /// Shared certificate pinning delegate for REST API calls.
+    /// Ensures all REST calls use TOFU pinning, not just SSE.
+    private var pinningDelegate: CertificatePinningDelegate?
     
     /// Dedicated actor for SSE event stream management.
     /// Isolates high-frequency network events from the MainActor.
@@ -425,7 +429,19 @@ final class HueClient: HueClientProtocol {
             }
         }
         
-        urlSession = URLSession(configuration: config, delegate: nil, delegateQueue: nil)
+        // Create a shared certificate pinning delegate for all REST calls.
+        // This ensures REST API calls use the same TOFU pinning as the SSE stream.
+        let keychainKey = bridgeIP.map { KeychainKeys.key(for: $0) }
+        pinningDelegate = CertificatePinningDelegate(
+            pinnedHash: pinnedHash,
+            keychainKey: keychainKey
+        ) { [weak self] trustedHash in
+            Task { @MainActor [weak self] in
+                await self?.handleTOFUPin(for: trustedHash)
+            }
+        }
+        
+        urlSession = URLSession(configuration: config, delegate: pinningDelegate, delegateQueue: nil)
     }
     
     // MARK: - Trust-On-First-Use Certificate Pinning
@@ -439,10 +455,25 @@ final class HueClient: HueClientProtocol {
         do {
             try await KeychainManager.shared.saveCertPin(to: keychainKey, hash: trustedHash)
             pinnedHash = trustedHash
+            pinningDelegate?.pinnedHash = trustedHash
             logger.info("Certificate pinned via TOFU for bridge at \(ip)")
         } catch {
             logger.error("Failed to save certificate pin to Keychain: \(error.localizedDescription)")
         }
+    }
+    
+    // MARK: - HueNetworkClientProtocol Conformance
+    
+    func get(url: URL) async throws -> (data: Data, response: URLResponse) {
+        try await authenticatedRequest(url: url, method: "GET")
+    }
+    
+    func put<T: Codable>(url: URL, body: T) async throws -> (data: Data, response: URLResponse) {
+        try await authenticatedRequest(url: url, method: "PUT", body: body)
+    }
+    
+    func post<T: Codable>(url: URL, body: T) async throws -> (data: Data, response: URLResponse) {
+        try await authenticatedRequest(url: url, method: "POST", body: body)
     }
     
     // MARK: - Authenticated Request Helper

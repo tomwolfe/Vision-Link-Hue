@@ -34,6 +34,11 @@ final class ARSessionManager {
     
     private var lastInferenceTime: TimeInterval = 0
     
+    /// Serial task queue for AR frame processing.
+    /// Cancels any in-progress frame processing before starting a new one,
+    /// preventing unbounded task accumulation when Vision processing stalls.
+    private var processingTask: Task<Void, Never>?
+    
     /// Root anchor for all AR content.
     var rootAnchor: AnchorEntity? { anchorEntity }
     
@@ -117,55 +122,52 @@ final class ARSessionManager {
         guard now - lastInferenceTime >= DetectionConstants.inferenceInterval else { return }
         lastInferenceTime = now
         
-        // Offload heavy Vision/Projection work to background task
-        Task.detached { [detectionEngine = self.detectionEngine, spatialProjector = self.spatialProjector, anchor = self.anchorEntity] in
-            do {
-                let detections = try await detectionEngine.processFrame(
-                    frame.imageBuffer,
-                    timestamp: frame.timestamp
-                )
+        // Cancel any in-progress frame processing to prevent task queue buildup.
+        // This ensures only the latest frame is processed, dropping stale frames.
+        processingTask?.cancel()
+        processingTask = Task { await self.processFrameSafely(frame) }
+    }
+    
+    /// Process a single AR frame with bounded concurrency.
+    /// Cancels on task cancellation to prevent resource waste.
+    private func processFrameSafely(_ frame: ARFrame) async {
+        guard !Task.isCancelled else { return }
+        
+        let anchor = self.anchorEntity
+        
+        do {
+            let detections = try await detectionEngine.processFrame(
+                frame.imageBuffer,
+                timestamp: frame.timestamp
+            )
+            
+            var newFixtures: [TrackedFixture] = []
+            
+            for detection in detections {
+                guard !Task.isCancelled else { return }
                 
-                var newFixtures: [TrackedFixture] = []
-                
-                for detection in detections {
-                    if let anchor {
-                        // Use TaskGroup for parallel detection processing and material sampling
-                        let material = await self.detectionEngine.classifyMaterial(from: frame, at: detection.region)
-                        
-                        let fixture = await withTaskGroup(of: TrackedFixture?.self) { taskGroup in
-                            // Spawn task for spatial projection with material info
-                            taskGroup.addTask {
-                                await self.processDetectionOffMain(detection, in: frame, anchor: anchor, material: material)
-                            }
-                            
-                            // Wait for all tasks to complete
-                            var result: TrackedFixture? = nil
-                            for await item in taskGroup {
-                                if let fixture = item {
-                                    result = fixture
-                                }
-                            }
-                            return result
-                        }
-                        
-                        if let fixture {
-                            newFixtures.append(fixture)
-                        }
+                if let anchor {
+                    let material = await detectionEngine.classifyMaterial(from: frame, at: detection.region)
+                    
+                    let fixture = await processDetectionOffMain(detection, in: frame, anchor: anchor, material: material)
+                    
+                    if let fixture {
+                        newFixtures.append(fixture)
                     }
                 }
-                
-                await MainActor.run { [newFixtures] in
-                    for fixture in newFixtures {
-                        if !self.trackedFixtures.contains(where: { $0.id == fixture.id }) {
-                            self.trackedFixtures.append(fixture)
-                        }
+            }
+            
+            await MainActor.run { [newFixtures] in
+                for fixture in newFixtures {
+                    if !self.trackedFixtures.contains(where: { $0.id == fixture.id }) {
+                        self.trackedFixtures.append(fixture)
                     }
-                    self.anchorCount = self.trackedFixtures.count
                 }
-            } catch {
-                await MainActor.run {
-                    self.logger.warning("Frame processing failed: \(error.localizedDescription)")
-                }
+                self.anchorCount = self.trackedFixtures.count
+            }
+        } catch {
+            await MainActor.run {
+                self.logger.warning("Frame processing failed: \(error.localizedDescription)")
             }
         }
     }

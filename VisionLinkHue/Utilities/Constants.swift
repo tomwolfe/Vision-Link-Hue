@@ -70,4 +70,21 @@ enum DetectionConstants {
     
     /// Maximum valid position magnitude from origin in meters.
     public static let maxPositionMagnitude: Float = 1000
+    
+    // MARK: - Projection
+    
+    /// Confidence score for raycast-on-mesh projections.
+    public static let raycastProjectionConfidence: Double = 0.95
+    
+    /// Confidence score for depth map unprojection.
+    public static let depthProjectionConfidence: Double = 0.75
+    
+    /// Confidence score for mesh result projections.
+    public static let meshResultConfidence: Double = 0.9
+    
+    /// Default fallback distance in meters when raycast and depth fail.
+    public static let fallbackDistanceMeters: Float = 2.0
+    
+    /// Confidence score for fallback projections.
+    public static let fallbackConfidence: Double = 0.5
 }

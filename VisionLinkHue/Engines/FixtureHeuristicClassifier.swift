@@ -83,6 +83,11 @@ struct JSONScoringRule: Sendable, Codable {
     let weight: Double
 }
 
+/// Configuration version for classification rules.
+/// Bumping this forces apps to reload rules, preventing breaking changes
+/// from old config files being applied to new classifier logic.
+private let classificationConfigVersion = "1.0.0"
+
 /// JSON-serializable configuration for heuristic classification.
 struct ClassificationConfigFile: Codable {
     let version: String?
@@ -200,6 +205,15 @@ struct FixtureHeuristicClassifier {
         let decoder = JSONDecoder()
         
         let configFile = try decoder.decode(ClassificationConfigFile.self, from: data)
+        
+        // Validate config version to prevent breaking changes from stale config files.
+        if let configVersion = configFile.version,
+           configVersion != classificationConfigVersion {
+            throw ClassificationConfigError.versionMismatch(
+                expected: classificationConfigVersion,
+                actual: configVersion
+            )
+        }
         
         var loadedRules: [ScoringRule] = []
         for jsonRule in configFile.rules {
@@ -365,6 +379,7 @@ enum ClassificationConfigError: Error, LocalizedError {
     case unknownFixtureType(String)
     case invalidRange(String)
     case fileNotFound(URL)
+    case versionMismatch(expected: String, actual: String)
     
     var errorDescription: String? {
         switch self {
@@ -372,6 +387,8 @@ enum ClassificationConfigError: Error, LocalizedError {
         case .unknownFixtureType(let type): return "Unknown fixture type in config: \(type)"
         case .invalidRange(let desc): return "Invalid range in config: \(desc)"
         case .fileNotFound(let url): return "Config file not found: \(url.path)"
+        case .versionMismatch(let expected, let actual):
+            return "Classification config version mismatch: expected \(expected), got \(actual)"
         }
     }
 }

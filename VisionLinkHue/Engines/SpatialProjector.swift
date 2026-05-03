@@ -79,7 +79,7 @@ final class SpatialProjector {
         let fallbackPosition = SpatialMath.fallbackPosition(
             normalized: normalizedPoint,
             cameraTransform: frame.camera.transform,
-            distance: 2.0
+            distance: DetectionConstants.fallbackDistanceMeters
         )
         
         let rotationMatrix = SpatialMath.rotationMatrix(from: frame.camera.transform)
@@ -98,7 +98,7 @@ final class SpatialProjector {
                 ),
                 position: fallbackPosition,
                 orientation: fallbackOrientation,
-                distanceMeters: 2.0,
+                distanceMeters: DetectionConstants.fallbackDistanceMeters,
                 material: nil
             )
         )
@@ -148,7 +148,7 @@ final class SpatialProjector {
                     detection: FixtureDetection(
                         type: .lamp,
                         region: region,
-                        confidence: 0.9
+                        confidence: DetectionConstants.meshResultConfidence
                     ),
                     position: adjustedPosition,
                     orientation: orientation,
@@ -226,7 +226,7 @@ final class SpatialProjector {
                     topLeft: normalizedPoint - SIMD2<Float>(0.05, 0.05),
                     bottomRight: normalizedPoint + SIMD2<Float>(0.05, 0.05)
                 ),
-                confidence: 0.95
+                confidence: DetectionConstants.raycastProjectionConfidence
             ),
             position: adjustedPosition,
             orientation: orientation,
@@ -294,7 +294,7 @@ final class SpatialProjector {
                         topLeft: normalizedPoint - SIMD2<Float>(0.05, 0.05),
                         bottomRight: normalizedPoint + SIMD2<Float>(0.05, 0.05)
                     ),
-                    confidence: 0.75
+                    confidence: DetectionConstants.depthProjectionConfidence
                 ),
                 position: adjustedPosition,
                 orientation: orientation,

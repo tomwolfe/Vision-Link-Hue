@@ -157,7 +157,7 @@ actor AppNotificationSystem {
 /// actor to prevent main-thread hangs during SSE reconnection bursts.
 @Observable
 @MainActor
-final class HueStateStream: Sendable {
+final class HueStateStream {
     
     private(set) var lights: [HueLightResource] = []
     private(set) var scenes: [HueSceneResource] = []
