@@ -43,6 +43,15 @@ protocol HueClientProtocol: AnyObject {
     /// Toggle power state for a light or group resource.
     func togglePower(resourceId: String, on: Bool) async throws
     
+    /// Sync AR-detected fixture positions back to the Hue Bridge.
+    func syncSpatialAwareness(fixtures: [SpatialAwarePosition]) async throws
+    
+    /// Sync a single fixture's spatial awareness data.
+    func syncSpatialAwareness(fixture: SpatialAwarePosition) async throws
+    
+    /// Get current spatial awareness data from the bridge.
+    func fetchSpatialAwareness() async throws -> [SpatialAwarePosition]
+    
     /// Start the SSE connection to the bridge event stream.
     func startEventStream()
     

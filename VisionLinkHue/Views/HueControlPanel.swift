@@ -38,9 +38,9 @@ struct HueControlPanel: View {
                 // Confidence badge
                 Text("\(Int(fixture.detection.confidence * 100))%")
                     .font(.caption2.monospacedDigit())
-                    .foregroundStyle(
-                        confidenceColor(for: fixture.detection.confidence)
-                    )
+                .foregroundStyle(
+                    LiquidGlassHUD.confidenceColor(for: fixture.detection.confidence)
+                )
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(.quaternary.opacity(0.5), in: Capsule())
@@ -123,23 +123,9 @@ struct HueControlPanel: View {
                 .tint(.orange)
             }
         }
-        .padding(16)
-        .glassEffect(.liquid, alignment: .center)
+        .padding(LiquidGlassHUD.panelPadding)
         .cornerRadius(16)
-        .frame(width: 220)
-    }
-    
-    private func confidenceColor(for confidence: Double) -> Color {
-        switch confidence {
-        case 0.9...:
-            return .green
-        case 0.85...:
-            return .green.opacity(0.8)
-        case 0.7...:
-            return .yellow
-        default:
-            return .red
-        }
+        .frame(width: LiquidGlassHUD.panelWidth)
     }
     
     /// Execute a light control operation, preferring the fixture's mapped Hue

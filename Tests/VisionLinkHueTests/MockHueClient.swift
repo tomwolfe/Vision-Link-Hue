@@ -22,9 +22,11 @@ final class MockHueClient: HueClientProtocol {
     private(set) var brightnessCalls: [(resourceId: String, brightness: Int)] = []
     private(set) var colorTempCalls: [(resourceId: String, mireds: Int)] = []
     private(set) var colorXycalls: [(resourceId: String, x: Double, y: Double)] = []
+    private(set) var spatialSyncCalls: [Int] = []
+    private(set) var spatialFetchCalls: Int = 0
     
     func discoverBridges() async -> [BridgeInfo] {
-        didDiscoverBridges = true
+        didDiscoverBridges = []
         return []
     }
     
@@ -36,7 +38,7 @@ final class MockHueClient: HueClientProtocol {
     
     func fetchState() async throws -> HueBridgeState {
         didFetchState = true
-        return HueBridgeState(lights: [], scenes: [], groups: [], sensors: [])
+        return HueBridgeState(lights: [], scenes: [], groups: [], resources: nil)
     }
     
     func patchLightState(resourceId: String, state: LightStatePatch) async throws {
@@ -61,6 +63,19 @@ final class MockHueClient: HueClientProtocol {
     
     func togglePower(resourceId: String, on: Bool) async throws {
         toggleCalls.append((resourceId: resourceId, on: on))
+    }
+    
+    func syncSpatialAwareness(fixtures: [SpatialAwarePosition]) async throws {
+        spatialSyncCalls.append(fixtures.count)
+    }
+    
+    func syncSpatialAwareness(fixture: SpatialAwarePosition) async throws {
+        spatialSyncCalls.append(1)
+    }
+    
+    func fetchSpatialAwareness() async throws -> [SpatialAwarePosition] {
+        spatialFetchCalls += 1
+        return []
     }
     
     func startEventStream() {

@@ -5,7 +5,10 @@ import os
 /// Unified `URLSessionDelegate` handling certificate pinning and TOFU.
 /// On first connection, trusts the certificate and invokes the TOFU callback
 /// to cache the hash. On subsequent connections, enforces the pinned hash.
-final class CertificatePinningDelegate: NSObject, @unchecked Sendable, URLSessionDelegate {
+///
+/// Properly `Sendable` - all stored properties are Sendable and the delegate
+/// methods only read state (no mutations), making it thread-safe.
+final class CertificatePinningDelegate: NSObject, Sendable, URLSessionDelegate {
     
     private let logger = Logger(
         subsystem: "com.tomwolfe.visionlinkhue",
@@ -14,14 +17,14 @@ final class CertificatePinningDelegate: NSObject, @unchecked Sendable, URLSessio
     
     let pinnedHash: Data?
     let keychainKey: String?
-    let tofuCallback: (Data) async -> Void
+    let tofuCallback: @Sendable (Data) async -> Void
     
     /// Create a certificate pinning delegate.
     /// - Parameters:
     ///   - pinnedHash: Previously stored hash for enforcement mode. `nil` for TOFU mode.
     ///   - keychainKey: The Keychain account key for TOFU pin persistence.
     ///   - tofuCallback: Called with the trusted hash on first connection (TOFU mode).
-    init(pinnedHash: Data?, keychainKey: String? = nil, tofuCallback: @escaping (Data) async -> Void) {
+    init(pinnedHash: Data?, keychainKey: String? = nil, tofuCallback: @escaping @Sendable (Data) async -> Void) {
         self.pinnedHash = pinnedHash
         self.keychainKey = keychainKey
         self.tofuCallback = tofuCallback
@@ -80,9 +83,9 @@ final class CertificatePinningDelegate: NSObject, @unchecked Sendable, URLSessio
     private func savePinnedHash(_ hash: Data) async {
         guard let keychainKey else { return }
         
-        // Try synchronous Keychain save first.
+        // Save via async KeychainManager to satisfy Swift 6.1 strict concurrency.
         do {
-            try KeychainManager.saveCertPin(to: keychainKey, hash: hash)
+            try await KeychainManager.shared.saveCertPin(to: keychainKey, hash: hash)
             logger.info("Certificate pinned via TOFU for key \(keychainKey)")
         } catch {
             logger.error("Failed to save certificate pin to Keychain: \(error.localizedDescription)")

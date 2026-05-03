@@ -6,14 +6,15 @@ import os
 /// Manages the AR session lifecycle and bridges ARKit frames to
 /// the RealityKit scene and DetectionEngine.
 @MainActor
-final class ARSessionManager: ObservableObject, ARSessionManagerProtocol {
+@Observable
+final class ARSessionManager {
     
-    @Published var isSessionActive: Bool = false
-    @Published var anchorCount: Int = 0
-    @Published var frameTimestamp: TimeInterval = 0
-    @Published var trackingState: ARTrackingState = .notAvailable
-    @Published var worldMapAvailable: Bool = false
-    @Published var trackedFixtures: [TrackedFixture] = []
+    var isSessionActive: Bool = false
+    var anchorCount: Int = 0
+    var frameTimestamp: TimeInterval = 0
+    var trackingState: ARTrackingState = .notAvailable
+    var worldMapAvailable: Bool = false
+    var trackedFixtures: [TrackedFixture] = []
     
     private let logger = Logger(
         subsystem: "com.tomwolfe.visionlinkhue",

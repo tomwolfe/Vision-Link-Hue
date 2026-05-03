@@ -41,8 +41,8 @@ final class HueClient: ObservableObject, HueClientProtocol {
     /// SSE reconnection timer.
     private var reconnectionTimer: Timer?
     
-    /// SSE buffer for assembling fragmented JSON.
-    private var sseBuffer = ""
+    /// Accumulates data lines for multi-line SSE events.
+    private var sseDataBuffer = ""
     
     /// SSE reconnect delay (exponential backoff).
     private var reconnectDelay: TimeInterval = 1.0
@@ -291,6 +291,76 @@ final class HueClient: ObservableObject, HueClientProtocol {
         )
     }
     
+    // MARK: - SpatialAware API (Spring 2026)
+    
+    /// Sync AR-detected fixture positions back to the Hue Bridge.
+    /// Enables more accurate preset scene rendering by informing the bridge
+    /// of the real-world 3D positions of detected lighting fixtures.
+    func syncSpatialAwareness(fixtures: [SpatialAwarePosition]) async throws {
+        guard let username = apiKey else {
+            throw HueError.noApiKey
+        }
+        
+        guard let ip = bridgeIP, let port = bridgePort else {
+            throw HueError.noBridgeConfigured
+        }
+        
+        let url = URL(string: "https://\(ip):\(port)/api/\(username)/spatial_awareness")!
+        
+        let request = SpatialAwareSyncRequest(fixtures: fixtures)
+        
+        let (data, response) = try await authenticatedRequest(url: url, method: "POST", body: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            throw HueError.invalidResponse
+        }
+        
+        let syncResponse = try JSONDecoder().decode(SpatialAwareSyncResponse.self, from: data)
+        
+        if let warnings = syncResponse.warnings, !warnings.isEmpty {
+            logger.warning("SpatialAware sync warnings: \(warnings.map { $0.message }.joined(separator: ", "))")
+        }
+        
+        logger.info("Synced \(syncResponse.success.count) fixture positions to bridge")
+    }
+    
+    /// Sync a single fixture's spatial awareness data.
+    func syncSpatialAwareness(fixture: SpatialAwarePosition) async throws {
+        try await syncSpatialAwareness(fixtures: [fixture])
+    }
+    
+    /// Get current spatial awareness data from the bridge.
+    func fetchSpatialAwareness() async throws -> [SpatialAwarePosition] {
+        guard let username = apiKey else {
+            throw HueError.noApiKey
+        }
+        
+        guard let ip = bridgeIP, let port = bridgePort else {
+            throw HueError.noBridgeConfigured
+        }
+        
+        let url = URL(string: "https://\(ip):\(port)/api/\(username)/resources/spatial_awareness")!
+        
+        let (data, _) = try await authenticatedRequest(url: url, method: "GET", body: nil as Codable?)
+        
+        let response = try JSONDecoder().decode(SpatialAwareSyncResponse.self, from: data)
+        
+        return response.success.compactMap { success in
+            // Reconstruct positions from bridge response
+            guard let light = stateStream?.light(by: success.id) else { return nil }
+            
+            return SpatialAwarePosition(
+                id: success.id,
+                position: SpatialAwarePosition.Position3D(x: 0, y: 0, z: 0),
+                confidence: 0.0,
+                fixtureType: light.metadata.archetypeValue.rawValue,
+                roomId: nil,
+                timestamp: Date()
+            )
+        }
+    }
+    
     // MARK: - SSE Event Stream
     
     /// Start the SSE connection to the bridge event stream using incremental streaming.
@@ -345,45 +415,32 @@ final class HueClient: ObservableObject, HueClientProtocol {
         logger.info("SSE event stream started (streaming)")
     }
     
-    /// Stream SSE events incrementally from AsyncBytes.
-    /// Uses a line-based parser that safely handles UTF-8 fragmentation
-    /// by accumulating raw bytes and scanning for \n before decoding.
+    /// Stream SSE events using `URLSession.AsyncBytes.lines`.
+    /// `bytes.lines` handles UTF-8 boundaries automatically.
+    /// Empty "keep-alive" lines are skipped rather than breaking the stream.
     private func streamSSEEvents(from bytes: AsyncBytes<UInt8>, session: URLSession) async {
-        var dataBuffer = Data()
-        var lineBuffer = Data()
+        sseDataBuffer = ""
         
-        for await chunk in bytes.chunks(ofType: UInt8.self) {
-            dataBuffer.append(contentsOf: chunk)
+        for await line in bytes.lines {
+            // Skip empty keep-alive lines.
+            if line.isEmpty {
+                // Empty line marks end of a complete SSE event.
+                if !sseDataBuffer.isEmpty {
+                    processSSEEvent(text: sseDataBuffer)
+                    sseDataBuffer = ""
+                }
+                continue
+            }
             
-            // Process complete lines from the buffer.
-            while let newlineIndex = dataBuffer.firstIndex(of: UInt8(ascii: "\n")) {
-                let lineData = dataBuffer[..<newlineIndex]
-                dataBuffer = dataBuffer[dataBuffer.index(newlineIndex, offsetBy: 1)...]
-                
-                // Strip trailing \r if present.
-                var line = lineData
-                if line.last == UInt8(ascii: "\r") {
-                    line.removeLast()
-                }
-                
-                let lineText = String(bytes: line, encoding: .utf8) ?? ""
-                
-                // Accumulate data lines for multi-line SSE events.
-                if lineText.hasPrefix("data: ") {
-                    lineBuffer.append(contentsOf: lineText.dropFirst(6))
-                } else if lineText.isEmpty {
-                    // Empty line marks end of event.
-                    if !lineBuffer.isEmpty {
-                        processSSEEvent(text: String(bytes: lineBuffer, encoding: .utf8) ?? "")
-                        lineBuffer.removeAll()
-                    }
-                }
+            // Accumulate data lines for multi-line SSE events.
+            if line.hasPrefix("data: ") {
+                sseDataBuffer.append(line.dropFirst(6))
             }
         }
         
         // Process any remaining buffered data after stream ends.
-        if !lineBuffer.isEmpty {
-            processSSEEvent(text: String(bytes: lineBuffer, encoding: .utf8) ?? "")
+        if !sseDataBuffer.isEmpty {
+            processSSEEvent(text: sseDataBuffer)
         }
     }
     
@@ -464,7 +521,7 @@ final class HueClient: ObservableObject, HueClientProtocol {
         sseTask = nil
         reconnectionTimer?.invalidate()
         reconnectionTimer = nil
-        sseBuffer = ""
+        sseDataBuffer = ""
         reconnectDelay = minReconnectDelay
         stateStream?.setIsConnected(false)
         logger.info("Disconnected from bridge")
@@ -498,9 +555,12 @@ final class HueClient: ObservableObject, HueClientProtocol {
         config.tlsMaximumProtocolVersion = .tls13
         
         // Load pinned hash from Keychain for TOFU.
-        if let ip = bridgeIP, let key = KeychainKeys.key(for: ip),
-           let hash = try? KeychainManager.loadCertPin(from: key) {
-            pinnedHash = hash
+        if let ip = bridgeIP, let key = KeychainKeys.key(for: ip) {
+            Task {
+                if let hash = try? await KeychainManager.shared.loadCertPin(from: key) {
+                    self.pinnedHash = hash
+                }
+            }
         }
         
         let keychainKey = bridgeIP.map { KeychainKeys.key(for: $0) }
@@ -523,7 +583,7 @@ final class HueClient: ObservableObject, HueClientProtocol {
         let keychainKey = KeychainKeys.key(for: ip)
         
         do {
-            try KeychainManager.saveCertPin(to: keychainKey, hash: trustedHash)
+            try await KeychainManager.shared.saveCertPin(to: keychainKey, hash: trustedHash)
             pinnedHash = trustedHash
             logger.info("Certificate pinned via TOFU for bridge at \(ip)")
         } catch {

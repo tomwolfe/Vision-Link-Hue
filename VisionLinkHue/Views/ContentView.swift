@@ -3,37 +3,46 @@ import RealityKit
 import ARKit
 
 /// Main content view that orchestrates the entire AR experience.
+/// Uses `@State` with `@Observable` types for granular dependency tracking.
 struct ContentView: View {
     
-    @StateObject private var stateStream = HueStateStream()
-    @StateObject private var hueClient: HueClient
-    @StateObject private var detectionEngine = DetectionEngine()
-    private let spatialProjector: SpatialProjector
-    @StateObject private var arSessionManager: ARSessionManager
+    @State private var stateStream = HueStateStream()
+    @State private var hueClient: HueClient
+    @State private var detectionEngine = DetectionEngine()
+    @State private var arSessionManager: ARSessionManager
+    @State private var spatialProjector: SpatialProjector
     
     @State private var showSettings: Bool = false
     @State private var dismissedErrorId: UUID?
     
-    init() {
-        _stateStream = StateObject(wrappedValue: HueStateStream())
-        
-        let client = HueClient(stateStream: stateStream)
-        _hueClient = StateObject(wrappedValue: client)
-        
-        let detector = DetectionEngine()
-        let projector = SpatialProjector()
-        spatialProjector = projector
-        
-        let manager = ARSessionManager(
-            detectionEngine: detector,
-            spatialProjector: projector,
-            hueClient: client,
-            stateStream: stateStream
-        )
-        
-        _detectionEngine = StateObject(wrappedValue: detector)
-        _arSessionManager = StateObject(wrappedValue: manager)
-    }
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                // AR session view
+                ARSessionView(
+                    sessionManager: arSessionManager,
+                    onFrameUpdate: { frame in
+                        Task {
+                            await arSessionManager.didUpdateFrame(frame)
+                        }
+                    },
+                    onARViewReady: { arView in
+                        Task {
+                            await arSessionManager.configureAndStart(in: arView)
+                        }
+                    }
+                )
+                
+                // HUD overlay
+                HUDOverlay(
+                    sessionManager: arSessionManager,
+                    detectionEngine: detectionEngine,
+                    hueClient: hueClient,
+                    stateStream: stateStream,
+                    frameSize: geometry.size
+                )
+            }
+        }
     
     @State private var arViewRef: ARView?
     

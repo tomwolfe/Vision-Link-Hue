@@ -23,18 +23,22 @@ enum KeychainError: Error, LocalizedError {
     }
 }
 
-// MARK: - Keychain Manager
+// MARK: - Keychain Actor
 
-/// Manages certificate pin hashes in the iOS Keychain for Trust-On-First-Use (TOFU) pinning.
-/// All operations are synchronous to avoid blocking network threads.
-enum KeychainManager {
+/// Async-safe Keychain manager for certificate pin hashes used in
+/// Trust-On-First-Use (TOFU) pinning.
+/// All operations are async to avoid blocking the calling thread,
+/// satisfying Swift 6.1 strict-concurrency requirements.
+actor KeychainManager {
+    
+    static let shared = KeychainManager()
     
     /// Save a certificate pin hash to the Keychain.
     /// - Parameters:
     ///   - keychainKey: The account key for this bridge's pin.
     ///   - hash: The SHA-256 hash of the certificate's public key.
     /// - Throws: `KeychainError.addFailed` if the operation fails.
-    static func saveCertPin(to keychainKey: String, hash: Data) throws {
+    func saveCertPin(to keychainKey: String, hash: Data) async throws {
         let query: [String: Any] = [
             kSecClass as String: kSecClassKey,
             kSecAttrService as String: KeychainKeys.service,
@@ -51,8 +55,7 @@ enum KeychainManager {
     /// Load a certificate pin hash from the Keychain.
     /// - Parameter keychainKey: The account key for this bridge's pin.
     /// - Returns: The stored hash, or `nil` if not found.
-    /// - Throws: `KeychainError.queryFailed` if the query fails unexpectedly.
-    static func loadCertPin(from keychainKey: String) throws -> Data? {
+    func loadCertPin(from keychainKey: String) async throws -> Data? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassKey,
             kSecAttrService as String: KeychainKeys.service,
@@ -69,7 +72,7 @@ enum KeychainManager {
     
     /// Delete a certificate pin hash from the Keychain.
     /// - Parameter keychainKey: The account key for this bridge's pin.
-    static func deleteCertPin(from keychainKey: String) {
+    func deleteCertPin(from keychainKey: String) async {
         let query: [String: Any] = [
             kSecClass as String: kSecClassKey,
             kSecAttrService as String: KeychainKeys.service,

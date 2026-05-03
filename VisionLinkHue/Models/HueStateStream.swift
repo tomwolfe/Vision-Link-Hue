@@ -1,5 +1,4 @@
 import Foundation
-import Combine
 
 /// Severity levels for application errors, used to prioritize UI feedback.
 /// Ordered from least to most severe for `Comparable` conformance.
@@ -50,31 +49,31 @@ struct AppError: Identifiable, LocalizedError {
 }
 
 /// Centralized state manager for Hue bridge data and connection status.
-/// Publishes lights, scenes, groups, connection status, and errors via Combine.
-final class HueStateStream: ObservableObject {
+/// Uses the `@Observable` macro for granular dependency tracking without
+/// Combine's overhead of full-view re-renders.
+@Observable
+final class HueStateStream {
     
-    @Published private(set) var lights: [HueLightResource] = []
-    @Published private(set) var scenes: [HueSceneResource] = []
-    @Published private(set) var groups: [BridgeGroup] = []
+    private(set) var lights: [HueLightResource] = []
+    private(set) var scenes: [HueSceneResource] = []
+    private(set) var groups: [BridgeGroup] = []
     
-    @Published var isConnected: Bool = false
-    @Published var bridgeConfig: BridgeConfig?
+    var isConnected: Bool = false
+    var bridgeConfig: BridgeConfig?
     
     /// Active error queue for toast/banner display.
-    @Published var activeErrors: [AppError] = []
+    var activeErrors: [AppError] = []
     
     /// Mapping from local fixture UUID to Hue bridge light ID.
     /// Populated via tap-to-link in the HUD.
-    @Published private(set) var fixtureLightMapping: [UUID: String] = [:]
+    private(set) var fixtureLightMapping: [UUID: String] = [:]
     
     func setIsConnected(_ connected: Bool) {
         isConnected = connected
     }
     
     /// UUID of the currently selected light group for HUD anchoring.
-    @Published var selectedGroupId: String?
-    
-    private let cancellables = Set<AnyCancellable>()
+    var selectedGroupId: String?
     
     /// Process a partial resource update from the SSE stream.
     func applyUpdate(_ update: ResourceUpdate) {

@@ -2,11 +2,33 @@ import SwiftUI
 import RealityKit
 import ARKit
 
-/// Container that bridges ARKit's ARView with SwiftUI's RealityView.
-/// Handles frame callbacks and feeds them to the DetectionEngine.
-struct ARViewContainer: UIViewRepresentable {
+/// SwiftUI view that manages an ARKit session and provides frame callbacks.
+/// Replaces the UIKit-bridged `ARViewContainer` with a cleaner abstraction
+/// that integrates better with SwiftUI's `RealityView` for entity management.
+struct ARSessionView: View {
     
-    let sessionManager: ARSessionManager
+    @ObservedObject var sessionManager: ARSessionManager
+    let onFrameUpdate: (ARFrame) -> Void
+    let onARViewReady: (ARView) -> Void
+    
+    @State private var arViewRef: ARView?
+    
+    var body: some View {
+        ARViewRepresentable(
+            onFrameUpdate: onFrameUpdate,
+            onARViewReady: { arView in
+                onARViewReady(arView)
+                arViewRef = arView
+            }
+        )
+        .ignoresSafeArea()
+    }
+}
+
+/// UIViewRepresentable wrapper for ARKit's ARView.
+/// Minimal coordinator pattern for frame callbacks.
+struct ARViewRepresentable: UIViewRepresentable {
+    
     let onFrameUpdate: (ARFrame) -> Void
     let onARViewReady: (ARView) -> Void
     
@@ -31,10 +53,9 @@ struct ARViewContainer: UIViewRepresentable {
     
     @MainActor
     final class Coordinator: NSObject, ARSessionDelegate {
+        let parent: ARViewRepresentable
         
-        let parent: ARViewContainer
-        
-        init(_ parent: ARViewContainer) {
+        init(_ parent: ARViewRepresentable) {
             self.parent = parent
         }
         

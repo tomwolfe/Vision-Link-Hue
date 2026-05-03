@@ -95,7 +95,7 @@ struct FixtureReticle: View {
                     .trim(from: 0, to: 1.0)
                     .stroke(
                         LinearGradient(
-                            colors: confidenceColor(for: fixture.detection.confidence),
+                            colors: LiquidGlassHUD.confidenceGradient(for: fixture.detection.confidence),
                             startPoint: .leading,
                             endPoint: .trailing
                         ),
@@ -123,19 +123,5 @@ struct FixtureReticle: View {
             axis: (x: 0, y: 1, z: 0)
         )
         .glassEffect(.liquid, alignment: .center)
-    }
-    
-    /// Color gradient based on confidence level.
-    private func confidenceColor(for confidence: Double) -> [Color] {
-        switch confidence {
-        case 0.9...:
-            return [.green, .green.opacity(0.3)]
-        case 0.85...:
-            return [.green.opacity(0.8), .yellow.opacity(0.3)]
-        case 0.7...:
-            return [.yellow, .orange.opacity(0.3)]
-        default:
-            return [.red, .orange.opacity(0.3)]
-        }
     }
 }

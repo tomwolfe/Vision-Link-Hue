@@ -9,12 +9,13 @@ import os
 ///
 /// Throttles inference to `DetectionConstants.inferenceInterval` (500ms)
 /// and applies non-maximum suppression to remove overlapping detections.
-final class DetectionEngine: ObservableObject {
+@Observable
+final class DetectionEngine {
     
-    @Published var lastDetections: [FixtureDetection] = []
-    @Published var isRunning: Bool = false
-    @Published var inferenceLatencyMs: Double = 0
-    @Published var frameCount: Int = 0
+    var lastDetections: [FixtureDetection] = []
+    var isRunning: Bool = false
+    var inferenceLatencyMs: Double = 0
+    var frameCount: Int = 0
     
     private let logger = Logger(subsystem: "com.tomwolfe.visionlinkhue", category: "DetectionEngine")
     
@@ -135,8 +136,6 @@ final class DetectionEngine: ObservableObject {
         
         return nonMaxSuppression(detections, iouThreshold: 0.3)
     }
-    
-
     
     /// Non-maximum suppression to remove overlapping detections.
     private func nonMaxSuppression(

@@ -90,7 +90,7 @@ struct HueLightResource: Codable, Sendable {
 struct HueSceneResource: Codable, Sendable {
     let id: String
     let type: String
-    let metadata: SceneMetadata
+    let metadata: Metadata
     let data: SceneData?
     let lights: [String]?
     
@@ -199,3 +199,80 @@ struct BridgeConfig: Codable, Sendable {
     let port: Int?
     let username: String?
 }
+
+// MARK: - SpatialAware API (Spring 2026)
+
+/// Spatial awareness data for a detected fixture, used to sync
+/// AR-detected positions back to the Hue Bridge for accurate
+/// preset scene rendering.
+struct SpatialAwarePosition: Codable, Sendable {
+    /// The CLIP v2 light resource ID.
+    let id: String
+    
+    /// 3D position in meters relative to the bridge's coordinate system.
+    let position: Position3D
+    
+    /// Detection confidence from the Vision framework (0.0-1.0).
+    let confidence: Double
+    
+    /// Fixture type detected by the on-device classifier.
+    let fixtureType: String
+    
+    /// Optional room/area assignment from the bridge.
+    let roomId: String?
+    
+    /// Spatial calibration timestamp.
+    let timestamp: Date
+    
+    struct Position3D: Codable, Sendable {
+        let x: Double
+        let y: Double
+        let z: Double
+        
+        init(x: Double, y: Double, z: Double) {
+            self.x = x
+            self.y = y
+            self.z = z
+        }
+        
+        init(simd: SIMD3<Float>) {
+            self.x = Double(simd.x)
+            self.y = Double(simd.y)
+            self.z = Double(simd.z)
+        }
+    }
+}
+
+/// Request body for syncing spatial awareness data to the bridge.
+struct SpatialAwareSyncRequest: Codable, Sendable {
+    let fixtures: [SpatialAwarePosition]
+}
+
+/// Response from the SpatialAware sync endpoint.
+struct SpatialAwareSyncResponse: Codable, Sendable {
+    let success: [SpatialAwareSuccess]
+    let warnings: [SpatialAwareWarning]?
+    
+    struct SpatialAwareSuccess: Codable, Sendable {
+        let id: String
+        let status: String
+    }
+    
+    struct SpatialAwareWarning: Codable, Sendable {
+        let id: String
+        let message: String
+    }
+}
+
+/// Partial spatial awareness update from SSE events.
+struct SpatialAwareUpdate: Codable, Sendable {
+    let spatial_awareness: [SpatialAwareResource]?
+    
+    struct SpatialAwareResource: Codable, Sendable {
+        let id: String
+        let position: SpatialAwarePosition.Position3D?
+        let confidence: Double?
+        let last_seen: Date?
+    }
+}
+
