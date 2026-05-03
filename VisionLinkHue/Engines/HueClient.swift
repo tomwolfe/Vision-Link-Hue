@@ -260,42 +260,22 @@ final class HueClient: ObservableObject, HueClientProtocol {
     
     /// Create a full SpatialAwarePosition from ARKit detection data.
     /// Delegates to `HueSpatialService`.
-    func createSpatialAwarePosition(
-        lightId: String,
-        arKitPosition: SIMD3<Float>,
-        arKitOrientation: simd_quatf,
-        confidence: Double,
-        fixtureType: String,
-        materialLabel: String?,
-        roomId: String?,
-        areaId: String?,
-        origin: SIMD3<Float>?
-    ) -> SpatialAwarePosition {
+    func createSpatialAwarePosition(context: DetectionContext) -> SpatialAwarePosition {
         guard let spatialService else {
             return SpatialAwarePosition(
-                id: lightId,
+                id: context.lightId,
                 position: SpatialAwarePosition.Position3D(x: 0, y: 0, z: 0),
-                confidence: confidence,
-                fixtureType: fixtureType,
-                roomId: roomId,
-                areaId: areaId,
+                confidence: context.confidence,
+                fixtureType: context.fixtureType,
+                roomId: context.roomId,
+                areaId: context.areaId,
                 timestamp: Date(),
                 orientation: nil,
-                materialLabel: materialLabel,
+                materialLabel: context.materialLabel,
                 roomOffset: nil
             )
         }
-        return spatialService.createSpatialAwarePosition(
-            lightId: lightId,
-            arKitPosition: arKitPosition,
-            arKitOrientation: arKitOrientation,
-            confidence: confidence,
-            fixtureType: fixtureType,
-            materialLabel: materialLabel,
-            roomId: roomId,
-            areaId: areaId,
-            origin: origin
-        )
+        return spatialService.createSpatialAwarePosition(context: context)
     }
     
     /// Sync AR-detected fixture positions back to the Hue Bridge.

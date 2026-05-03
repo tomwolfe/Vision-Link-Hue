@@ -115,7 +115,7 @@ final class DetectionEngineTests: XCTestCase {
         )
         
         // The regions overlap significantly.
-        let iou = calculateIoU(highConfDetection.region, lowConfDetection.region)
+        let iou = highConfDetection.region.intersectionOverUnion(with: lowConfDetection.region)
         XCTAssertGreaterThan(iou, 0.0, "Regions should overlap")
         XCTAssertGreaterThan(iou, 0.3, "IoU should exceed NMS threshold")
         
@@ -138,7 +138,7 @@ final class DetectionEngineTests: XCTestCase {
         )
         
         // These regions are far apart.
-        let iou = calculateIoU(detection1.region, detection2.region)
+        let iou = detection1.region.intersectionOverUnion(with: detection2.region)
         XCTAssertEqual(iou, 0.0, "Non-overlapping regions should have IoU of 0")
         
         // Invoke nonMaxSuppression and verify both detections survive.
@@ -153,24 +153,6 @@ final class DetectionEngineTests: XCTestCase {
     }
     
     // MARK: - Helper Methods
-    
-    /// Calculate IoU between two normalized rects (internal logic extracted for testing).
-    private func calculateIoU(_ a: NormalizedRect, _ b: NormalizedRect) -> Float {
-        let interX1 = max(a.topLeft.x, b.topLeft.x)
-        let interY1 = max(a.topLeft.y, b.topLeft.y)
-        let interX2 = min(a.bottomRight.x, b.bottomRight.x)
-        let interY2 = min(a.bottomRight.y, b.bottomRight.y)
-        
-        let interWidth = max(0, interX2 - interX1)
-        let interHeight = max(0, interY2 - interY1)
-        let intersection = interWidth * interHeight
-        
-        let areaA = a.width * a.height
-        let areaB = b.width * b.height
-        let union = areaA + areaB - intersection
-        
-        return union > 0 ? intersection / Float(union) : 0
-    }
     
     /// Create a minimal test pixel buffer (1x1 RGBA).
     private func createTestPixelBuffer() -> CVPixelBuffer? {

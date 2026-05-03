@@ -58,6 +58,9 @@ actor HueEventStreamActor {
     /// TOFU callback for certificate pinning.
     private var tofuCallback: @Sendable (Data) async -> Void = { _ in }
     
+    /// Saved connection parameters for reconnection.
+    private var pendingReconnection: (url: URL, pinnedHash: Data?, keychainKey: String?, tofuCallback: @Sendable (Data) async -> Void)?
+    
     // MARK: - Connection Management
     
     /// Start the SSE connection to the bridge event stream.
@@ -75,6 +78,7 @@ actor HueEventStreamActor {
         disconnect()
         
         self.tofuCallback = tofuCallback
+        self.pendingReconnection = (url: url, pinnedHash: pinnedHash, keychainKey: keychainKey, tofuCallback: tofuCallback)
         
         let sessionDelegate = CertificatePinningDelegate(
             pinnedHash: pinnedHash,
@@ -229,7 +233,21 @@ actor HueEventStreamActor {
             guard !Task.isCancelled else { return }
             
             await self.logger.info("Attempting SSE reconnection (delay: \(String(format: "%.1f", delay))s)...")
-            await self.logger.warning("SSE stream ended unexpectedly, reconnection not yet implemented")
+            
+            guard let params = self.pendingReconnection else {
+                await self.logger.warning("SSE reconnection aborted: no saved connection parameters")
+                return
+            }
+            
+            await self.start(
+                url: params.url,
+                pinnedHash: params.pinnedHash,
+                keychainKey: params.keychainKey,
+                tofuCallback: params.tofuCallback
+            )
+            
+            // Reset backoff delay on successful reconnection attempt
+            self.reconnectDelay = minReconnectDelay
         }
     }
     

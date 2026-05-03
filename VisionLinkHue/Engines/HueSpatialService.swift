@@ -99,33 +99,23 @@ final class HueSpatialService {
     
     /// Create a full SpatialAwarePosition from ARKit detection data with
     /// room-relative coordinate mapping.
-    func createSpatialAwarePosition(
-        lightId: String,
-        arKitPosition: SIMD3<Float>,
-        arKitOrientation: simd_quatf,
-        confidence: Double,
-        fixtureType: String,
-        materialLabel: String? = nil,
-        roomId: String? = nil,
-        areaId: String? = nil,
-        origin: SIMD3<Float>? = nil
-    ) -> SpatialAwarePosition {
+    func createSpatialAwarePosition(context: DetectionContext) -> SpatialAwarePosition {
         let (position, roomOffset) = mapARKitToBridgeSpace(
-            arKitPosition: arKitPosition,
-            arKitOrientation: arKitOrientation,
-            referencePoint: origin
+            arKitPosition: context.arKitPosition,
+            arKitOrientation: context.arKitOrientation,
+            referencePoint: context.origin
         )
         
         return SpatialAwarePosition(
-            id: lightId,
+            id: context.lightId,
             position: position,
-            confidence: confidence,
-            fixtureType: fixtureType,
-            roomId: roomId,
-            areaId: areaId,
+            confidence: context.confidence,
+            fixtureType: context.fixtureType,
+            roomId: context.roomId,
+            areaId: context.areaId,
             timestamp: Date(),
-            orientation: SpatialAwarePosition.Orientation(simd: arKitOrientation),
-            materialLabel: materialLabel,
+            orientation: SpatialAwarePosition.Orientation(simd: context.arKitOrientation),
+            materialLabel: context.materialLabel,
             roomOffset: roomOffset
         )
     }

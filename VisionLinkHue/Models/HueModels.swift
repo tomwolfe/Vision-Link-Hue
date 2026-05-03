@@ -385,6 +385,42 @@ struct SpatialAwareUpdate: Codable, Sendable {
     }
 }
 
+/// Context object for creating a SpatialAwarePosition from ARKit detection data.
+/// Consolidates the 9 individual parameters into a single typed parameter.
+struct DetectionContext: Sendable {
+    let lightId: String
+    let arKitPosition: SIMD3<Float>
+    let arKitOrientation: simd_quatf
+    let confidence: Double
+    let fixtureType: String
+    let materialLabel: String?
+    let roomId: String?
+    let areaId: String?
+    let origin: SIMD3<Float>?
+    
+    init(
+        lightId: String,
+        arKitPosition: SIMD3<Float>,
+        arKitOrientation: simd_quatf,
+        confidence: Double,
+        fixtureType: String,
+        materialLabel: String? = nil,
+        roomId: String? = nil,
+        areaId: String? = nil,
+        origin: SIMD3<Float>? = nil
+    ) {
+        self.lightId = lightId
+        self.arKitPosition = arKitPosition
+        self.arKitOrientation = arKitOrientation
+        self.confidence = confidence
+        self.fixtureType = fixtureType
+        self.materialLabel = materialLabel
+        self.roomId = roomId
+        self.areaId = areaId
+        self.origin = origin
+    }
+}
+
 /// Bridge firmware and spatial capabilities info.
 struct BridgeSpatialInfo: Sendable {
     let firmwareVersion: String

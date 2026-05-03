@@ -62,6 +62,24 @@ struct NormalizedRect: Sendable {
             height: Double(height) * frameSize.height
         )
     }
+    
+    /// Calculate the Intersection over Union (IoU) between this rect and another.
+    func intersectionOverUnion(with other: NormalizedRect) -> Float {
+        let interX1 = max(topLeft.x, other.topLeft.x)
+        let interY1 = max(topLeft.y, other.topLeft.y)
+        let interX2 = min(bottomRight.x, other.bottomRight.x)
+        let interY2 = min(bottomRight.y, other.bottomRight.y)
+        
+        let interWidth = max(0, interX2 - interX1)
+        let interHeight = max(0, interY2 - interY1)
+        let intersection = interWidth * interHeight
+        
+        let areaA = width * height
+        let areaB = other.width * other.height
+        let union = areaA + areaB - intersection
+        
+        return union > 0 ? intersection / Float(union) : 0
+    }
 }
 
 /// Result of an AI-driven fixture detection pass.

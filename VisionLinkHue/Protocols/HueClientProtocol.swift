@@ -58,17 +58,7 @@ protocol HueClientProtocol: AnyObject {
     func mapARKitToBridgeSpace(arKitPosition: SIMD3<Float>, arKitOrientation: simd_quatf, referencePoint: SIMD3<Float>?) -> (position: SpatialAwarePosition.Position3D, roomOffset: SpatialAwarePosition.RoomOffset?)
     
     /// Create a full SpatialAwarePosition from ARKit detection data with room-relative mapping.
-    func createSpatialAwarePosition(
-        lightId: String,
-        arKitPosition: SIMD3<Float>,
-        arKitOrientation: simd_quatf,
-        confidence: Double,
-        fixtureType: String,
-        materialLabel: String?,
-        roomId: String?,
-        areaId: String?,
-        origin: SIMD3<Float>?
-    ) -> SpatialAwarePosition
+    func createSpatialAwarePosition(context: DetectionContext) -> SpatialAwarePosition
     
     /// Whether a valid 3+ point calibration has been established.
     var isCalibrated: Bool { get }

@@ -3,22 +3,14 @@ import RealityKit
 import ARKit
 
 /// Main content view that orchestrates the entire AR experience.
-/// Uses `@State` with `@Observable` types for granular dependency tracking.
+/// Uses `@Environment` for dependency injection from `AppContainer`.
 struct ContentView: View {
     
-    @State private var stateStream: HueStateStream
-    @State private var hueClient: HueClient
-    @State private var detectionEngine: DetectionEngine
-    @State private var arSessionManager: ARSessionManager
-    @State private var spatialProjector: SpatialProjector
-    
-    init(container: AppContainer = .shared) {
-        _stateStream = State(initialValue: container.stateStream)
-        _hueClient = State(initialValue: container.hueClient)
-        _detectionEngine = State(initialValue: container.detectionEngine)
-        _arSessionManager = State(initialValue: container.arSessionManager)
-        _spatialProjector = State(initialValue: container.spatialProjector)
-    }
+    @Environment(HueStateStream.self) private var stateStream
+    @Environment(HueClient.self) private var hueClient
+    @Environment(DetectionEngine.self) private var detectionEngine
+    @Environment(ARSessionManager.self) private var arSessionManager
+    @Environment(SpatialProjector.self) private var spatialProjector
     
     @State private var showSettings: Bool = false
     @State private var dismissedErrorId: UUID?

@@ -97,9 +97,6 @@ struct HUDOverlay: View {
                         Text("Scanning...")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                            .task {
-                                detectionEngine.start()
-                            }
                     }
                     
                     // Detection latency indicator

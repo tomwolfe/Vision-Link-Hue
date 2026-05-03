@@ -12,6 +12,11 @@ struct VisionLinkHueApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(AppContainer.shared.stateStream)
+                .environment(AppContainer.shared.hueClient)
+                .environment(AppContainer.shared.detectionEngine)
+                .environment(AppContainer.shared.arSessionManager)
+                .environment(AppContainer.shared.spatialProjector)
         }
     }
 }

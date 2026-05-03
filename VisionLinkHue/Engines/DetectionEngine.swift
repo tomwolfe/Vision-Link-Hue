@@ -219,7 +219,7 @@ final class DetectionEngine: Sendable {
             for (j, other) in sorted.enumerated() where i != j {
                 guard !suppressed.contains(other.id) else { continue }
                 
-                let iou = calculateIoU(detection.region, other.region)
+                let iou = detection.region.intersectionOverUnion(with: other.region)
                 if iou > iouThreshold {
                     suppressed.insert(other.id)
                 }
@@ -227,24 +227,6 @@ final class DetectionEngine: Sendable {
         }
         
         return keep
-    }
-    
-    /// Calculate Intersection over Union between two normalized rects.
-    private func calculateIoU(_ a: NormalizedRect, _ b: NormalizedRect) -> Float {
-        let interX1 = max(a.topLeft.x, b.topLeft.x)
-        let interY1 = max(a.topLeft.y, b.topLeft.y)
-        let interX2 = min(a.bottomRight.x, b.bottomRight.x)
-        let interY2 = min(a.bottomRight.y, b.bottomRight.y)
-        
-        let interWidth = max(0, interX2 - interX1)
-        let interHeight = max(0, interY2 - interY1)
-        let intersection = interWidth * interHeight
-        
-        let areaA = a.width * a.height
-        let areaB = b.width * b.height
-        let union = areaA + areaB - intersection
-        
-        return union > 0 ? intersection / Float(union) : 0
     }
     
     // MARK: - Neural Surface Material Detection

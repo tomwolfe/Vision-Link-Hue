@@ -263,30 +263,15 @@ final class SpatialProjector {
         let px = Int(normalizedPoint.x * Float(pixelWidth))
         let py = Int(normalizedPoint.y * Float(pixelHeight))
         
-        let depthIndex = py * pixelWidth + px
-        
-        let depthBytes = depthMap.data.bindMemory(to: UInt16.self, capacity: depthMap.data.count)
-        
-        guard depthIndex >= 0, depthIndex < depthMap.data.count / MemoryLayout<UInt16>.stride else {
+        guard let depthMeters = extractDepth(
+            at: SIMD2<Int>(px, py),
+            in: normalizedPoint,
+            depthMap: depthMap,
+            confidenceMap: sceneDepth.confidenceMap,
+            pixelWidth: pixelWidth,
+            pixelHeight: pixelHeight
+        ) else {
             return nil
-        }
-        
-        let depthValue = depthBytes[depthIndex]
-        let depthMeters = Float(depthValue) / 1000.0
-        
-        guard depthMeters >= configuration.minDepthMeters,
-              depthMeters <= configuration.maxDepthMeters else {
-            return nil
-        }
-        
-        if let confidenceMap = sceneDepth.confidenceMap {
-            let confidenceIndex = py * pixelWidth + px
-            if confidenceIndex >= 0, confidenceIndex < confidenceMap.data.count {
-                let confidenceByte = confidenceMap.data[confidenceIndex]
-                if confidenceByte == 0 {
-                    return nil
-                }
-            }
         }
         
         guard let position = SpatialMath.depthUnproject(
@@ -325,6 +310,48 @@ final class SpatialProjector {
         #else
         return nil
         #endif
+    }
+    
+    /// Extract depth value at a pixel coordinate from the depth and confidence maps.
+    /// Returns depth in meters, or nil if the depth is invalid or confidence is insufficient.
+    private func extractDepth(
+        at pixel: SIMD2<Int>,
+        in normalizedPoint: SIMD2<Float>,
+        depthMap: CVPixelBuffer,
+        confidenceMap: CVPixelBuffer?,
+        pixelWidth: Int,
+        pixelHeight: Int
+    ) -> Float? {
+        let px = pixel.x
+        let py = pixel.y
+        
+        let depthIndex = py * pixelWidth + px
+        
+        let depthBytes = depthMap.data.bindMemory(to: UInt16.self, capacity: depthMap.data.count)
+        
+        guard depthIndex >= 0, depthIndex < depthMap.data.count / MemoryLayout<UInt16>.stride else {
+            return nil
+        }
+        
+        let depthValue = depthBytes[depthIndex]
+        let depthMeters = Float(depthValue) / 1000.0
+        
+        guard depthMeters >= configuration.minDepthMeters,
+              depthMeters <= configuration.maxDepthMeters else {
+            return nil
+        }
+        
+        if let confidenceMap = confidenceMap {
+            let confidenceIndex = py * pixelWidth + px
+            if confidenceIndex >= 0, confidenceIndex < confidenceMap.data.count {
+                let confidenceByte = confidenceMap.data[confidenceIndex]
+                if confidenceByte == 0 {
+                    return nil
+                }
+            }
+        }
+        
+        return depthMeters
     }
 }
 
