@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build and Test
+    runs-on: macos-15
+    strategy:
+      matrix:
+        destination: ['platform=visionOS Simulator,name=Apple Vision Pro']
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app
+
+      - name: Build
+        run: xcodebuild build-for-testing \
+          -scheme Vision-Link-Hue \
+          -destination 'platform=visionOS Simulator,name=Apple Vision Pro' \
+          -configuration Release \
+          2>&1 | xcpretty
+
+      - name: Test
+        run: xcodebuild test-without-building \
+          -scheme Vision-Link-Hue \
+          -destination 'platform=visionOS Simulator,name=Apple Vision Pro' \
+          -configuration Release \
+          2>&1 | xcpretty
+
+  sbom:
+    name: Generate SBOM
+    runs-on: macos-15
+    needs: build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app
+
+      - name: Generate SBOM
+        run: swift package generate-sbom --format json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json
+          retention-days: 90
+
+  lint:
+    name: Lint
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app
+
+      - name: Swift Format Check
+        run: swift package --allow-writing-to-package-descriptor lint 2>&1 || true

@@ -1,13 +1,20 @@
 import SwiftUI
 import RealityKit
 import ARKit
+import os
 
 /// Scene picker for recalling lighting scenes.
 struct ScenePickerView: View {
     
+    private static let logger = Logger(
+        subsystem: "com.tomwolfe.visionlinkhue",
+        category: "ScenePickerView"
+    )
+    
     let scenes: [HueSceneResource]
     let groupId: String
     let hueClient: HueClient
+    let stateStream: HueStateStream?
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -26,9 +33,8 @@ struct ScenePickerView: View {
                                         sceneId: scene.id
                                     )
                                 } catch {
-                                    // Errors surface via hueClient.lastError
-                                    // and SSE event stream reconnection.
-                                    print("Scene recall failed: \(error.localizedDescription)")
+                                    Self.logger.error("Scene recall failed: \(error.localizedDescription)")
+                                    await stateStream?.reportError(error, severity: .error, source: "ScenePickerView.recall")
                                 }
                             }
                         } label: {

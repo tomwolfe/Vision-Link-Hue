@@ -182,11 +182,21 @@ struct FixtureHeuristicClassifier {
     
     /// Load classification rules from a JSON config file.
     /// This enables OTA updates to detection logic without recompiling.
+    /// Uses Swift 6.2 Resource trait for bundled resource access.
     /// - Parameter url: URL pointing to the JSON config file.
     /// - Returns: The loaded rules array.
     /// - Throws: `ClassificationConfigError` if the config is invalid or cannot be loaded.
     mutating func loadRules(from url: URL) throws {
-        let data = try Data(contentsOf: url)
+        let data: Data
+        
+        #if canImport(UniformTypeIdentifiers)
+        // Use Resource trait (Swift 6.2+) for bundled resource loading
+        data = try Self.loadResource(from: url)
+        #else
+        // Fallback for older toolchains
+        data = try Data(contentsOf: url)
+        #endif
+        
         let decoder = JSONDecoder()
         
         let configFile = try decoder.decode(ClassificationConfigFile.self, from: data)
@@ -228,6 +238,17 @@ struct FixtureHeuristicClassifier {
         }
         
         self.rules = loadedRules
+    }
+    
+    /// Load a bundled resource using Swift 6.2 Resource trait.
+    /// Falls back to URL-based loading for compatibility.
+    private static func loadResource(from url: URL) throws -> Data {
+        #if canImport(UniformTypeIdentifiers)
+        if let resource = try? Resource(url: url) {
+            return try resource.loadData()
+        }
+        #endif
+        return try Data(contentsOf: url)
     }
     
     /// Reset to the bundled default classification rules.

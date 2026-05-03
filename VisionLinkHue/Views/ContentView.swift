@@ -14,36 +14,6 @@ struct ContentView: View {
     
     @State private var showSettings: Bool = false
     @State private var dismissedErrorId: UUID?
-    
-    var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                // AR session view
-                ARSessionView(
-                    sessionManager: arSessionManager,
-                    onFrameUpdate: { frame in
-                        Task {
-                            await arSessionManager.didUpdateFrame(frame)
-                        }
-                    },
-                    onARViewReady: { arView in
-                        Task {
-                            await arSessionManager.configureAndStart(in: arView)
-                        }
-                    }
-                )
-                
-                // HUD overlay
-                HUDOverlay(
-                    sessionManager: arSessionManager,
-                    detectionEngine: detectionEngine,
-                    hueClient: hueClient,
-                    stateStream: stateStream,
-                    frameSize: geometry.size
-                )
-            }
-        }
-    
     @State private var arViewRef: ARView?
     
     var body: some View {

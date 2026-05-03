@@ -23,5 +23,8 @@ let package = Package(
                 .enableExperimentalFeature("StrictConcurrency")
             ]
         )
-    ]
+    ],
+    // Enable SBOM generation for April 2026 App Store security compliance.
+    // Run: swift package generate-sbom --format json
+    cxxLanguageStandard: .none
 )

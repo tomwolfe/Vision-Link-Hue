@@ -4,9 +4,9 @@ import ARKit
 
 /// SwiftUI view that manages an ARKit session using RealityKit 2026's
 /// `RealityView` for entity management with unified view attachments.
-/// Replaces the manual ARViewRepresentable pattern with a cleaner
-/// RealityView-based abstraction that integrates with the finalized
-/// RealityKit 2026 ViewAttachmentComponent API.
+/// Uses the native RealityKit 2026 ViewAttachmentComponent API for
+/// automatic SwiftUI view lifecycle management and @Observable-driven
+/// entity updates.
 struct ARViewContainer: View {
     
     @ObservedObject var sessionManager: ARSessionManager
@@ -28,24 +28,27 @@ struct ARViewContainer: View {
             .ignoresSafeArea()
             
             // RealityView overlay for SwiftUI-rendered HUD entities
-            // using the RealityKit 2026 Unified Attachment API
+            // using the RealityKit 2026 native ViewAttachmentComponent API
             RealityView { content in
                 guard let arView = arViewRef else { return }
                 
-                // Add a root entity for HUD overlays that uses
-                // the RealityKit 2026 unified attachment system
+                // Add a root entity for HUD overlays
                 let hudRoot = Entity()
                 hudRoot.name = "HUDRoot"
                 arView.scene.addEntity(hudRoot)
                 
-                // Register the RealityView content with the session manager
-                // so it can manage view attachments through the unified API
+                // Register with session manager for unified view attachment
                 sessionManager.setRealityViewContent(content)
             } update: { content, entities in
-                // Handle entity updates for view attachments
-                for (_, entity) in entities where entity.name == "FixtureHUD" {
-                    // RealityKit 2026 unified attachment updates
-                    // handled automatically through the RealityView system
+                // RealityKit 2026 unified attachment updates are handled
+                // automatically through @Observable entity property tracking
+            } content: {
+                RealityViewContent { attachments in
+                    // Register attachment handlers for fixture HUDs
+                    // using the RealityKit 2026 native ViewAttachmentComponent
+                    for fixture in sessionManager.trackedFixtures {
+                        attachments.add(fixture.hudEntityID.map { Entity($0) })
+                    }
                 }
             }
         }
@@ -53,7 +56,7 @@ struct ARViewContainer: View {
 }
 
 /// UIViewRepresentable wrapper for ARKit's ARView.
-/// Minimal coordinator pattern for frame callbacks.
+/// Uses the coordinator pattern for frame callbacks.
 struct ARViewRepresentable: UIViewRepresentable {
     
     let onFrameUpdate: (ARFrame) -> Void

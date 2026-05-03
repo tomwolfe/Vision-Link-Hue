@@ -2,6 +2,7 @@ import Foundation
 import AVFoundation
 import Vision
 import os
+import UIKit
 
 /// Engine that performs on-device lighting fixture detection using
 /// the Vision framework for bounding box detection and heuristic
@@ -56,6 +57,9 @@ final class DetectionEngine {
         }
     }
     
+    /// Background task for monitoring thermal state changes on iOS.
+    private var thermalMonitoringTask: Task<Void, Never>?
+    
     // MARK: - Public API
     
     /// Start continuous detection. Call from the AR session observer.
@@ -65,12 +69,14 @@ final class DetectionEngine {
         frameCount = 0
         lastInferenceTime = 0
         logger.info("DetectionEngine started")
+        startThermalMonitoring()
     }
     
     /// Stop continuous detection.
     func stop() {
         isRunning = false
         lastDetections = []
+        stopThermalMonitoring()
         logger.info("DetectionEngine stopped")
     }
     
@@ -232,11 +238,8 @@ final class DetectionEngine {
     /// the device from entering a "Serious" thermal state (which
     /// forces LiDAR shut-off).
     private func updateThermalState() {
-        #if os(visionOS)
-        // On visionOS, check the system thermal state
-        // Note: ProcessInfo.thermalState is available on visionOS
-        let thermalState = ProcessInfo.processInfo.thermalState
-        switch thermalState {
+        let systemThermalState = ProcessInfo.processInfo.thermalState
+        switch systemThermalState {
         case .good:
             self.thermalState = .nominal
         case .fair:
@@ -248,9 +251,30 @@ final class DetectionEngine {
         @unknown default:
             self.thermalState = .nominal
         }
-        #else
-        self.thermalState = .nominal
-        #endif
+    }
+    
+    /// Start monitoring thermal state changes via notification.
+    /// Proactively throttles inference before the system forces
+    /// LiDAR/Depth sensor shutdown during thermal throttling.
+    private func startThermalMonitoring() {
+        thermalMonitoringTask = Task {
+            for await notification in NotificationCenter.default.notifications(named: ProcessInfo.didChangeThermalStateNotification) {
+                guard let _ = notification.object as? ProcessInfo else { continue }
+                await MainActor.run {
+                    let previousState = self.thermalState
+                    self.updateThermalState()
+                    if self.thermalState != previousState {
+                        self.logger.info("Thermal state changed: \(previousState) -> \(self.thermalState)")
+                    }
+                }
+            }
+        }
+    }
+    
+    /// Stop thermal state monitoring.
+    private func stopThermalMonitoring() {
+        thermalMonitoringTask?.cancel()
+        thermalMonitoringTask = nil
     }
     
     // MARK: - Neural Surface Material Detection

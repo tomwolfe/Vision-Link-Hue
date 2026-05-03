@@ -183,12 +183,17 @@ final class HueStateStream {
     /// Prevents main-thread hangs during SSE reconnection bursts.
     private let notificationSystem = AppNotificationSystem()
     
+    private let userDefaults = UserDefaults.standard
+    private let fixtureMappingKey = "com.tomwolfe.visionlinkhue.fixtureLightMapping"
+    private let bridgeConfigKey = "com.tomwolfe.visionlinkhue.bridgeConfig"
+    
     init() {
         notificationSystem.onNotification = { [weak self] notifications in
             // Update the UI-visible error list on the caller's context
             // The actor guarantees thread-safe access to activeErrors
             self?.activeErrors = notifications
         }
+        loadPersistedState()
     }
     
     func setIsConnected(_ connected: Bool) {
@@ -242,11 +247,13 @@ final class HueStateStream {
     /// Link a local fixture UUID to a Hue bridge light ID.
     func linkFixture(_ fixtureId: UUID, toLight lightId: String) {
         fixtureLightMapping[fixtureId] = lightId
+        saveFixtureLightMapping()
     }
     
     /// Unlink a local fixture from its mapped Hue light.
     func unlinkFixture(_ fixtureId: UUID) {
         fixtureLightMapping.removeValue(forKey: fixtureId)
+        saveFixtureLightMapping()
     }
     
     /// Resolve a scene by its ID.
@@ -280,6 +287,67 @@ final class HueStateStream {
     func clearErrors() {
         Task { [notificationSystem] in
             await notificationSystem.clearAllNotifications()
+        }
+    }
+    
+    // MARK: - State Persistence
+    
+    /// Load persisted fixture-light mappings and bridge config from UserDefaults.
+    private func loadPersistedState() {
+        if let data = userDefaults.data(forKey: fixtureMappingKey),
+           let mapping = try? JSONDecoder().decode([String: String].self, from: data) {
+            self.fixtureLightMapping = mapping.mapKeys { UUID(uuidString: $0) ?? UUID(), $1 }
+        }
+        
+        if let data = userDefaults.data(forKey: bridgeConfigKey),
+           let config = try? JSONDecoder().decode(BridgeConfig.self, from: data) {
+            self.bridgeConfig = config
+        }
+    }
+    
+    /// Persist the current fixture-light mapping to UserDefaults.
+    func saveFixtureLightMapping() {
+        let stringMapping = fixtureLightMapping.mapKeys { $0.uuidString, $1 }
+        if let data = try? JSONEncoder().encode(stringMapping) {
+            userDefaults.set(data, forKey: fixtureMappingKey)
+        }
+    }
+    
+    /// Persist the current bridge config to UserDefaults.
+    func saveBridgeConfig() {
+        if let config = bridgeConfig {
+            if let data = try? JSONEncoder().encode(config) {
+                userDefaults.set(data, forKey: bridgeConfigKey)
+            }
+        }
+    }
+    
+    /// Clear all persisted state.
+    func clearPersistedState() {
+        userDefaults.removeObject(forKey: fixtureMappingKey)
+        userDefaults.removeObject(forKey: bridgeConfigKey)
+    }
+}
+
+extension Dictionary {
+    /// Convert a dictionary with UUID keys to a string-keyed dictionary.
+    func mapKeys<Key: Hashable, Value>(_ keyTransform: (Key) -> String, _ valueTransform: (Value) -> Value) -> [String: Value] {
+        var result: [String: Value] = [:]
+        for (key, value) in self {
+            result[keyTransform(key)] = valueTransform(value)
+        }
+        return result
+    }
+}
+
+extension Dictionary where Key == UUID, Value == String {
+    /// Convert a string-keyed dictionary to a UUID-keyed dictionary.
+    init(mapKeys: [String: Value]) {
+        self = [:]
+        for (keyString, value) in mapKeys {
+            if let uuid = UUID(uuidString: keyString) {
+                self[uuid] = value
+            }
         }
     }
 }

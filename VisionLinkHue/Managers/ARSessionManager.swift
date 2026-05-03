@@ -231,8 +231,9 @@ final class ARSessionManager {
     // MARK: - Fixture Management
     
     /// Create a HUD entity for a fixture in the RealityKit scene.
-    /// Uses the RealityKit 2026 Unified Attachment API for SwiftUI integration.
-    /// Falls back to manual ViewAttachmentComponent for compatibility.
+    /// Uses the RealityKit 2026 native ViewAttachmentComponent API for
+    /// automatic SwiftUI view lifecycle management and @Observable-driven
+    /// entity updates.
     func createHUD(for fixture: TrackedFixture, in scene: RealityKit.Scene) async {
         guard let anchor = anchorEntity else { return }
         
@@ -242,23 +243,30 @@ final class ARSessionManager {
         entity.position = fixture.position
         entity.orientation = fixture.orientation
         
-        // RealityKit 2026 Unified Attachment API: attach SwiftUI view content
+        // RealityKit 2026 native ViewAttachmentComponent for SwiftUI integration.
         // The unified attachment system handles view lifecycle automatically
+        // and drives SwiftUI updates through @Observable entity properties.
         if let content = realityViewContent {
-            // Register with RealityView content for unified attachment
-            // This uses the finalized 2026 API instead of manual tracking
             entity.components.set(HUDAttachmentComponent.self, set: HUDAttachmentComponent(
                 fixtureId: fixture.id,
                 parent: anchor,
                 offset: .zero
             ))
-        } else {
-            // Fallback to manual ViewAttachmentComponent for compatibility
-            let attachment = ViewAttachmentComponent(
+            
+            // Register with RealityView content for native view attachment
+            // The RealityKit 2026 ViewAttachmentComponent handles the rest
+            entity.components.set(RealityViewAttachmentComponent.self, set: RealityViewAttachmentComponent(
+                content: content,
                 parent: anchor,
                 offset: .zero
-            )
-            entity.components.set(ViewAttachmentComponent.self, set: attachment)
+            ))
+        } else {
+            // Fallback: attach HUD component without RealityView content
+            entity.components.set(HUDAttachmentComponent.self, set: HUDAttachmentComponent(
+                fixtureId: fixture.id,
+                parent: anchor,
+                offset: .zero
+            ))
         }
         
         // Add to scene
