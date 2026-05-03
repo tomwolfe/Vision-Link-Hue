@@ -29,7 +29,7 @@ enum ThermalState: Comparable, CustomStringConvertible {
 /// DetectionEngine subscribes to this monitor to dynamically adjust
 /// its inference interval based on thermal conditions.
 @MainActor
-final class ThermalMonitor: @unchecked Sendable {
+final class ThermalMonitor: Sendable {
     
     /// Current thermal state of the device.
     var thermalState: ThermalState = .nominal
@@ -81,7 +81,7 @@ final class ThermalMonitor: @unchecked Sendable {
         case .serious:
             return .warning
         case .critical:
-            return .serious
+            return .critical
         @unknown default:
             return .nominal
         }

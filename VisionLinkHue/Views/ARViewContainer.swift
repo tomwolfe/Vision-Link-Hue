@@ -53,8 +53,22 @@ struct ARViewRepresentable: UIViewRepresentable {
     func updateUIView(_ arView: ARView, context: Context) {
         // Pass high-level session commands from ARSessionManager
         // to the ARView's session
-        if !sessionManager.isSessionActive {
+        if sessionManager.isSessionActive {
+            if !context.coordinator.isSessionRunning {
+                let configuration = ARWorldTrackingConfiguration()
+                #if !targetEnvironment(simulator)
+                configuration.worldReconstructionMode = ARWorldTrackingConfiguration.WorldReconstructionMode.automatic
+                configuration.planeDetection = [.horizontal, .vertical]
+                configuration.lightEstimation = .automatic
+                #else
+                configuration.planeDetection = [.horizontal, .vertical]
+                #endif
+                arView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
+                context.coordinator.isSessionRunning = true
+            }
+        } else {
             arView.session.pause()
+            context.coordinator.isSessionRunning = false
         }
     }
     
@@ -64,6 +78,7 @@ struct ARViewRepresentable: UIViewRepresentable {
     
     final class Coordinator: NSObject, ARSessionDelegate {
         let parent: ARViewRepresentable
+        var isSessionRunning: Bool = false
         
         init(_ parent: ARViewRepresentable) {
             self.parent = parent

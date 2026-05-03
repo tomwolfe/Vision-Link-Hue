@@ -194,7 +194,7 @@ final class SpatialProjectorTests: XCTestCase {
         XCTAssertNil(ray, "Should return nil when intrinsics are unavailable")
     }
     
-    /// Verify that unprojectDirection returns nil when intrinsics are nil.
+    /// Verify that unprojectDirection falls back to camera forward when intrinsics are nil.
     func testUnprojectDirectionWithNilIntrinsics() {
         let cameraTransform = simd_float4x4(
             SIMD4<Float>(1, 0, 0, 0),
@@ -209,7 +209,8 @@ final class SpatialProjectorTests: XCTestCase {
             cameraTransform: cameraTransform
         )
         
-        XCTAssertNil(direction, "Should return nil when intrinsics are unavailable")
+        XCTAssertNotNil(direction, "Should return valid forward direction when intrinsics are unavailable")
+        XCTAssertEqual(direction!, SIMD3<Float>(0, 0, -1), accuracy: 0.01, "Should fall back to camera forward direction")
     }
     
     // MARK: - ProjectionError Tests

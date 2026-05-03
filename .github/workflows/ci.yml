@@ -12,7 +12,7 @@ jobs:
     runs-on: macos-15
     strategy:
       matrix:
-        destination: ['platform=visionOS Simulator,name=Apple Vision Pro']
+        destination: ['platform=iOS Simulator,name=iPhone 16']
 
     steps:
       - name: Checkout
@@ -24,14 +24,14 @@ jobs:
       - name: Build
         run: xcodebuild build-for-testing \
           -scheme Vision-Link-Hue \
-          -destination 'platform=visionOS Simulator,name=Apple Vision Pro' \
+          -destination 'platform=iOS Simulator,name=iPhone 16' \
           -configuration Release \
           2>&1 | xcpretty
 
       - name: Test
         run: xcodebuild test-without-building \
           -scheme Vision-Link-Hue \
-          -destination 'platform=visionOS Simulator,name=Apple Vision Pro' \
+          -destination 'platform=iOS Simulator,name=iPhone 16' \
           -configuration Release \
           2>&1 | xcpretty
 

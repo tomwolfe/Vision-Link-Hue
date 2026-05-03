@@ -101,7 +101,7 @@ final class DetectionEngineTests: XCTestCase {
     
     // MARK: - NMS Logic Tests
     
-    func testNonMaxSuppressionRemovesOverlappingDetections() {
+    func testNonMaxSuppressionRemovesOverlappingDetections() async {
         // Create two overlapping detections with different confidence.
         let highConfDetection = FixtureDetection(
             type: .lamp,
@@ -119,12 +119,13 @@ final class DetectionEngineTests: XCTestCase {
         XCTAssertGreaterThan(iou, 0.0, "Regions should overlap")
         XCTAssertGreaterThan(iou, 0.3, "IoU should exceed NMS threshold")
         
-        // High confidence detection should be kept, low confidence suppressed.
-        XCTAssertEqual(highConfDetection.confidence, DetectionConstants.minConfidence + 0.2)
-        XCTAssertEqual(lowConfDetection.confidence, DetectionConstants.minConfidence + 0.1)
+        // Invoke nonMaxSuppression and verify the high-confidence detection is kept.
+        let result = await engine.nonMaxSuppression([highConfDetection, lowConfDetection], iouThreshold: 0.3)
+        XCTAssertEqual(result.count, 1, "NMS should suppress the lower-confidence overlapping detection")
+        XCTAssertEqual(result.first?.id, highConfDetection.id, "NMS should keep the higher-confidence detection")
     }
     
-    func testNonMaxSuppressionKeepsNonOverlappingDetections() {
+    func testNonMaxSuppressionKeepsNonOverlappingDetections() async {
         let detection1 = FixtureDetection(
             type: .lamp,
             region: NormalizedRect(x: 0.0, y: 0.0, width: 0.1, height: 0.1),
@@ -140,14 +141,15 @@ final class DetectionEngineTests: XCTestCase {
         let iou = calculateIoU(detection1.region, detection2.region)
         XCTAssertEqual(iou, 0.0, "Non-overlapping regions should have IoU of 0")
         
-        // Both should be kept (confidence-wise).
-        XCTAssertGreaterThan(detection1.confidence, DetectionConstants.minConfidence)
-        XCTAssertGreaterThan(detection2.confidence, DetectionConstants.minConfidence)
+        // Invoke nonMaxSuppression and verify both detections survive.
+        let result = await engine.nonMaxSuppression([detection1, detection2], iouThreshold: 0.3)
+        XCTAssertEqual(result.count, 2, "NMS should keep both non-overlapping detections")
     }
     
-    func testNonMaxSuppressionEmptyInputReturnsEmpty() {
+    func testNonMaxSuppressionEmptyInputReturnsEmpty() async {
         // Empty detection array should produce empty result.
-        XCTAssertTrue([] == [])
+        let result = await engine.nonMaxSuppression([], iouThreshold: 0.3)
+        XCTAssertTrue(result.isEmpty, "NMS with empty input should return empty result")
     }
     
     // MARK: - Helper Methods

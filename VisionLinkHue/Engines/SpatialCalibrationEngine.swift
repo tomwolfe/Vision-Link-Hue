@@ -142,11 +142,22 @@ final class SpatialCalibrationEngine {
     }
     
     /// Compute the optimal rotation matrix using the Kabsch algorithm.
+    /// Uses polar decomposition: R = H * (H^T * H)^(-1/2)
+    /// This avoids the need for SVD while providing numerically stable results.
     private func kabschRotation(from covMatrix: simd_float3x3) -> simd_float3x3 {
-        // Use polar decomposition: R = H * (H^T * H)^(-1/2)
-        // This avoids the need for SVD
         let H = covMatrix
         let HTH = H.transpose * H
+        let detHTH = determinant(HTH)
+        
+        if detHTH < 1e-6 {
+            logger.warning("Kabsch algorithm: det(HTH) = \(detHTH) < 1e-6, falling back to identity transformation. Covariance matrix may be ill-conditioned due to collinear or insufficient calibration points.")
+            return simd_float3x3(
+                SIMD3<Float>(1, 0, 0),
+                SIMD3<Float>(0, 1, 0),
+                SIMD3<Float>(0, 0, 1)
+            )
+        }
+        
         let HTHInvSqrt = inverseSqrtMatrix(HTH)
         var R = H * HTHInvSqrt
         

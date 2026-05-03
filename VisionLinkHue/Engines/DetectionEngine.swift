@@ -15,7 +15,8 @@ import os
 /// fixture classification (Glass, Metal, Wood, etc.) via ARMeshMaterialLabel.
 /// Uses low-power mode to prevent thermal throttling on device.
 @Observable
-final class DetectionEngine: @unchecked Sendable {
+@MainActor
+final class DetectionEngine: Sendable {
     
     var lastDetections: [FixtureDetection] = []
     var isRunning: Bool = false
@@ -136,6 +137,11 @@ final class DetectionEngine: @unchecked Sendable {
         return filtered
     }
     
+    /// Update thermal state from the thermal monitor for adaptive throttling.
+    private func updateThermalState() {
+        _ = thermalMonitor.thermalState
+    }
+    
     // MARK: - Vision Detection
     
     private func runVisionDetection(_ pixelBuffer: CVPixelBuffer, lowPower: Bool = false) async throws -> [FixtureDetection] {
@@ -158,8 +164,12 @@ final class DetectionEngine: @unchecked Sendable {
                         return
                     }
                     
-                    let detections = self.classifyFixtures(from: results)
-                    continuation.resume(returning: detections)
+                    let observations = results.map { ObservationData(boundingBox: $0.boundingBox) }
+                    
+                    Task {
+                        let detections = await self.classifyFixtures(from: observations)
+                        continuation.resume(returning: detections)
+                    }
                 } catch {
                     self.logger.error("Vision detection failed: \(error.localizedDescription)")
                     continuation.resume(throwing: error)
@@ -169,12 +179,10 @@ final class DetectionEngine: @unchecked Sendable {
     }
     
     /// Classify detected objects into fixture types using heuristic scoring.
-    private func classifyFixtures(from observations: [VNRectangleObservation]) -> [FixtureDetection] {
+    private func classifyFixtures(from observations: [ObservationData]) -> [FixtureDetection] {
         var detections: [FixtureDetection] = []
         
         for observation in observations {
-            // Only consider objects in the upper portion of the frame
-            // (lighting fixtures are typically on walls/ceilings)
             guard observation.boundingBox.minY < 0.8 else { continue }
             guard observation.boundingBox.width > 0.05 && observation.boundingBox.height > 0.05 else { continue }
             
@@ -193,7 +201,7 @@ final class DetectionEngine: @unchecked Sendable {
     }
     
     /// Non-maximum suppression to remove overlapping detections.
-    private func nonMaxSuppression(
+    func nonMaxSuppression(
         _ detections: [FixtureDetection],
         iouThreshold: Float
     ) -> [FixtureDetection] {

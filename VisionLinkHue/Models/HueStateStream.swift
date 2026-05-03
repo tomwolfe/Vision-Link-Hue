@@ -76,10 +76,10 @@ actor AppNotificationSystem {
     private var lastNotificationTimeBySource: [String: Date] = [:]
     
     /// Notification event publisher for UI consumption.
-    var onNotification: (([AppError]) -> Void)?
+    var onNotification: (@Sendable ([AppError]) -> Void)?
     
     /// Set the notification event handler.
-    func setNotificationHandler(_ handler: @escaping ([AppError]) -> Void) {
+    func setNotificationHandler(_ handler: @escaping @Sendable ([AppError]) -> Void) {
         onNotification = handler
     }
     
@@ -156,7 +156,8 @@ actor AppNotificationSystem {
 /// Delegates error notification handling to the `AppNotificationSystem`
 /// actor to prevent main-thread hangs during SSE reconnection bursts.
 @Observable
-final class HueStateStream: @unchecked Sendable {
+@MainActor
+final class HueStateStream: Sendable {
     
     private(set) var lights: [HueLightResource] = []
     private(set) var scenes: [HueSceneResource] = []
@@ -183,14 +184,23 @@ final class HueStateStream: @unchecked Sendable {
     init(persistence: FixturePersistence) {
         self.persistence = persistence
         loadPersistedState()
+        configure()
     }
     
     func configure() {
         Task { [notificationSystem] in
             await notificationSystem.setNotificationHandler { [weak self] notifications in
-                self?.activeErrors = notifications
+                Task { @MainActor [weak self] in
+                    self?.activeErrors = notifications
+                }
             }
         }
+    }
+    
+    /// Update active errors from the notification system.
+    /// Called by the AppNotificationSystem actor.
+    func updateErrors(_ errors: [AppError]) {
+        activeErrors = errors
     }
     
     func setIsConnected(_ connected: Bool) {

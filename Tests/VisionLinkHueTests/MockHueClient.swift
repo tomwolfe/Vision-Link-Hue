@@ -2,6 +2,7 @@ import Foundation
 
 /// Mock implementation of `HueClientProtocol` for unit testing.
 /// All methods return immediately with no side effects.
+@MainActor
 final class MockHueClient: HueClientProtocol {
     
     var bridgeIP: String?

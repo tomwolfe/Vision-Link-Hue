@@ -353,13 +353,16 @@ final class HueClient: ObservableObject, HueClientProtocol {
         Task { [weak self] in
             guard let self else { return }
             
-            let stateStream = self.stateStream
-            await self.eventStream.setEventHandler { @Sendable update in
-                stateStream?.applyUpdate(update)
+            await self.eventStream.setEventHandler { [weak self] update in
+                Task { @MainActor [weak self] in
+                    self?.stateStream?.applyUpdate(update)
+                }
             }
             
-            await self.eventStream.setErrorHandler { @Sendable error in
-                stateStream?.reportError(error, severity: .error, source: "HueClient.sse")
+            await self.eventStream.setErrorHandler { [weak self] error in
+                Task { @MainActor [weak self] in
+                    self?.stateStream?.reportError(error, severity: .error, source: "HueClient.sse")
+                }
             }
             
             await self.eventStream.start(

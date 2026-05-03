@@ -6,7 +6,8 @@ import os
 /// Service that manages SwiftData persistence for fixture-light mappings
 /// and spatial coordinates. Provides atomic transactions for all
 /// persistence operations.
-final class FixturePersistence: @unchecked Sendable {
+@MainActor
+final class FixturePersistence: Sendable {
     
     let modelContainer: ModelContainer
     let modelContext: ModelContext

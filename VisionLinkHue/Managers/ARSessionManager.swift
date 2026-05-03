@@ -142,7 +142,7 @@ final class ARSessionManager {
                             
                             // Spawn parallel task for material sampling
                             taskGroup.addTask {
-                                let material = self.detectionEngine.classifyMaterial(from: frame, at: detection.region)
+                                let material = await self.detectionEngine.classifyMaterial(from: frame, at: detection.region)
                                 return nil // Material result is logged but doesn't block fixture creation
                             }
                             
@@ -258,6 +258,10 @@ final class ARSessionManager {
     /// Remove a fixture and its HUD from the scene.
     func removeFixture(_ fixtureId: UUID) {
         trackedFixtures.removeAll { $0.id == fixtureId }
+        
+        if let entity = fixtureEntities[fixtureId] {
+            entity.removeFromParent()
+        }
         fixtureEntities.removeValue(forKey: fixtureId)
         anchorCount = trackedFixtures.count
         logger.debug("Removed fixture \(fixtureId)")

@@ -1,6 +1,13 @@
 import Vision
 import Foundation
 
+// MARK: - Observation Data
+
+/// Sendable observation data extracted from VNRectangleObservation for cross-queue classification.
+struct ObservationData: Sendable {
+    let boundingBox: CGRect
+}
+
 // MARK: - Scoring Rules
 
 /// A single declarative scoring rule that assigns points to a fixture type
@@ -283,6 +290,47 @@ struct FixtureHeuristicClassifier {
         return sorted.first?.key ?? .lamp
     }
     
+    /// Classify observation data into a fixture type using weighted scoring.
+    func classify(typeFrom data: ObservationData) -> FixtureType {
+        let aspectRatio = data.boundingBox.width / max(data.boundingBox.height, 0.001)
+        let normalizedY = data.boundingBox.midY
+        let area = data.boundingBox.width * data.boundingBox.height
+        
+        var scores: [FixtureType: Double] = [:]
+        for fixture in FixtureType.allCases {
+            scores[fixture] = 0.0
+        }
+        
+        for rule in rules {
+            var matches = true
+            
+            if let aspectRange = rule.aspectRange {
+                guard aspectRange.contains(aspectRatio) else { matches = false; continue }
+            }
+            
+            if matches, let yRange = rule.yRange {
+                guard yRange.contains(normalizedY) else { matches = false; continue }
+            }
+            
+            if matches, let areaRange = rule.areaRange {
+                guard areaRange.contains(area) else { matches = false; continue }
+            }
+            
+            if matches {
+                scores[rule.type]! += rule.weight
+            }
+        }
+        
+        let sorted = scores.sorted { a, b in
+            if a.value == b.value {
+                return specificity[a.key, default: 0] > specificity[b.key, default: 0]
+            }
+            return a.value > b.value
+        }
+        
+        return sorted.first?.key ?? .lamp
+    }
+    
     /// Calculate detection confidence from observation quality metrics.
     func calculateConfidence(from observation: VNRectangleObservation) -> Double {
         var confidence: Double = 0.7
@@ -297,6 +345,30 @@ struct FixtureHeuristicClassifier {
         
         let centerX = observation.boundingBox.midX
         let centerY = observation.boundingBox.midY
+        let distanceFromCenter = sqrt(
+            pow(centerX - 0.5, 2) + pow(centerY - 0.5, 2)
+        )
+        if distanceFromCenter < 0.3 {
+            confidence += 0.05
+        }
+        
+        return min(confidence, 0.99)
+    }
+    
+    /// Calculate detection confidence from observation data.
+    func calculateConfidence(from data: ObservationData) -> Double {
+        var confidence: Double = 0.7
+        
+        let area = data.boundingBox.width * data.boundingBox.height
+        if area > 0.01 && area < 0.5 {
+            confidence += 0.15
+        }
+        if area > 0.05 && area < 0.3 {
+            confidence += 0.05
+        }
+        
+        let centerX = data.boundingBox.midX
+        let centerY = data.boundingBox.midY
         let distanceFromCenter = sqrt(
             pow(centerX - 0.5, 2) + pow(centerY - 0.5, 2)
         )

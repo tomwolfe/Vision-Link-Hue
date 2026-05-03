@@ -19,10 +19,10 @@ actor HueEventStreamActor {
     var isConnected: Bool { state == .connected }
     
     /// Event handler for parsed resource updates from the bridge.
-    var onEvent: ((ResourceUpdate) async -> Void)?
+    var onEvent: (@Sendable (ResourceUpdate) -> Void)?
     
     /// Error handler for stream-level errors.
-    var onError: ((any Error) async -> Void)?
+    var onError: (@Sendable (any Error) -> Void)?
     
     // MARK: - Private State
     
@@ -91,7 +91,9 @@ actor HueEventStreamActor {
             delegateQueue: nil
         )
         
-        sseTask = Task { [weak self] in
+        let session = urlSession
+        
+        sseTask = Task { [weak self, session] in
             guard let self else { return }
             
             do {
@@ -100,11 +102,12 @@ actor HueEventStreamActor {
                 request.setValue("keep-alive", forHTTPHeaderField: "Connection")
                 request.timeoutInterval = 300
                 
-                guard let urlSession else {
+                guard let session else {
                     await handleDisconnect(error: HueError.invalidResponse)
                     return
                 }
-                let (data, response) = try await urlSession.data(for: request)
+                
+                let (bytes, response) = try await session.bytes(for: request)
                 
                 guard let httpResponse = response as? HTTPURLResponse,
                       (200...299).contains(httpResponse.statusCode) else {
@@ -112,7 +115,7 @@ actor HueEventStreamActor {
                     return
                 }
                 
-                await streamEvents(from: data)
+                await streamEventsIncrementally(from: bytes.lines)
                 
             } catch {
                 await handleDisconnect(error: error)
@@ -124,48 +127,58 @@ actor HueEventStreamActor {
     }
     
     /// Set the event handler for parsed resource updates.
-    func setEventHandler(_ handler: @escaping @Sendable ((ResourceUpdate) async -> Void)) {
+    func setEventHandler(_ handler: @escaping @Sendable (ResourceUpdate) -> Void) {
         onEvent = handler
     }
     
     /// Set the error handler for stream-level errors.
-    func setErrorHandler(_ handler: @escaping @Sendable ((any Error) async -> Void)) {
+    func setErrorHandler(_ handler: @escaping @Sendable (any Error) -> Void) {
         onError = handler
     }
     
-    /// Stream SSE events from the data.
-    private func streamEvents(from data: Data) async {
+    /// Stream SSE events incrementally from a line-by-line byte stream.
+    /// Processes events in real-time without buffering the entire response.
+    private func streamEventsIncrementally(from lines: any AsyncSequence<String, any Error>) async {
         sseDataBuffer = ""
         parseFailures = 0
         
-        let text = String(decoding: data, as: UTF8.self)
-        let lines = text.components(separatedBy: "\n")
-        
-        for line in lines {
-            // Skip empty lines (mark end of event or keep-alive)
-            if line.isEmpty {
-                // Empty line marks end of a complete SSE event
-                if !sseDataBuffer.isEmpty {
-                    let eventText = sseDataBuffer
+        do {
+            for try await line in lines {
+                // Respect cancellation for clean teardown
+                guard !Task.isCancelled else {
+                    logger.info("SSE stream cancelled, tearing down")
                     sseDataBuffer = ""
-                    
-                    do {
-                        try await parseAndDispatchEvent(eventText)
-                    } catch {
-                        parseFailures += 1
-                        if parseFailures >= maxParseFailures {
-                            state = .degraded
-                            logger.warning("Entered degraded mode after \(self.parseFailures) parse failures")
+                    state = .idle
+                    return
+                }
+                
+                // Skip empty lines (mark end of event or keep-alive)
+                if line.isEmpty {
+                    // Empty line marks end of a complete SSE event
+                    if !sseDataBuffer.isEmpty {
+                        let eventText = sseDataBuffer
+                        sseDataBuffer = ""
+                        
+                        do {
+                            try await parseAndDispatchEvent(eventText)
+                        } catch {
+                            parseFailures += 1
+                            if parseFailures >= maxParseFailures {
+                                state = .degraded
+                                logger.warning("Entered degraded mode after \(self.parseFailures) parse failures")
+                            }
                         }
                     }
+                    continue
                 }
-                continue
+                
+                // Accumulate data lines for multi-line SSE events
+                if line.hasPrefix("data: ") {
+                    sseDataBuffer += String(line.dropFirst(6))
+                }
             }
-            
-            // Accumulate data lines for multi-line SSE events
-            if line.hasPrefix("data: ") {
-                sseDataBuffer += String(line.dropFirst(6))
-            }
+        } catch {
+            logger.error("SSE stream error during line iteration: \(error.localizedDescription)")
         }
         
         // Process any remaining buffered data after stream ends
@@ -187,14 +200,14 @@ actor HueEventStreamActor {
         let decoder = JSONDecoder()
         let update = try decoder.decode(ResourceUpdate.self, from: trimmed.data(using: .utf8)!)
         
-        await onEvent?(update)
+        onEvent?(update)
     }
     
     /// Handle stream disconnection with state machine-driven reconnection.
     private func handleDisconnect(error: any Error) async {
         logger.error("SSE stream error: \(error.localizedDescription)")
         
-        await onError?(error)
+        onError?(error)
         
         // Transition to reconnecting state and schedule reconnection
         state = .reconnecting
@@ -216,6 +229,7 @@ actor HueEventStreamActor {
             guard !Task.isCancelled else { return }
             
             await self.logger.info("Attempting SSE reconnection (delay: \(String(format: "%.1f", delay))s)...")
+            await self.logger.warning("SSE stream ended unexpectedly, reconnection not yet implemented")
         }
     }
     
