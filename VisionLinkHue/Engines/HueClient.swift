@@ -20,7 +20,7 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
     // MARK: - State
     
     var bridgeIP: String?
-    var bridgePort: Int = 80
+    var bridgePort: Int = 443
     var apiKey: String?
     var bridgeConfig: BridgeConfig?
     
@@ -455,7 +455,7 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
         do {
             try await KeychainManager.shared.saveCertPin(to: keychainKey, hash: trustedHash)
             pinnedHash = trustedHash
-            pinningDelegate?.pinnedHash = trustedHash
+            pinningDelegate?.updatePinnedHash(trustedHash)
             logger.info("Certificate pinned via TOFU for bridge at \(ip)")
         } catch {
             logger.error("Failed to save certificate pin to Keychain: \(error.localizedDescription)")

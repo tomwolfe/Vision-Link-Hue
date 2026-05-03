@@ -2,13 +2,10 @@ import Foundation
 import Security
 import os
 
-/// Unified `URLSessionDelegate` handling certificate pinning and TOFU.
-/// On first connection, trusts the certificate and invokes the TOFU callback
-/// to cache the hash. On subsequent connections, enforces the pinned hash.
-///
-/// Properly `Sendable` - all stored properties are Sendable and the delegate
-/// methods only read state (no mutations), making it thread-safe.
-final class CertificatePinningDelegate: NSObject, @unchecked Sendable, URLSessionDelegate {
+/// Actor that manages certificate pin state with proper Swift concurrency isolation.
+/// All mutable state (`pinnedHash`) is confined to the actor, eliminating the need
+/// for `@unchecked Sendable` suppression.
+actor CertificatePinStore {
     
     private let logger = Logger(
         subsystem: "com.tomwolfe.visionlinkhue",
@@ -19,15 +16,68 @@ final class CertificatePinningDelegate: NSObject, @unchecked Sendable, URLSessio
     let keychainKey: String?
     let tofuCallback: @Sendable (Data) async -> Void
     
-    /// Create a certificate pinning delegate.
-    /// - Parameters:
-    ///   - pinnedHash: Previously stored hash for enforcement mode. `nil` for TOFU mode.
-    ///   - keychainKey: The Keychain account key for TOFU pin persistence.
-    ///   - tofuCallback: Called with the trusted hash on first connection (TOFU mode).
-    init(pinnedHash: Data?, keychainKey: String? = nil, tofuCallback: @escaping @Sendable (Data) async -> Void) {
+    init(pinnedHash: Data?, keychainKey: String?, tofuCallback: @Sendable @escaping (Data) async -> Void) {
         self.pinnedHash = pinnedHash
         self.keychainKey = keychainKey
         self.tofuCallback = tofuCallback
+    }
+    
+    /// Evaluate a certificate challenge against the pinned hash.
+    /// Returns the disposition and credential, or nil for TOFU mode
+    /// where the caller must handle the async TOFU flow.
+    func evaluateChallenge(publicKeyHash: Data) async -> (URLSession.AuthChallengeDisposition, URLCredential?)? {
+        if let pinnedHash {
+            // Enforcement mode: compare against stored hash.
+            if publicKeyHash == pinnedHash {
+                return (.useCredential, nil)
+            } else {
+                logger.error("Certificate pin mismatch - expected \(pinnedHash.count) bytes, got \(publicKeyHash.count) bytes")
+                return (.cancelAuthenticationChallenge, nil)
+            }
+        } else {
+            // TOFU mode: trust on first use, return nil to signal caller
+            // should proceed with async TOFU callback.
+            return nil
+        }
+    }
+    
+    /// Save a newly trusted certificate hash via TOFU.
+    func savePinnedHash(_ hash: Data) async {
+        guard let keychainKey else { return }
+        
+        do {
+            try await KeychainManager.shared.saveCertPin(to: keychainKey, hash: hash)
+            self.pinnedHash = hash
+            logger.info("Certificate pinned via TOFU for key \(keychainKey)")
+        } catch {
+            logger.error("Failed to save certificate pin to Keychain: \(error.localizedDescription)")
+        }
+        
+        await tofuCallback(hash)
+    }
+}
+
+/// `URLSessionDelegate` that bridges to `CertificatePinStore` actor for
+/// thread-safe certificate pinning and TOFU management.
+///
+/// The delegate itself is stateless and only holds a reference to the actor.
+/// All mutable state is isolated within the actor, satisfying Swift 6.1
+/// strict concurrency without `@unchecked Sendable`.
+final class CertificatePinningDelegate: NSObject, URLSessionDelegate {
+    
+    private let logger = Logger(
+        subsystem: "com.tomwolfe.visionlinkhue",
+        category: "CertificatePinning"
+    )
+    
+    private let pinStore: CertificatePinStore
+    
+    init(pinnedHash: Data?, keychainKey: String? = nil, tofuCallback: @escaping @Sendable (Data) async -> Void) {
+        self.pinStore = CertificatePinStore(
+            pinnedHash: pinnedHash,
+            keychainKey: keychainKey,
+            tofuCallback: tofuCallback
+        )
         super.init()
     }
     
@@ -60,38 +110,23 @@ final class CertificatePinningDelegate: NSObject, @unchecked Sendable, URLSessio
         
         let hash = publicKeyData.sha256()
         
-        if let pinnedHash {
-            // Enforcement mode: compare against stored hash.
-            if hash == pinnedHash {
-                completionHandler(.useCredential, nil)
-            } else {
-                logger.error("Certificate pin mismatch - expected \(pinnedHash.count) bytes, got \(hash.count) bytes")
-                completionHandler(.cancelAuthenticationChallenge, nil)
-            }
-        } else {
-            // TOFU mode: trust on first use, cache the hash synchronously.
-            // completionHandler must be invoked synchronously within this delegate method.
-            completionHandler(.useCredential, nil)
+        Task { [weak self] in
+            guard let self else { return }
             
-            // Save the pin asynchronously without blocking the delegate callback.
-            Task {
-                await self.savePinnedHash(hash)
+            if let result = await self.pinStore.evaluateChallenge(publicKeyHash: hash) {
+                completionHandler(result.0, result.1)
+            } else {
+                // TOFU mode: trust the certificate and save asynchronously.
+                completionHandler(.useCredential, nil)
+                await self.pinStore.savePinnedHash(hash)
             }
         }
     }
     
-    private func savePinnedHash(_ hash: Data) async {
-        guard let keychainKey else { return }
-        
-        // Save via async KeychainManager to satisfy Swift 6.1 strict concurrency.
-        do {
-            try await KeychainManager.shared.saveCertPin(to: keychainKey, hash: hash)
-            logger.info("Certificate pinned via TOFU for key \(keychainKey)")
-        } catch {
-            logger.error("Failed to save certificate pin to Keychain: \(error.localizedDescription)")
+    /// Update the pinned hash via TOFU after external confirmation.
+    func updatePinnedHash(_ hash: Data) {
+        Task { [weak self] in
+            await self?.pinStore.pinnedHash = hash
         }
-        
-        // Invoke async callback for state updates.
-        await tofuCallback(hash)
     }
 }

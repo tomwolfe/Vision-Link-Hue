@@ -190,6 +190,7 @@ actor HueEventStreamActor {
             try? await parseAndDispatchEvent(sseDataBuffer)
         }
         
+        await resetReconnectDelay()
         state = .idle
     }
     
@@ -248,9 +249,6 @@ actor HueEventStreamActor {
                 keychainKey: params.keychainKey,
                 tofuCallback: params.tofuCallback
             )
-            
-            // Reset backoff delay on successful reconnection attempt
-            await self.resetReconnectDelay()
         }
     }
     

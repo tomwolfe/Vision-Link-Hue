@@ -33,9 +33,6 @@ struct ARViewRepresentable: UIViewRepresentable {
     func makeUIView(context: Context) -> ARView {
         let arView = ARView(frame: .zero)
         
-        let configuration = ARWorldTrackingConfiguration().configuredWithEnvironment()
-        
-        arView.session.run(configuration)
         arView.session.delegate = context.coordinator
         
         self.onARViewReady(arView)
@@ -44,8 +41,6 @@ struct ARViewRepresentable: UIViewRepresentable {
     }
     
     func updateUIView(_ arView: ARView, context: Context) {
-        // Pass high-level session commands from ARSessionManager
-        // to the ARView's session
         if sessionManager.isSessionActive {
             if !context.coordinator.isSessionRunning {
                 let configuration = ARWorldTrackingConfiguration().configuredWithEnvironment()

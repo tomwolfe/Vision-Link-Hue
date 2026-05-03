@@ -3,19 +3,14 @@ import SwiftUI
 import Foundation
 
 /// RealityKit 2026 fixture HUD entity factory.
-/// Uses a BillboardComponent for automatic viewport-facing orientation.
-/// The FixtureHUDView SwiftUI view is available for future integration
-/// with RealityKit's ViewAttachmentComponent when the API becomes available.
-///
-/// This replaces the deprecated manual ViewAttachmentComponent and
-/// HUDAttachmentComponent components. All new fixture HUDs use the
-/// unified RealityKit 26 attachment system.
+/// Creates a visible billboard entity with a semi-transparent quad
+/// that always faces the camera for fixture tracking overlays.
 @MainActor
 final class FixtureHUDFactory {
     
-    /// Create a HUD entity for a tracked fixture using a billboard component
-    /// that always faces the camera. The FixtureHUDView SwiftUI view is
-    /// available for future integration with RealityKit's ViewAttachmentComponent.
+    /// Create a HUD entity for a tracked fixture with a visible billboard quad.
+    /// The entity uses a BillboardComponent to always face the camera and
+    /// displays a semi-transparent rounded-rect quad at the fixture's position.
     ///
     /// - Parameters:
     ///   - fixture: The tracked fixture to create a HUD for.
@@ -23,7 +18,23 @@ final class FixtureHUDFactory {
     ///   - anchor: The parent anchor entity for the HUD.
     /// - Returns: The created entity, or nil if creation fails.
     func createHUD(for fixture: TrackedFixture, in scene: RealityKit.Scene, parent anchor: Entity) -> Entity? {
-        let entity = ModelEntity()
+        let aspectRatio: Float = 2.0
+        let width: Float = 0.08
+        let height = width / aspectRatio
+        
+        let mesh = MeshResource.generateBox(
+            size: SIMD3<Float>(width, height, 0.001),
+            cornerRadius: 0.01
+        )
+        
+        let material = MeshMaterial()
+        material.color = .init(
+            diffuse: .init(color: .systemBackground),
+            roughness: .init(color: .init(color: .white))
+        )
+        material.opacity = .init(0.85, interpolation: .linear)
+        
+        let entity = ModelEntity(mesh: mesh, materials: [material])
         entity.name = "FixtureHUD-\(fixture.id.uuidString)"
         entity.position = fixture.position
         entity.orientation = fixture.orientation
