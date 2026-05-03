@@ -39,6 +39,15 @@ final class FixtureMapping {
     /// Whether this mapping has been synced to the Hue Bridge via SpatialAware.
     var isSyncedToBridge: Bool
     
+    /// Bridge room-space X coordinate (source of truth for persistence).
+    var bridgePositionX: Float?
+    
+    /// Bridge room-space Y coordinate (source of truth for persistence).
+    var bridgePositionY: Float?
+    
+    /// Bridge room-space Z coordinate (source of truth for persistence).
+    var bridgePositionZ: Float?
+    
     init(
         fixtureId: UUID,
         lightId: String? = nil,
@@ -62,6 +71,9 @@ final class FixtureMapping {
         self.confidence = confidence
         self.updatedAt = Date()
         self.isSyncedToBridge = false
+        self.bridgePositionX = nil
+        self.bridgePositionY = nil
+        self.bridgePositionZ = nil
     }
     
     /// Convenience accessor for the fixture UUID.

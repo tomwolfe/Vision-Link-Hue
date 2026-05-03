@@ -152,6 +152,36 @@ final class DetectionEngineTests: XCTestCase {
         XCTAssertTrue(result.isEmpty, "NMS with empty input should return empty result")
     }
     
+    // MARK: - Vision Coordinate Space Tests
+    
+    func testNormalizedRectYAxisFlipping() {
+        // Vision framework uses bottom-left origin.
+        // When creating a NormalizedRect from a Vision bounding box,
+        // the Y values must be flipped for ARKit/Camera coordinate space.
+        
+        // Simulate a Vision bounding box: minY=0.2 (bottom), maxY=0.8 (top)
+        // After flipping: topLeft.y = 1.0 - 0.8 = 0.2 (top in ARKit space)
+        //                  bottomRight.y = 1.0 - 0.2 = 0.8 (bottom in ARKit space)
+        
+        let visionMinY: Float = 0.2
+        let visionMaxY: Float = 0.8
+        
+        let flippedTopY = 1.0 - visionMaxY
+        let flippedBottomY = 1.0 - visionMinY
+        
+        XCTAssertEqual(flippedTopY, 0.2, accuracy: 0.001, "Flipped top Y should be 0.2")
+        XCTAssertEqual(flippedBottomY, 0.8, accuracy: 0.001, "Flipped bottom Y should be 0.8")
+        
+        // Verify the flipped rect has correct ordering
+        let rect = NormalizedRect(
+            topLeft: SIMD2<Float>(0.1, flippedTopY),
+            bottomRight: SIMD2<Float>(0.9, flippedBottomY)
+        )
+        
+        XCTAssertLessThan(rect.topLeft.y, rect.bottomRight.y, "Top Y should be less than bottom Y in ARKit space")
+        XCTAssertEqual(rect.height, 0.6, accuracy: 0.001, "Height should be preserved after flip")
+    }
+    
     // MARK: - Helper Methods
     
     /// Create a minimal test pixel buffer (1x1 RGBA).

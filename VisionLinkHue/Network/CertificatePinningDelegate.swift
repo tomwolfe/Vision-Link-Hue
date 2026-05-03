@@ -92,15 +92,6 @@ final class CertificatePinningDelegate: NSObject, URLSessionDelegate {
             return
         }
         
-        let secTrust = serverTrust
-        var error: CFError?
-        
-        guard SecTrustEvaluateWithError(secTrust, &error) else {
-            logger.warning("Server trust evaluation failed")
-            completionHandler(.cancelAuthenticationChallenge, nil)
-            return
-        }
-        
         guard let publicKey = SecTrustCopyPublicKey(secTrust),
               let publicKeyData = SecKeyCopyExternalRepresentation(publicKey, nil) as Data? else {
             logger.warning("Failed to extract public key from server trust")
@@ -109,15 +100,16 @@ final class CertificatePinningDelegate: NSObject, URLSessionDelegate {
         }
         
         let hash = publicKeyData.sha256()
+        let credential = URLCredential(trust: serverTrust)
         
         Task { [weak self] in
             guard let self else { return }
             
             if let result = await self.pinStore.evaluateChallenge(publicKeyHash: hash) {
-                completionHandler(result.0, result.1)
+                completionHandler(result.0, result.0 == .useCredential ? credential : nil)
             } else {
                 // TOFU mode: trust the certificate and save asynchronously.
-                completionHandler(.useCredential, nil)
+                completionHandler(.useCredential, credential)
                 await self.pinStore.savePinnedHash(hash)
             }
         }

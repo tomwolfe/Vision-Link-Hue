@@ -270,6 +270,25 @@ final class CalibrationTests: XCTestCase {
         XCTAssertFalse(mapped.z.isInfinite)
     }
     
+    func testKabschHandlesZeroPoints() {
+        // All-zero calibration points should not cause division by zero
+        engine.addCalibrationPoint(arKit: SIMD3<Float>(0, 0, 0), bridge: SIMD3<Float>(0, 0, 0))
+        engine.addCalibrationPoint(arKit: SIMD3<Float>(0, 0, 0), bridge: SIMD3<Float>(0, 0, 0))
+        engine.addCalibrationPoint(arKit: SIMD3<Float>(0, 0, 0), bridge: SIMD3<Float>(0, 0, 0))
+        
+        // Should handle gracefully - produces identity as fallback
+        XCTAssertTrue(engine.isCalibrated)
+        XCTAssertNotNil(engine.transformation)
+        
+        let mapped = engine.mapToBridgeSpace(SIMD3<Float>(1, 0, 0))
+        XCTAssertFalse(mapped.x.isNaN)
+        XCTAssertFalse(mapped.y.isNaN)
+        XCTAssertFalse(mapped.z.isNaN)
+        XCTAssertFalse(mapped.x.isInfinite)
+        XCTAssertFalse(mapped.y.isInfinite)
+        XCTAssertFalse(mapped.z.isInfinite)
+    }
+    
     func testKabschHandlesMultipleCalibrationPoints() {
         // Using more than 3 points should produce a more accurate result
         // via least-squares optimization

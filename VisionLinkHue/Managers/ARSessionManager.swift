@@ -32,8 +32,6 @@ final class ARSessionManager {
     private var anchorEntity: AnchorEntity?
     private var fixtureEntities: [UUID: Entity] = [:]
     
-    private var lastInferenceTime: TimeInterval = 0
-    
     /// Serial task queue for AR frame processing.
     /// Cancels any in-progress frame processing before starting a new one,
     /// preventing unbounded task accumulation when Vision processing stalls.
@@ -116,11 +114,6 @@ final class ARSessionManager {
             self.trackingState = .notAvailable
             #endif
         }
-        
-        // Throttle inference to DetectionConstants.inferenceInterval
-        let now = CFAbsoluteTimeGetCurrent()
-        guard now - lastInferenceTime >= DetectionConstants.inferenceInterval else { return }
-        lastInferenceTime = now
         
         // Cancel any in-progress frame processing to prevent task queue buildup.
         // This ensures only the latest frame is processed, dropping stale frames.

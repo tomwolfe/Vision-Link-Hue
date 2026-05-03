@@ -178,7 +178,7 @@ final class SpatialCalibrationEngine {
     private func inverseSqrtMatrix(_ M: simd_float3x3) -> simd_float3x3 {
         // Initial guess using trace
         let trace = M.columns.0.x + M.columns.1.y + M.columns.2.z
-        let scale = 1.0 / sqrt(trace)
+        let scale = 1.0 / sqrt(max(trace, 1e-6))
         var X = simd_float3x3(
             SIMD3<Float>(scale, 0, 0),
             SIMD3<Float>(0, scale, 0),

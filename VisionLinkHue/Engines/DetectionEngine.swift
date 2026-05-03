@@ -176,8 +176,8 @@ final class DetectionEngine {
             guard observation.boundingBox.width > DetectionConstants.minBoundingBoxSize && observation.boundingBox.height > DetectionConstants.minBoundingBoxSize else { continue }
             
             let region = NormalizedRect(
-                topLeft: SIMD2<Float>(Float(observation.boundingBox.minX), Float(observation.boundingBox.minY)),
-                bottomRight: SIMD2<Float>(Float(observation.boundingBox.maxX), Float(observation.boundingBox.maxY))
+                topLeft: SIMD2<Float>(Float(observation.boundingBox.minX), Float(1.0 - observation.boundingBox.maxY)),
+                bottomRight: SIMD2<Float>(Float(observation.boundingBox.maxX), Float(1.0 - observation.boundingBox.minY))
             )
             
             let type = classifier.classify(typeFrom: observation)
@@ -238,8 +238,9 @@ final class DetectionEngine {
     // MARK: - Neural Surface Material Detection
     
     /// Classify fixture material using ARKit 2026 Neural Surface Synthesis.
-    /// Samples material labels from the detection region's center and
-    /// surrounding area for robust classification.
+    /// Samples material labels across the full detection region for robust
+    /// classification. This handles fixtures with empty centers (ring-pendants,
+    /// chandeliers) that would otherwise sample the background behind the fixture.
     /// Returns material labels like "Glass", "Metal", "Wood" based on
     /// the ARMeshMaterialLabel of the detected surface.
     func classifyMaterial(from frame: ARFrame, at region: NormalizedRect? = nil) -> String? {
@@ -251,14 +252,15 @@ final class DetectionEngine {
             return nil
         }
         
-        let samplePoint: SIMD2<Float>
         if let region {
-            samplePoint = region.center
+            return materialClassifier.sampleMaterial(region: region, materialLabel: materialLabel)
         } else {
-            samplePoint = SIMD2<Float>(0.5, 0.5)
+            return materialClassifier.sampleMaterial(
+                at: SIMD2<Float>(0.5, 0.5),
+                in: frame,
+                materialLabel: materialLabel
+            )
         }
-        
-        return materialClassifier.sampleMaterial(at: samplePoint, in: frame, materialLabel: materialLabel)
         #else
         return nil
         #endif

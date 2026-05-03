@@ -80,14 +80,29 @@ struct NeuralSurfaceMaterialClassifier: Sendable {
         in frame: ARFrame,
         materialLabel: CVPixelBuffer
     ) -> String? {
+        sampleMaterial(region: NormalizedRect(
+            topLeft: normalizedPosition - SIMD2<Float>(Self.sampleRadius, Self.sampleRadius),
+            bottomRight: normalizedPosition + SIMD2<Float>(Self.sampleRadius, Self.sampleRadius)
+        ), materialLabel: materialLabel)
+    }
+    
+    /// Sample material labels across a normalized bounding region in the AR frame.
+    /// Uses a grid spread across the entire region with majority voting for robust
+    /// classification. This handles fixtures with empty centers (ring-pendants,
+    /// chandeliers) that would otherwise sample the background behind the fixture.
+    ///
+    /// - Parameters:
+    ///   - region: Normalized bounding box covering the fixture.
+    ///   - materialLabel: The raw material label pixel buffer from `sceneDepth.materialLabel`.
+    /// - Returns: The dominant material label string, or `nil` if no valid data.
+    func sampleMaterial(region: NormalizedRect, materialLabel: CVPixelBuffer) -> String? {
         let pixelWidth = Int(CVPixelBufferGetWidth(materialLabel))
         let pixelHeight = Int(CVPixelBufferGetHeight(materialLabel))
         
-        let basePx = Int(normalizedPosition.x * Float(pixelWidth))
-        let basePy = Int(normalizedPosition.y * Float(pixelHeight))
-        
-        let radius = Int(NeuralSurfaceMaterialClassifier.sampleRadius * Float(max(pixelWidth, pixelHeight)))
-        let clampedRadius = min(radius, 5)
+        let topLeftPx = Int(region.topLeft.x * Float(pixelWidth))
+        let topLeftPy = Int(region.topLeft.y * Float(pixelHeight))
+        let bottomRightPx = Int(region.bottomRight.x * Float(pixelWidth))
+        let bottomRightPy = Int(region.bottomRight.y * Float(pixelHeight))
         
         var voteCount: [String: Int] = [:]
         var totalSamples = 0
@@ -95,11 +110,10 @@ struct NeuralSurfaceMaterialClassifier: Sendable {
         CVPixelBufferLockBaseAddress(materialLabel, .readOnly)
         defer { CVPixelBufferUnlockBaseAddress(materialLabel, .readOnly) }
         
-        for dy in -clampedRadius...clampedRadius {
-            for dx in -clampedRadius...clampedRadius {
-                let px = basePx + dx
-                let py = basePy + dy
-                
+        let step = max(1, min(bottomRightPx - topLeftPx, bottomRightPy - topLeftPy) / 5)
+        
+        for py in stride(from: topLeftPy, through: bottomRightPy, by: step) {
+            for px in stride(from: topLeftPx, through: bottomRightPx, by: step) {
                 guard px >= 0, px < pixelWidth, py >= 0, py < pixelHeight else { continue }
                 
                 let label = extractMaterialLabel(from: materialLabel, pixelX: px, pixelY: py, width: pixelWidth)

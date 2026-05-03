@@ -61,9 +61,45 @@ final class FixturePersistence: Sendable {
         }
     }
     
+    /// Load persisted fixture mappings that have bridge-space coordinates.
+    /// These can be projected back into ARKit space using a calibration transform.
+    func loadMappingsWithBridgeSpace() -> [FixtureMapping] {
+        let descriptor = FetchDescriptor<FixtureMapping>(
+            predicate: #Predicate<FixtureMapping> {
+                $0.bridgePositionX != nil && $0.bridgePositionY != nil && $0.bridgePositionZ != nil
+            }
+        )
+        
+        do {
+            let mappings = try modelContext.fetch(descriptor)
+            return mappings.sorted { $0.updatedAt > $1.updatedAt }
+        } catch {
+            logger.error("Failed to load bridge-space fixture mappings: \(error.localizedDescription)")
+            return []
+        }
+    }
+    
+    /// Check if any persisted mappings have bridge-space coordinates.
+    func hasBridgeSpaceMappings() -> Bool {
+        let descriptor = FetchDescriptor<FixtureMapping>(
+            predicate: #Predicate<FixtureMapping> {
+                $0.bridgePositionX != nil
+            }
+        )
+        
+        do {
+            let count = try modelContext.count(descriptor)
+            return count > 0
+        } catch {
+            logger.error("Failed to check for bridge-space mappings: \(error.localizedDescription)")
+            return false
+        }
+    }
+    
     /// Save a fixture-light mapping with spatial coordinates atomically.
     /// Validates the spatial data before persisting to prevent malformed
     /// coordinate data from being stored in SwiftData.
+    /// Preserves bridge-space coordinates if already present.
     func saveMapping(
         fixtureId: UUID,
         lightId: String?,
@@ -72,6 +108,31 @@ final class FixturePersistence: Sendable {
         distanceMeters: Float,
         fixtureType: String,
         confidence: Double
+    ) {
+        saveMapping(
+            fixtureId: fixtureId,
+            lightId: lightId,
+            position: position,
+            orientation: orientation,
+            distanceMeters: distanceMeters,
+            fixtureType: fixtureType,
+            confidence: confidence,
+            bridgePosition: nil
+        )
+    }
+    
+    /// Save a fixture-light mapping with bridge-space coordinates.
+    /// Bridge-space coordinates are the source of truth for persistence,
+    /// allowing fixtures to be projected back into ARKit space on app launch.
+    func saveMapping(
+        fixtureId: UUID,
+        lightId: String?,
+        position: SIMD3<Float>,
+        orientation: simd_quatf,
+        distanceMeters: Float,
+        fixtureType: String,
+        confidence: Double,
+        bridgePosition: SIMD3<Float>?
     ) {
         // Validate spatial data before persisting
         guard validateSpatialData(position: position, orientation: orientation, distanceMeters: distanceMeters) else {
@@ -99,6 +160,11 @@ final class FixturePersistence: Sendable {
                 existing.fixtureType = fixtureType
                 existing.confidence = confidence
                 existing.updatedAt = Date()
+                if let bp = bridgePosition {
+                    existing.bridgePositionX = bp.x
+                    existing.bridgePositionY = bp.y
+                    existing.bridgePositionZ = bp.z
+                }
             } else {
                 let mapping = FixtureMapping(
                     fixtureId: fixtureId,
@@ -109,6 +175,11 @@ final class FixturePersistence: Sendable {
                     fixtureType: fixtureType,
                     confidence: confidence
                 )
+                if let bp = bridgePosition {
+                    mapping.bridgePositionX = bp.x
+                    mapping.bridgePositionY = bp.y
+                    mapping.bridgePositionZ = bp.z
+                }
                 modelContext.insert(mapping)
             }
             

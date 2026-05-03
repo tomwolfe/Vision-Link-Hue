@@ -603,4 +603,141 @@ final class PersistenceTests: XCTestCase {
         let mappings = persistence.loadMappings()
         XCTAssertEqual(mappings.count, 1, "Minimal valid position should be accepted")
     }
+    
+    // MARK: - Bridge Space Coordinate Tests
+    
+    func testSaveMappingWithBridgeSpaceCoordinates() {
+        let fixtureId = UUID()
+        let position = SIMD3<Float>(1.0, 2.0, 3.0)
+        let orientation = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: Float.pi / 4)
+        let bridgePosition = SIMD3<Float>(5.0, 1.5, 2.0)
+        
+        persistence.saveMapping(
+            fixtureId: fixtureId,
+            lightId: "test-light",
+            position: position,
+            orientation: orientation,
+            distanceMeters: 2.5,
+            fixtureType: "pendant",
+            confidence: 0.9,
+            bridgePosition: bridgePosition
+        )
+        
+        let mappings = persistence.loadMappings()
+        XCTAssertEqual(mappings.count, 1, "Mapping with bridge space should be accepted")
+        XCTAssertEqual(mappings.first?.bridgePositionX, 5.0)
+        XCTAssertEqual(mappings.first?.bridgePositionY, 1.5)
+        XCTAssertEqual(mappings.first?.bridgePositionZ, 2.0)
+    }
+    
+    func testLoadMappingsWithBridgeSpace() {
+        let fixtureId1 = UUID()
+        let fixtureId2 = UUID()
+        let position = SIMD3<Float>(1.0, 2.0, 3.0)
+        let orientation = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: Float.pi / 4)
+        
+        // Save one mapping with bridge space, one without
+        persistence.saveMapping(
+            fixtureId: fixtureId1,
+            lightId: "light-1",
+            position: position,
+            orientation: orientation,
+            distanceMeters: 2.0,
+            fixtureType: "ceiling",
+            confidence: 0.9,
+            bridgePosition: SIMD3<Float>(5.0, 1.0, 2.0)
+        )
+        persistence.saveMapping(
+            fixtureId: fixtureId2,
+            lightId: "light-2",
+            position: position,
+            orientation: orientation,
+            distanceMeters: 3.0,
+            fixtureType: "lamp",
+            confidence: 0.85
+        )
+        
+        let bridgeMappings = persistence.loadMappingsWithBridgeSpace()
+        XCTAssertEqual(bridgeMappings.count, 1, "Should only return mappings with bridge space")
+        XCTAssertEqual(bridgeMappings.first?.lightId, "light-1")
+        
+        let allMappings = persistence.loadMappings()
+        XCTAssertEqual(allMappings.count, 2, "Should return all mappings")
+    }
+    
+    func testHasBridgeSpaceMappingsReturnsTrue() {
+        let fixtureId = UUID()
+        let position = SIMD3<Float>(1.0, 2.0, 3.0)
+        let orientation = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: Float.pi / 4)
+        
+        XCTAssertFalse(persistence.hasBridgeSpaceMappings(), "Should be false with no mappings")
+        
+        persistence.saveMapping(
+            fixtureId: fixtureId,
+            lightId: "test-light",
+            position: position,
+            orientation: orientation,
+            distanceMeters: 2.0,
+            fixtureType: "ceiling",
+            confidence: 0.9,
+            bridgePosition: SIMD3<Float>(5.0, 1.0, 2.0)
+        )
+        
+        XCTAssertTrue(persistence.hasBridgeSpaceMappings(), "Should be true after saving bridge space")
+    }
+    
+    func testHasBridgeSpaceMappingsReturnsFalseWithoutBridgeSpace() {
+        let fixtureId = UUID()
+        let position = SIMD3<Float>(1.0, 2.0, 3.0)
+        let orientation = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: Float.pi / 4)
+        
+        persistence.saveMapping(
+            fixtureId: fixtureId,
+            lightId: "test-light",
+            position: position,
+            orientation: orientation,
+            distanceMeters: 2.0,
+            fixtureType: "ceiling",
+            confidence: 0.9
+        )
+        
+        XCTAssertFalse(persistence.hasBridgeSpaceMappings(), "Should be false without bridge space")
+    }
+    
+    func testUpdateMappingPreservesBridgeSpace() {
+        let fixtureId = UUID()
+        let position1 = SIMD3<Float>(1.0, 2.0, 3.0)
+        let position2 = SIMD3<Float>(4.0, 5.0, 6.0)
+        let orientation = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: Float.pi / 4)
+        let bridgePosition = SIMD3<Float>(5.0, 1.5, 2.0)
+        
+        persistence.saveMapping(
+            fixtureId: fixtureId,
+            lightId: "light-1",
+            position: position1,
+            orientation: orientation,
+            distanceMeters: 2.0,
+            fixtureType: "ceiling",
+            confidence: 0.9,
+            bridgePosition: bridgePosition
+        )
+        
+        var mappings = persistence.loadMappings()
+        XCTAssertEqual(mappings.first?.bridgePositionX, 5.0)
+        
+        // Update with new ARKit position but no bridge space (should preserve existing)
+        persistence.saveMapping(
+            fixtureId: fixtureId,
+            lightId: "light-1",
+            position: position2,
+            orientation: orientation,
+            distanceMeters: 3.0,
+            fixtureType: "ceiling",
+            confidence: 0.95
+        )
+        
+        mappings = persistence.loadMappings()
+        XCTAssertEqual(mappings.first?.bridgePositionX, 5.0, "Bridge space should be preserved after update")
+        XCTAssertEqual(mappings.first?.positionX, 4.0, "ARKit position should be updated")
+    }
 }
