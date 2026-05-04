@@ -114,7 +114,6 @@ xcodebuild test -scheme Vision-Link-Hue -destination 'platform=iOS Simulator,nam
 
 ### CI/CD
 - **Build & Test**: Validates compilation and runs `XCTest` suites on iOS Simulator.
-- **SBOM Generation**: Automatically generates a Software Bill of Materials for App Store compliance (`swift package generate-sbom`).
 - **Linting**: Checks code formatting and concurrency warnings.
 
 See [`.github/workflows/ci.yml`](.github/workflows/ci.yml) for pipeline configuration.
