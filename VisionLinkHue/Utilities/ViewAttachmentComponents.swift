@@ -18,28 +18,13 @@ final class FixtureHUDFactory {
     ///   - anchor: The parent anchor entity for the HUD.
     /// - Returns: The created entity, or nil if creation fails.
     func createHUD(for fixture: TrackedFixture, in scene: RealityKit.Scene, parent anchor: Entity) -> Entity? {
-        let aspectRatio: Float = 2.0
-        let width: Float = 0.08
-        let height = width / aspectRatio
-        
-        let mesh = MeshResource.generateBox(
-            size: SIMD3<Float>(width, height, 0.001),
-            cornerRadius: 0.01
-        )
-        
-        let material = MeshMaterial()
-        material.color = .init(
-            diffuse: .init(color: .systemBackground),
-            roughness: .init(color: .init(color: .white))
-        )
-        material.opacity = .init(0.85, interpolation: .linear)
-        
-        let entity = ModelEntity(mesh: mesh, materials: [material])
+        let entity = Entity()
         entity.name = "FixtureHUD-\(fixture.id.uuidString)"
         entity.position = fixture.position
         entity.orientation = fixture.orientation
         
         entity.components.set(BillboardComponent())
+        entity.components.set(ViewAttachmentComponent(rootView: FixtureHUDView(fixture: fixture)))
         
         anchor.addChild(entity)
         

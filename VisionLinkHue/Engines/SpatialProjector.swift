@@ -325,15 +325,9 @@ final class SpatialProjector {
         CVPixelBufferLockBaseAddress(depthMap, .readOnly)
         let baseAddress = CVPixelBufferGetBaseAddress(depthMap)!
         let bytesPerRow = CVPixelBufferGetBytesPerRow(depthMap)
-        let pointer = baseAddress.advanced(by: Int(py) * bytesPerRow + Int(px) * MemoryLayout<UInt16>.stride)
-        let depthValue = pointer.assumingMemoryBound(to: UInt16.self).pointee
+        let pointer = baseAddress.advanced(by: Int(py) * bytesPerRow + Int(px) * MemoryLayout<Float32>.stride)
+        let depthMeters = pointer.assumingMemoryBound(to: Float32.self).pointee
         CVPixelBufferUnlockBaseAddress(depthMap, [])
-        
-        guard depthIndex >= 0, depthIndex < pixelWidth * pixelHeight else {
-            return nil
-        }
-        
-        let depthMeters = Float(depthValue) / 1000.0
         
         guard depthMeters >= configuration.minDepthMeters,
               depthMeters <= configuration.maxDepthMeters else {

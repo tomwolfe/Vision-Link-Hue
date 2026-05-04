@@ -150,21 +150,23 @@ final class DetectionEngine {
         let request = VNDetectRectanglesRequest()
         request.minimumConfidence = DetectionConstants.rectangleMinimumConfidence
         
-        // Use structured concurrency with Task for proper cancellation support.
-        // In low-power mode, lower the task priority to reduce CPU/GPU load
-        // and prevent thermal throttling that forces LiDAR shut-off.
+        // Use detached task to prevent blocking the Main Actor during heavy
+        // Vision framework processing. In low-power mode, lower the task
+        // priority to reduce CPU/GPU load and prevent thermal throttling
+        // that forces LiDAR shut-off.
         let priority: TaskPriority = lowPower ? .utility : .userInitiated
         
-        return try await Task(priority: priority) {
+        let observations = try await Task.detached(priority: priority) {
             try handler.perform([request])
             
             guard let results = request.results as? [VNRectangleObservation] else {
-                return []
+                return [ObservationData]()
             }
             
-            let observations = results.map { ObservationData(boundingBox: $0.boundingBox) }
-            return await classifyFixtures(from: observations)
+            return results.map { ObservationData(boundingBox: $0.boundingBox) }
         }.value
+        
+        return classifyFixtures(from: observations)
     }
     
     /// Classify detected objects into fixture types using heuristic scoring.
