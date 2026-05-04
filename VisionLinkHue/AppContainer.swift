@@ -1,12 +1,135 @@
 import SwiftUI
 import ARKit
 
+/// Protocol for creating `HueStateStream` instances.
+/// Enables dependency injection of mock streams in tests.
+@MainActor
+protocol HueStateStreamFactory {
+    func create(persistence: FixturePersistence) -> HueStateStream
+}
+
+/// Protocol for creating `HueClient` instances.
+/// Enables dependency injection of mock clients in tests.
+@MainActor
+protocol HueClientFactory {
+    func create(stateStream: HueStateStream) -> HueClient
+}
+
+/// Protocol for creating `DetectionEngine` instances.
+/// Enables dependency injection of mock engines in tests.
+@MainActor
+protocol DetectionEngineFactory {
+    func create() -> DetectionEngine
+}
+
+/// Protocol for creating `SpatialProjector` instances.
+/// Enables dependency injection of mock projectors in tests.
+@MainActor
+protocol SpatialProjectorFactory {
+    func create() -> SpatialProjector
+}
+
+/// Protocol for creating `ARSessionManager` instances.
+/// Enables dependency injection of mock managers in tests.
+@MainActor
+protocol ARSessionManagerFactory {
+    func create(
+        detectionEngine: DetectionEngine,
+        spatialProjector: SpatialProjector,
+        hueClient: HueClient,
+        stateStream: HueStateStream,
+        fixturePersistence: FixturePersistence
+    ) -> ARSessionManager
+}
+
+/// Default implementations of all factory protocols.
+/// Used by `AppContainer` for production dependency creation.
+@MainActor
+final class DefaultFactories: @unchecked Sendable {
+    
+    let stateStreamFactory: HueStateStreamFactory
+    let hueClientFactory: HueClientFactory
+    let detectionEngineFactory: DetectionEngineFactory
+    let spatialProjectorFactory: SpatialProjectorFactory
+    let arSessionManagerFactory: ARSessionManagerFactory
+    
+    init(
+        stateStreamFactory: HueStateStreamFactory = DefaultHueStateStreamFactory(),
+        hueClientFactory: HueClientFactory = DefaultHueClientFactory(),
+        detectionEngineFactory: DetectionEngineFactory = DefaultDetectionEngineFactory(),
+        spatialProjectorFactory: SpatialProjectorFactory = DefaultSpatialProjectorFactory(),
+        arSessionManagerFactory: ARSessionManagerFactory = DefaultARSessionManagerFactory()
+    ) {
+        self.stateStreamFactory = stateStreamFactory
+        self.hueClientFactory = hueClientFactory
+        self.detectionEngineFactory = detectionEngineFactory
+        self.spatialProjectorFactory = spatialProjectorFactory
+        self.arSessionManagerFactory = arSessionManagerFactory
+    }
+}
+
+/// Default factory for `HueStateStream`.
+@MainActor
+final class DefaultHueStateStreamFactory: HueStateStreamFactory {
+    func create(persistence: FixturePersistence) -> HueStateStream {
+        let stream = HueStateStream(persistence: persistence)
+        stream.configure()
+        return stream
+    }
+}
+
+/// Default factory for `HueClient`.
+@MainActor
+final class DefaultHueClientFactory: HueClientFactory {
+    func create(stateStream: HueStateStream) -> HueClient {
+        let client = HueClient(stateStream: stateStream)
+        client.spatialService?.setHueClient(client)
+        return client
+    }
+}
+
+/// Default factory for `DetectionEngine`.
+@MainActor
+final class DefaultDetectionEngineFactory: DetectionEngineFactory {
+    func create() -> DetectionEngine {
+        DetectionEngine()
+    }
+}
+
+/// Default factory for `SpatialProjector`.
+@MainActor
+final class DefaultSpatialProjectorFactory: SpatialProjectorFactory {
+    func create() -> SpatialProjector {
+        SpatialProjector()
+    }
+}
+
+/// Default factory for `ARSessionManager`.
+@MainActor
+final class DefaultARSessionManagerFactory: ARSessionManagerFactory {
+    func create(
+        detectionEngine: DetectionEngine,
+        spatialProjector: SpatialProjector,
+        hueClient: HueClient,
+        stateStream: HueStateStream,
+        fixturePersistence: FixturePersistence
+    ) -> ARSessionManager {
+        ARSessionManager(
+            detectionEngine: detectionEngine,
+            spatialProjector: spatialProjector,
+            hueClient: hueClient,
+            stateStream: stateStream,
+            fixturePersistence: fixturePersistence
+        )
+    }
+}
+
 /// Centralized dependency injection container for the application.
 /// Initializes all core services once at app launch and provides
 /// deterministic access to dependencies throughout the view hierarchy.
 ///
-/// This eliminates manual dependency instantiation in `ContentView.init()`
-/// and makes each view testable in isolation with mock dependencies.
+/// Uses protocol-based factories for creating dependencies, enabling
+/// deep unit testing of the View layer with mock implementations.
 @MainActor
 final class AppContainer {
     
@@ -18,17 +141,19 @@ final class AppContainer {
     let arSessionManager: ARSessionManager
     let spatialProjector: SpatialProjector
     
-    private init() {
+    private let factories: DefaultFactories
+    
+    private init(factories: DefaultFactories = DefaultFactories()) {
+        self.factories = factories
+        
         let persistence = FixturePersistence.shared
-        let stream = HueStateStream(persistence: persistence)
-        stream.configure()
         
-        let client = HueClient(stateStream: stream)
-        client.spatialService?.setHueClient(client)
-        
-        let detector = DetectionEngine()
-        let projector = SpatialProjector()
-        let manager = ARSessionManager(
+        // Create dependencies through factories for testability.
+        let stream = factories.stateStreamFactory.create(persistence: persistence)
+        let client = factories.hueClientFactory.create(stateStream: stream)
+        let detector = factories.detectionEngineFactory.create()
+        let projector = factories.spatialProjectorFactory.create()
+        let manager = factories.arSessionManagerFactory.create(
             detectionEngine: detector,
             spatialProjector: projector,
             hueClient: client,

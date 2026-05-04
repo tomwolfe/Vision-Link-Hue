@@ -9,6 +9,54 @@ enum ARRelocalizationState: Sendable {
     case relocalizing(progress: Float)
     case relocalized
     case failed
+    /// Relocalization is failing; provides directional guidance for the user to look in a specific direction.
+    case failing(lookDirection: LookDirection, progress: Float)
+}
+
+/// Directional guidance for the user during relocalization failure.
+/// Derived from ARKit's feature point distribution analysis to tell the user
+/// which direction to pan the device to expose more tracked features.
+enum LookDirection: Sendable {
+    /// No specific direction; generic prompt.
+    case none
+    /// Pan the device to the left to expose more tracked features.
+    case left
+    /// Pan the device to the right to expose more tracked features.
+    case right
+    /// Pan the device upward to expose more tracked features.
+    case up
+    /// Pan the device downward to expose more tracked features.
+    case down
+    /// Move the device closer to the environment.
+    case closer
+    /// Move the device farther from the environment.
+    case farther
+    
+    /// Human-readable instruction for the HUD.
+    var instruction: String {
+        switch self {
+        case .none: return "Move your device slowly to help the app reconnect"
+        case .left: return "Look to your left to help reconnect"
+        case .right: return "Look to your right to help reconnect"
+        case .up: return "Look up to help reconnect"
+        case .down: return "Look down to help reconnect"
+        case .closer: return "Move your device closer to the room"
+        case .farther: return "Move your device farther from the room"
+        }
+    }
+    
+    /// System image name for the directional arrow icon.
+    var icon: String {
+        switch self {
+        case .none: return "arrow.forward.circle"
+        case .left: return "arrow.left.circle.fill"
+        case .right: return "arrow.right.circle.fill"
+        case .up: return "arrow.up.circle.fill"
+        case .down: return "arrow.down.circle.fill"
+        case .closer: return "arrow.inward.circle.fill"
+        case .farther: return "arrow.outward.circle.fill"
+        }
+    }
 }
 
 /// Manages the AR session lifecycle and bridges ARKit frames to
@@ -45,6 +93,7 @@ final class ARSessionManager {
     private let hudFactory: FixtureHUDFactory
     private let provider: CameraConfigurationProvider
     private let fixturePersistence: FixturePersistence
+    private let relocalizationGuide: RelocalizationGuide
     
     private var arView: ARView?
     private var anchorEntity: AnchorEntity?
@@ -75,7 +124,8 @@ final class ARSessionManager {
         stateStream: HueStateStream,
         fixturePersistence: FixturePersistence = FixturePersistence.shared,
         hudFactory: FixtureHUDFactory = FixtureHUDFactory(),
-        provider: CameraConfigurationProvider = DefaultCameraConfigurationProvider()
+        provider: CameraConfigurationProvider = DefaultCameraConfigurationProvider(),
+        relocalizationGuide: RelocalizationGuide = RelocalizationGuide()
     ) {
         self.detectionEngine = detectionEngine
         self.spatialProjector = spatialProjector
@@ -84,6 +134,7 @@ final class ARSessionManager {
         self.fixturePersistence = fixturePersistence
         self.hudFactory = hudFactory
         self.provider = provider
+        self.relocalizationGuide = relocalizationGuide
     }
     
     // MARK: - Session Lifecycle
@@ -138,6 +189,9 @@ final class ARSessionManager {
     private func attemptRelocalization(using worldMap: ARWorldMap, in arView: ARView) async {
         guard let session = arView.session as? ARSession else { return }
         
+        // Reset relocalization guide state for the new attempt.
+        relocalizationGuide.reset()
+        
         isRelocalizing = true
         relocalizationState = .relocalizing(progress: 0.0)
         logger.info("Attempting relocalization with saved world map")
@@ -179,14 +233,34 @@ final class ARSessionManager {
     }
     
     /// Monitor the session state to detect successful relocalization.
+    /// Provides directional guidance to the user when tracking is limited.
     private func waitForRelocalizationCompletion() async {
         guard let session = arView?.session as? ARSession else { return }
         
         let startTime = ContinuousClock.now
         let timeout = Duration.seconds(15)
+        var lastGuidanceUpdate: ContinuousClock.Instant = .now
+        let guidanceInterval = Duration.seconds(2)
         
         while !Task.isCancelled {
-            let snapshot = session.currentFrame?.camera.trackingState
+            let frame = session.currentFrame
+            let snapshot = frame?.camera.trackingState
+            
+            // Analyze frame for directional guidance at regular intervals.
+            let elapsedSinceGuidance = ContinuousClock.now - lastGuidanceUpdate
+            if elapsedSinceGuidance >= guidanceInterval, let frame = frame {
+                let confidence = frame?.camera.trackingState == .limited ? 0.3 : 0.6
+                let direction = relocalizationGuide.analyzeFrame(frame, confidence: confidence)
+                
+                if direction != .none {
+                    await MainActor.run {
+                        let progress = min(self.relocalizationProgress, 0.9)
+                        self.relocalizationState = .failing(lookDirection: direction, progress: progress)
+                    }
+                }
+                
+                lastGuidanceUpdate = .now
+            }
             
             if snapshot == .normal || snapshot == .limited(.localization) {
                 await MainActor.run {
@@ -203,8 +277,17 @@ final class ARSessionManager {
             let elapsed = ContinuousClock.now - startTime
             if elapsed >= timeout {
                 await MainActor.run {
-                    self.isRelocalizing = false
-                    self.relocalizationState = .failed
+                    // Provide final directional guidance before failure.
+                    if let frame = frame {
+                        let direction = relocalizationGuide.analyzeFrame(frame, confidence: 0.1)
+                        if direction != .none {
+                            self.relocalizationState = .failing(lookDirection: direction, progress: 0.0)
+                        } else {
+                            self.relocalizationState = .failed
+                        }
+                    } else {
+                        self.relocalizationState = .failed
+                    }
                     self.relocalizationProgress = 0.0
                 }
                 logger.warning("Relocalization timed out")
@@ -269,7 +352,15 @@ final class ARSessionManager {
                     self.relocalizationProgress = 1.0
                     self.worldMapCaptureTask?.cancel()
                     self.worldMapCaptureTask = nil
+                    self.relocalizationGuide.reset()
                     logger.info("Relocalization completed from frame tracking")
+                } else {
+                    // Update feature density for trend analysis during relocalization.
+                    let depthMap = frame.sceneDepth?.depthMap
+                    if let depthMap = depthMap {
+                        let density = self.computeFeatureDensity(depthMap)
+                        self.relocalizationGuide.updateFeatureDensity(density)
+                    }
                 }
             }
             #else
@@ -451,6 +542,46 @@ final class ARSessionManager {
         
         // Capture and save the world map for session persistence
         await captureAndSaveWorldMap()
+    }
+    
+    /// Compute the feature density from a depth map.
+    /// Returns a value between 0.0 and 1.0 representing the ratio of
+    /// valid depth pixels to total pixels, indicating how many visual
+    /// features are available for ARKit tracking.
+    private func computeFeatureDensity(_ depthMap: CVPixelBuffer) -> Float {
+        CVPixelBufferLockBaseAddress(depthMap, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
+        
+        let width = CVPixelBufferGetWidth(depthMap)
+        let height = CVPixelBufferGetHeight(depthMap)
+        let bytesPerRow = CVPixelBufferGetBytesPerRow(depthMap)
+        
+        guard let pointer = CVPixelBufferGetBaseAddress(depthMap) else {
+            return 0.0
+        }
+        
+        var validCount = 0
+        let totalPixels = width * height
+        
+        // Sample a subset of pixels for performance (every 4th pixel).
+        let stride = 4
+        let sampleWidth = (width + stride - 1) / stride
+        let sampleHeight = (height + stride - 1) / stride
+        let totalSamples = sampleWidth * sampleHeight
+        
+        for y in stride.stride(to: height, by: stride) {
+            for x in stride.stride(to: width, by: stride) {
+                let byteOffset = y * bytesPerRow + x * 4
+                let depthValue = Int32(pointer.load(fromByteOffset: byteOffset, as: Int32.self))
+                
+                // Valid depth values are positive and within reasonable range.
+                if depthValue > 0 && depthValue < 65535 {
+                    validCount += 1
+                }
+            }
+        }
+        
+        return Float(validCount) / Float(totalSamples)
     }
     
 }

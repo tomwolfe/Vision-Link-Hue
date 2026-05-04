@@ -21,12 +21,11 @@ enum PinchGestureState: Sendable {
 /// `TrackedFixture` and maps vertical pinch movement to brightness
 /// control via the `HueClient` API.
 ///
-/// Uses Vision framework's `VNDetectHandPoseRequest` for hand detection
-/// and applies geometric heuristics to identify pinching behavior from
-/// landmark proximity and vertical displacement.
+/// Conforms to `SpatialInputHandler` for unified input handling alongside
+/// gaze-based targeting on Apple Vision Pro.
 @MainActor
 @Observable
-final class GestureManager: Sendable {
+final class GestureManager: SpatialInputHandler, Sendable {
     
     /// Whether hand tracking is currently enabled.
     var isHandTrackingEnabled: Bool = false
@@ -39,6 +38,15 @@ final class GestureManager: Sendable {
     
     /// The current pinch gesture state.
     var pinchState: PinchGestureState = .inactive
+    
+    /// Whether this input system is currently active.
+    var isActive: Bool { isHandTrackingEnabled }
+    
+    /// The current target position in world space, if available.
+    var targetPosition: SIMD3<Float>?
+    
+    /// Whether the user is actively selecting (pinching or gazing).
+    var isSelecting: Bool { pinchState != .inactive }
     
     /// The last recognized brightness level from pinch control.
     var lastBrightness: Int = 100
@@ -95,6 +103,32 @@ final class GestureManager: Sendable {
     ) {
         self.hueClient = hueClient
         self.trackedFixtures = trackedFixtures
+    }
+    
+    /// Update the current target based on gaze direction (no-op for hand-tracking).
+    /// GestureManager handles hand-based input only; gaze targeting is delegated
+    /// to `GazeTargetingSystem`. This method satisfies the `SpatialInputHandler` protocol.
+    func updateGazeTarget(gazeOrigin: SIMD3<Float>, gazeDirection: SIMD3<Float>, cameraTransform: simd_float4x4) {
+        // No-op: hand-tracking gesture manager does not process gaze input.
+        // Gaze targeting is handled by GazeTargetingSystem.
+    }
+    
+    /// Begin a selection gesture. For hand-tracking, this starts the pinch sequence.
+    func beginSelection() {
+        pinchState = .began
+        isPinching = true
+        logger.debug("Selection gesture began via hand tracking")
+    }
+    
+    /// End a selection gesture. For hand-tracking, this completes the pinch.
+    func endSelection() {
+        if pinchState != .inactive {
+            let finalBrightness = clampBrightness(lastBrightness + Int(pinchState == .active(brightnessDelta: 0) ? 0 : 0))
+            pinchState = .ended(finalBrightness: finalBrightness)
+            lastBrightness = finalBrightness
+            isPinching = false
+            logger.debug("Selection gesture ended via hand tracking: brightness=\(finalBrightness)")
+        }
     }
     
     /// Process a hand pose observation and update gesture state.

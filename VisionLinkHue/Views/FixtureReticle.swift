@@ -14,6 +14,12 @@ enum ReticleVisualState: Sendable {
     case connecting(progress: Float)
     /// Relocalization failed, showing retry state.
     case relocalizationFailed
+    /// User is gazing at the fixture (Vision Pro).
+    case gazeTargeted
+    /// User is fixating on the fixture with dwell selection in progress.
+    case gazeDwell(progress: Float)
+    /// User is actively selecting via gaze (pinch-confirm after gaze).
+    case gazeSelecting
 }
 
 /// 3D reticle overlay shown at detected fixture positions.
@@ -51,6 +57,22 @@ struct FixtureReticle: View {
         }
     }
     
+    /// Whether the reticle is being gazed at.
+    private var isGazeTargeted: Bool {
+        switch visualState {
+        case .gazeTargeted, .gazeDwell, .gazeSelecting: return true
+        default: return false
+        }
+    }
+    
+    /// Current dwell progress from gaze targeting.
+    private var gazeDwellProgress: Float {
+        switch visualState {
+        case .gazeDwell(let progress): return progress
+        default: return 0.0
+        }
+    }
+    
     /// Current brightness value from pinch gesture.
     private var currentBrightness: Int {
         switch visualState {
@@ -64,6 +86,11 @@ struct FixtureReticle: View {
             // Connecting ring animation for relocalization state
             if isConnecting {
                 connectingRing
+            }
+            
+            // Gaze dwell ring animation for Vision Pro
+            if isGazeTargeted {
+                gazeDwellRing
             }
             
             // Outer ring - glass effect
@@ -201,6 +228,24 @@ struct FixtureReticle: View {
             .opacity(connectingOpacity)
     }
     
+    // MARK: - Gaze Dwell Ring
+    
+    private var gazeDwellRing: some View {
+        Circle()
+            .trim(from: 0, to: gazeDwellProgress)
+            .stroke(
+                LinearGradient(
+                    colors: [.purple.opacity(0.8), .purple.opacity(0.3)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ),
+                style: StrokeStyle(lineWidth: 3, lineCap: .round)
+            )
+            .frame(width: 80, height: 80)
+            .rotationEffect(.degrees(gazeDwellProgress * 360.0))
+            .opacity(isGazeTargeted ? 0.8 : 0.0)
+    }
+    
     private var connectingRotation: Double {
         switch visualState {
         case .connecting(let progress):
@@ -223,6 +268,10 @@ struct FixtureReticle: View {
         switch visualState {
         case .pinchActive:
             return [.orange.opacity(0.7), .yellow.opacity(0.4), .orange.opacity(0.2)]
+        case .gazeSelecting:
+            return [.purple.opacity(0.7), .indigo.opacity(0.4), .purple.opacity(0.2)]
+        case .gazeTargeted, .gazeDwell:
+            return [.purple.opacity(0.6), .indigo.opacity(0.3), .purple.opacity(0.1)]
         case .handNearby:
             return [.white.opacity(0.7), .blue.opacity(0.4), .white.opacity(0.2)]
         default:
@@ -232,8 +281,8 @@ struct FixtureReticle: View {
     
     private var pinchLineWidth: CGFloat {
         switch visualState {
-        case .pinchActive: return 3
-        case .handNearby: return 2.5
+        case .pinchActive, .gazeSelecting: return 3
+        case .handNearby, .gazeTargeted, .gazeDwell: return 2.5
         default: return 2
         }
     }
@@ -241,7 +290,8 @@ struct FixtureReticle: View {
     private var pinchRingSize: CGFloat {
         switch visualState {
         case .pinchActive: return 68
-        case .handNearby: return 64
+        case .gazeSelecting: return 72
+        case .handNearby, .gazeTargeted, .gazeDwell: return 64
         default: return 60
         }
     }
@@ -249,6 +299,7 @@ struct FixtureReticle: View {
     private var pinchingDotColor: Color {
         switch visualState {
         case .pinchActive: return .orange.opacity(0.9)
+        case .gazeSelecting, .gazeTargeted, .gazeDwell: return .purple.opacity(0.9)
         case .handNearby: return .blue.opacity(0.7)
         default: return .white.opacity(0.9)
         }
@@ -257,7 +308,8 @@ struct FixtureReticle: View {
     private var pinchingDotSize: CGFloat {
         switch visualState {
         case .pinchActive: return 6
-        case .handNearby: return 5
+        case .gazeSelecting: return 7
+        case .handNearby, .gazeTargeted, .gazeDwell: return 5
         default: return 4
         }
     }
