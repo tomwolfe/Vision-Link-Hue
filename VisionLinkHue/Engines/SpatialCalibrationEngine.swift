@@ -2,11 +2,86 @@ import Foundation
 import simd
 import os
 
+// MARK: - SpatialCalibrationEngine
+
 /// Engine that computes the optimal rigid-body transformation (rotation + translation)
 /// between ARKit local space and Bridge Room Space coordinates using the Kabsch algorithm.
 ///
-/// The Kabsch algorithm uses singular value decomposition (SVD) to find the optimal
-/// rotation matrix that minimizes the RMSD between two centered point sets.
+/// ## Mathematical Background
+///
+/// The Kabsch algorithm solves the **orthogonal Procrustes problem**: given two
+/// centered point sets P and Q, find the rotation matrix R that minimizes the
+/// root-mean-square deviation (RMSD):
+///
+/// ```
+/// E(R) = Σᵢ ||qᵢ - R·pᵢ||²
+/// ```
+///
+/// where `pᵢ` are source points (ARKit coordinates) and `qᵢ` are target points
+/// (Bridge Room Space coordinates).
+///
+/// The algorithm avoids SVD by using **polar decomposition**:
+///
+/// ```
+/// R = H · (Hᵀ · H)^(-½)
+/// ```
+///
+/// where `H` is the 3×3 covariance matrix between the centered point sets:
+///
+/// ```
+/// H = Σᵢ (qᵢ - q̄) · (pᵢ - p̄)ᵀ
+/// ```
+///
+/// The inverse square root `(Hᵀ · H)^(-½)` is computed via **Newton-Raphson
+/// iteration**, which converges quadratically to the matrix inverse square root:
+///
+/// ```
+/// X_{n+1} = ½ · X_n · (3I - M · X_n²)
+/// ```
+///
+/// where `M = Hᵀ · H` and `X₀ = I / √(tr(M))` is the initial trace-based guess.
+///
+/// ## Implementation Notes
+///
+/// - **Numerical stability**: The Newton-Raphson method avoids the numerical
+///   instability of direct SVD on ill-conditioned covariance matrices. A
+///   determinant check (`det(HTH) > 1e-6`) guards against singular matrices
+///   caused by collinear calibration points.
+///
+/// - **Reflection handling**: After computing `R`, the determinant is checked.
+///   If `det(R) < 0`, the matrix represents a reflection rather than a rotation.
+///   The algorithm flips the column corresponding to the smallest singular value
+///   to enforce a proper rotation (`det(R) = +1`).
+///
+/// - **Gram-Schmidt re-orthogonalization**: Applied after polar decomposition
+///   to ensure strict orthogonality of the rotation matrix columns, correcting
+///   for accumulated floating-point errors.
+///
+/// ## Transformation Formula
+///
+/// The full rigid-body transformation maps a source point `p` to the target space:
+///
+/// ```
+/// q = R · p + t
+/// ```
+///
+/// where the translation `t` is:
+///
+/// ```
+/// t = q̄ - R · p̄
+/// ```
+///
+/// and `p̄`, `q̄` are the centroids of the source and target point sets.
+///
+/// ## RMSD Computation
+///
+/// The root-mean-square deviation after transformation is:
+///
+/// ```
+/// RMSD = √( Σᵢ ||qᵢ - (R·pᵢ + t)||² / n )
+/// ```
+///
+/// This provides a per-point error metric for calibration quality assessment.
 ///
 /// Supports persistence of the transformation matrix via `PersistenceStore` protocol,
 /// enabling automatic calibration restoration when ARKit re-localizes in a known room.
@@ -155,6 +230,58 @@ final class SpatialCalibrationEngine {
     // MARK: - Kabsch Algorithm Implementation
     
     /// Compute the optimal rigid-body transformation using the Kabsch algorithm.
+    ///
+    /// ## Algorithm Steps
+    ///
+    /// 1. **Centroid Computation**: Calculate the centroid of each point set:
+    ///    ```
+    ///    p̄ = (1/n) · Σᵢ pᵢ
+    ///    q̄ = (1/n) · Σᵢ qᵢ
+    ///    ```
+    ///
+    /// 2. **Centering**: Subtract centroids to center each point set at the origin:
+    ///    ```
+    ///    p'ᵢ = pᵢ - p̄
+    ///    q'ᵢ = qᵢ - q̄
+    ///    ```
+    ///
+    /// 3. **Covariance Matrix**: Compute the 3×3 covariance matrix:
+    ///    ```
+    ///    H = Σᵢ q'ᵢ · (p'ᵢ)ᵀ
+    ///    ```
+    ///    In column-major form (simd_float3x3):
+    ///    ```
+    ///    H = [q'₁·p'₁ₓ  q'₁·p'₁ᵧ  q'₁·p'₁ᵤ]
+    ///        [q'₂·p'₂ₓ  q'₂·p'₂ᵧ  q'₂·p'₂ᵤ]
+    ///        [q'₃·p'₃ₓ  q'₃·p'₃ᵧ  q'₃·p'₃ᵤ]
+    ///    ```
+    ///
+    /// 4. **Polar Decomposition**: Compute the optimal rotation via:
+    ///    ```
+    ///    R = H · (Hᵀ · H)^(-½)
+    ///    ```
+    ///    The inverse square root is computed via Newton-Raphson iteration.
+    ///
+    /// 5. **Reflection Correction**: If `det(R) < 0`, flip the column corresponding
+    ///    to the smallest singular value to ensure a proper rotation.
+    ///
+    /// 6. **Gram-Schmidt Re-orthogonalization**: Enforce strict orthogonality.
+    ///
+    /// 7. **Translation**: Compute the translation vector:
+    ///    ```
+    ///    t = q̄ - R · p̄
+    ///    ```
+    ///
+    /// ## Convergence Guarantees
+    ///
+    /// The Newton-Raphson iteration for matrix inverse square root converges
+    /// quadratically when the initial guess `X₀ = I / √(tr(M))` is within
+    /// the convergence basin. For well-conditioned covariance matrices
+    /// (`det(HTH) > 1e-6`), convergence is typically achieved in 5-10 iterations.
+    /// The implementation caps iterations at 20 with an epsilon of 1e-5 for
+    /// robust termination.
+    ///
+    /// - Note: Requires at least 3 non-collinear calibration points.
     private func computeTransformation() {
         guard calibrationPoints.count >= Self.minCalibrationPoints else { return }
         
@@ -202,8 +329,53 @@ final class SpatialCalibrationEngine {
     }
     
     /// Compute the optimal rotation matrix using the Kabsch algorithm.
-    /// Uses polar decomposition: R = H * (H^T * H)^(-1/2)
-    /// This avoids the need for SVD while providing numerically stable results.
+    ///
+    /// ## Mathematical Derivation
+    ///
+    /// Given the covariance matrix `H`, the optimal rotation `R` is found via
+    /// **polar decomposition** of `H`:
+    ///
+    /// ```
+    /// H = R · S
+    /// ```
+    ///
+    /// where `S` is a symmetric positive-definite matrix. The rotation factor
+    /// `R` is extracted as:
+    ///
+    /// ```
+    /// R = H · (Hᵀ · H)^(-½)
+    /// ```
+    ///
+    /// This follows from the identity `S = √(Hᵀ · H)`, so `S^(-1) = (Hᵀ · H)^(-½)`.
+    ///
+    /// ## Reflection Handling
+    ///
+    /// If `det(R) < 0`, the decomposition produces an improper rotation
+    /// (a reflection). The algorithm corrects this by flipping the column
+    /// of `R` corresponding to the smallest singular value of `H`:
+    ///
+    /// ```
+    /// If det(R) < 0:
+    ///     R[:, k] = -R[:, k]   where k = argmin_j σⱼ
+    /// ```
+    ///
+    /// This ensures `det(R) = +1`, enforcing a proper rotation.
+    ///
+    /// ## Gram-Schmidt Re-orthogonalization
+    ///
+    /// After polar decomposition, floating-point errors may cause columns
+    /// to deviate from strict orthogonality. The Gram-Schmidt process
+    /// re-orthogonalizes:
+    ///
+    /// ```
+    /// c₀ = normalize(h₀)
+    /// c₁ = normalize(h₁ - (c₀ · h₁) · c₀)
+    /// c₂ = normalize(c₀ × c₁)
+    /// R = [c₀ c₁ c₂]
+    /// ```
+    ///
+    /// - Parameter covMatrix: The 3×3 covariance matrix `H` between centered point sets.
+    /// - Returns: A 3×3 orthogonal rotation matrix with `det(R) = +1`.
     private func kabschRotation(from covMatrix: simd_float3x3) -> simd_float3x3 {
         let H = covMatrix
         let HTH = H.transpose * H
@@ -234,7 +406,64 @@ final class SpatialCalibrationEngine {
         return R
     }
     
-    /// Compute the inverse square root of a 3x3 matrix using Newton's method.
+    /// Compute the inverse square root of a 3×3 positive-definite matrix using Newton's method.
+    ///
+    /// ## Newton-Raphson Iteration
+    ///
+    /// Given a positive-definite matrix `M`, we seek `X = M^(-½)` such that:
+    ///
+    /// ```
+    /// X · X = M^(-1)
+    /// ```
+    ///
+    /// Equivalently, `Y = X^(-1)` satisfies `Y · Y = M`, and `X = Y^(-1)`.
+    ///
+    /// The Newton-Raphson iteration for `M^(-½)` is:
+    ///
+    /// ```
+    /// X_{n+1} = ½ · X_n · (3I - M · X_n²)
+    /// ```
+    ///
+    /// This iteration converges quadratically: the number of correct digits
+    /// approximately doubles each iteration.
+    ///
+    /// ## Initial Guess
+    ///
+    /// The initial guess uses the trace of `M`:
+    ///
+    /// ```
+    /// X₀ = I / √(tr(M)) = I / √(Σᵢ Mᵢᵢ)
+    /// ```
+    ///
+    /// This is derived from the observation that for a scaled identity matrix
+    /// `M = αI`, the inverse square root is `X = (1/√α) · I`, and `tr(M) = 3α`.
+    ///
+    /// ## Convergence Criterion
+    ///
+    /// The iteration terminates when the Frobenius-norm difference between
+    /// successive iterates falls below `ε = 1e-5`:
+    ///
+    /// ```
+    /// ||X_{n+1} - X_n||_F ≤ ε
+    /// ```
+    ///
+    /// where `||·||_F` is the Frobenius norm:
+    ///
+    /// ```
+    /// ||A||_F = √(Σᵢⱼ Aᵢⱼ²)
+    /// ```
+    ///
+    /// The iteration is capped at 20 iterations to prevent infinite loops
+    /// in degenerate cases.
+    ///
+    /// ## Numerical Stability
+    ///
+    /// The trace-based initial guess ensures `X₀` is well-scaled, preventing
+    /// divergence for matrices with large condition numbers. The `max(trace, 1e-6)`
+    /// guard prevents division by zero for zero-trace matrices.
+    ///
+    /// - Parameter M: A 3×3 positive-definite matrix (typically `Hᵀ · H`).
+    /// - Returns: The inverse square root `M^(-½)`.
     private func inverseSqrtMatrix(_ M: simd_float3x3) -> simd_float3x3 {
         // Initial guess using trace
         let trace = M.columns.0.x + M.columns.1.y + M.columns.2.z
@@ -273,7 +502,30 @@ final class SpatialCalibrationEngine {
         return X
     }
     
-    /// Compute the determinant of a 3x3 matrix.
+    /// Compute the determinant of a 3×3 matrix.
+    ///
+    /// ## Sarrus' Rule
+    ///
+    /// Uses the direct expansion formula for 3×3 determinants:
+    ///
+    /// ```
+    /// det(M) = a(ei - fh) - b(di - fg) + c(dh - eg)
+    /// ```
+    ///
+    /// where the matrix is:
+    ///
+    /// ```
+    /// [a b c]
+    /// [d e f]
+    /// [g h i]
+    /// ```
+    ///
+    /// The determinant is used to:
+    /// - Check if `HTH` is near-singular (`det(HTH) < 1e-6`)
+    /// - Detect reflections in the rotation matrix (`det(R) < 0`)
+    ///
+    /// - Parameter M: A 3×3 matrix.
+    /// - Returns: The determinant value.
     private func determinant(_ M: simd_float3x3) -> Float {
         let a = M.columns.0.x
         let b = M.columns.0.y
@@ -288,7 +540,40 @@ final class SpatialCalibrationEngine {
         return a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g)
     }
     
-    /// Orthogonalize a 3x3 matrix using Gram-Schmidt process.
+    /// Orthogonalize a 3×3 matrix using the Gram-Schmidt process.
+    ///
+    /// ## Gram-Schmidt Process
+    ///
+    /// Given three column vectors `h₀, h₁, h₂`, the Gram-Schmidt process
+    /// produces an orthonormal basis:
+    ///
+    /// ```
+    /// c₀ = h₀ / ||h₀||
+    ///
+    /// c₁ = (h₁ - (c₀ · h₁) · c₀) / ||h₁ - (c₀ · h₁) · c₀||
+    ///
+    /// c₂ = (c₀ × c₁) / ||c₀ × c₁||
+    /// ```
+    ///
+    /// The result is a rotation matrix `[c₀ c₁ c₂]` where:
+    /// - `||cᵢ|| = 1` for all columns (unit length)
+    /// - `cᵢ · cⱼ = 0` for `i ≠ j` (mutually orthogonal)
+    /// - `c₀ × c₁ = c₂` (right-handed coordinate system)
+    ///
+    /// ## Why Re-orthogonalize?
+    ///
+    /// After polar decomposition, accumulated floating-point errors may cause
+    /// the rotation matrix columns to deviate from strict orthogonality. This
+    /// can lead to:
+    /// - Scale distortion when transforming coordinates
+    /// - Drift in repeated transformations
+    /// - Numerical instability in subsequent calculations
+    ///
+    /// Gram-Schmidt re-orthogonalization corrects these issues with minimal
+    /// computational cost.
+    ///
+    /// - Parameter M: A 3×3 matrix with approximately orthogonal columns.
+    /// - Returns: A strictly orthogonal 3×3 rotation matrix.
     private func orthogonalize(_ M: simd_float3x3) -> simd_float3x3 {
         var c0 = normalize(M.columns.0)
         var c1 = M.columns.1 - c0 * dot(c0, M.columns.1)

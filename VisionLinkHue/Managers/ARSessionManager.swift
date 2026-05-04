@@ -99,6 +99,7 @@ final class ARSessionManager {
     private let fixturePersistence: FixturePersistence
     private let relocalizationGuide: RelocalizationGuide
     private let objectAnchorService: ObjectAnchorPersistenceService
+    private let clusterEngine: SpatialClusterEngine
     
     private var arView: ARView?
     private var anchorEntity: AnchorEntity?
@@ -134,7 +135,8 @@ final class ARSessionManager {
         hudFactory: FixtureHUDFactory = FixtureHUDFactory(),
         provider: CameraConfigurationProvider = DefaultCameraConfigurationProvider(),
         relocalizationGuide: RelocalizationGuide = RelocalizationGuide(),
-        objectAnchorService: ObjectAnchorPersistenceService = ObjectAnchorPersistenceService()
+        objectAnchorService: ObjectAnchorPersistenceService = ObjectAnchorPersistenceService(),
+        clusterEngine: SpatialClusterEngine = SpatialClusterEngine()
     ) {
         self.detectionEngine = detectionEngine
         self.spatialProjector = spatialProjector
@@ -145,6 +147,11 @@ final class ARSessionManager {
         self.provider = provider
         self.relocalizationGuide = relocalizationGuide
         self.objectAnchorService = objectAnchorService
+        self.clusterEngine = clusterEngine
+        
+        clusterEngine.onClustersChange = { [weak self] _ in
+            self?.stateStream.clusters = self?.clusterEngine.clusters ?? []
+        }
     }
     
     // MARK: - Session Lifecycle
@@ -485,6 +492,9 @@ final class ARSessionManager {
                     }
                 }
                 self.anchorCount = self.trackedFixtures.count
+                
+                // Update spatial clusters from tracked fixtures.
+                self.clusterEngine.configure(trackedFixtures: self.trackedFixtures)
             }
         } catch {
             await MainActor.run {

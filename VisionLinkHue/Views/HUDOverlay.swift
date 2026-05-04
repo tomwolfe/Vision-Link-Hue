@@ -50,6 +50,20 @@ struct HUDOverlay: View {
                 
                 Spacer()
                 
+                // Cluster status
+                if !stateStream.clusters.isEmpty {
+                    HStack(spacing: 6) {
+                        Image(systemName: "apps.ipad")
+                            .foregroundStyle(.secondary)
+                        
+                        Text("\(stateStream.clusters.count) clusters")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
+                Spacer()
+                
                 // Settings / Scene recall
                 Button {
                     showScenes.toggle()

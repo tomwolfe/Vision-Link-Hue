@@ -39,7 +39,8 @@ protocol ARSessionManagerFactory {
         hueClient: HueClient,
         stateStream: HueStateStream,
         fixturePersistence: FixturePersistence,
-        objectAnchorService: ObjectAnchorPersistenceService
+        objectAnchorService: ObjectAnchorPersistenceService,
+        clusterEngine: SpatialClusterEngine
     ) -> ARSessionManager
 }
 
@@ -134,7 +135,8 @@ final class DefaultARSessionManagerFactory: ARSessionManagerFactory {
         hueClient: HueClient,
         stateStream: HueStateStream,
         fixturePersistence: FixturePersistence,
-        objectAnchorService: ObjectAnchorPersistenceService
+        objectAnchorService: ObjectAnchorPersistenceService,
+        clusterEngine: SpatialClusterEngine
     ) -> ARSessionManager {
         ARSessionManager(
             detectionEngine: detectionEngine,
@@ -142,7 +144,8 @@ final class DefaultARSessionManagerFactory: ARSessionManagerFactory {
             hueClient: hueClient,
             stateStream: stateStream,
             fixturePersistence: fixturePersistence,
-            objectAnchorService: objectAnchorService
+            objectAnchorService: objectAnchorService,
+            clusterEngine: clusterEngine
         )
     }
 }
@@ -195,13 +198,16 @@ final class AppContainer {
         let client = factories.hueClientFactory.create(stateStream: stream)
         let detector = factories.detectionEngineFactory.create()
         let projector = factories.spatialProjectorFactory.create()
+        let clusterEngine = SpatialClusterEngine()
+        
         let manager = factories.arSessionManagerFactory.create(
             detectionEngine: detector,
             spatialProjector: projector,
             hueClient: client,
             stateStream: stream,
             fixturePersistence: persistence,
-            objectAnchorService: objectAnchorService
+            objectAnchorService: objectAnchorService,
+            clusterEngine: clusterEngine
         )
         
         // Wire up calibration persistence to the spatial service's engine

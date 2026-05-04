@@ -29,7 +29,7 @@ final class DetectionEngine {
     var isObjectDetectionActive: Bool = true
     
     /// Thermal state monitor for adaptive inference throttling.
-    private let thermalMonitor = ThermalMonitor()
+    private let thermalMonitor: ThermalMonitor
     
     /// Current thermal state of the device for adaptive inference throttling.
     var thermalState: ThermalState { thermalMonitor.thermalState }
@@ -75,6 +75,7 @@ final class DetectionEngine {
         self.materialClassifier = NeuralSurfaceMaterialClassifier(
             materialFixtureMapping: NeuralSurfaceMaterialClassifier.loadMaterialMapping()
         )
+        self.thermalMonitor = ThermalMonitor()
         self.onModelLoadingProgress = onModelLoadingProgress
         Task { await loadObjectDetectionModel() }
         Task { await loadIntentClassifierModel() }
@@ -86,8 +87,11 @@ final class DetectionEngine {
     /// Adaptive inference interval that adjusts based on thermal state.
     /// In Serious thermal states, throttles to 2x the base interval
     /// to protect LiDAR hardware from overheating.
+    /// Uses effectiveThermalState which accounts for predictive
+    /// throttling based on inference latency trends.
     private var currentInferenceInterval: TimeInterval {
-        switch thermalState {
+        let state = thermalMonitor.effectiveThermalState
+        switch state {
         case .nominal, .fair:
             return DetectionConstants.inferenceInterval
         case .warning:
@@ -156,6 +160,9 @@ final class DetectionEngine {
         
         let elapsed = ContinuousClock.now - start
         inferenceLatencyMs = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
+        
+        // Update predictive thermal model with latency measurement for proactive throttling.
+        thermalMonitor.updateWithLatency(inferenceLatencyMs)
         
         let filtered = detections.filter { $0.confidence >= minConfidence }
         

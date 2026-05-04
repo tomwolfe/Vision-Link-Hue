@@ -26,6 +26,10 @@ enum ThermalState: Comparable, CustomStringConvertible {
 /// Subscribes to `ProcessInfo.thermalStateDidChangeNotification` and
 /// updates the thermal state for consumers to react to.
 ///
+/// Integrates with `ThermalPredictiveModel` to proactively throttle
+/// inference based on rising latency trends, preventing the device
+/// from reaching a "Serious" thermal state before the system detects it.
+///
 /// DetectionEngine subscribes to this monitor to dynamically adjust
 /// its inference interval based on thermal conditions.
 @MainActor
@@ -34,8 +38,29 @@ final class ThermalMonitor: Sendable {
     /// Current thermal state of the device.
     var thermalState: ThermalState = .nominal
     
+    /// Whether predictive throttling is currently active.
+    var isPredictiveThrottlingActive: Bool {
+        predictiveModel.isPredictiveThrottling
+    }
+    
+    /// The predicted thermal state based on latency trends.
+    /// May be one level worse than the actual thermal state when
+    /// rising latency trends indicate imminent thermal degradation.
+    var predictedThermalState: ThermalState {
+        predictiveModel.predictedThermalState
+    }
+    
+    /// The effective thermal state used for adaptive throttling decisions.
+    /// Returns the worse of the actual and predicted states.
+    var effectiveThermalState: ThermalState {
+        max(thermalState, predictedThermalState)
+    }
+    
     /// Callback invoked when thermal state changes.
     var onStateChange: ((ThermalState) -> Void)?
+    
+    /// Callback invoked when predictive throttling state changes.
+    var onPredictiveThrottleChange: ((Bool) -> Void)?
     
     private let logger = Logger(
         subsystem: "com.tomwolfe.visionlinkhue",
@@ -43,6 +68,33 @@ final class ThermalMonitor: Sendable {
     )
     
     private var thermalMonitoringTask: Task<Void, Never>?
+    
+    /// Predictive thermal model for proactive throttling based on
+    /// inference latency trends.
+    private var predictiveModel: ThermalPredictiveModel
+    
+    /// Initialize with an optional predictive model configuration.
+    /// - Parameter predictiveConfig: Configuration for the predictive throttling model.
+    init(predictiveConfig: ThermalPredictiveModel.PredictiveConfiguration? = nil) {
+        if let config = predictiveConfig {
+            self.predictiveModel = ThermalPredictiveModel(thermalState: .nominal, configuration: config)
+        } else {
+            self.predictiveModel = ThermalPredictiveModel(thermalState: .nominal)
+        }
+    }
+    
+    /// Update the predictive model with a new inference latency measurement.
+    /// - Parameter latencyMs: The inference latency in milliseconds.
+    func updateWithLatency(_ latencyMs: Double) {
+        predictiveModel.update(withLatency: latencyMs)
+        
+        let wasPredictiveActive = predictiveModel.isPredictiveThrottling
+        if wasPredictiveActive {
+            logger.debug(
+                "Predictive throttling active: EWMA=\(String(format: "%.0f", predictiveModel.ewmaLatency))ms, slope=\(String(format: "%.1f", predictiveModel.latencyTrendSlope))ms/sample"
+            )
+        }
+    }
     
     /// Start monitoring thermal state changes via notification.
     func start() {
@@ -56,6 +108,7 @@ final class ThermalMonitor: Sendable {
                 
                 let previousState = self.thermalState
                 self.thermalState = Self.mapSystemThermalState(ProcessInfo.processInfo.thermalState)
+                self.predictiveModel.updateThermalState(self.thermalState)
                 
                 if self.thermalState != previousState {
                     self.logger.info("Thermal state changed: \(previousState) -> \(self.thermalState)")
