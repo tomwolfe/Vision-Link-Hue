@@ -38,42 +38,47 @@ extension Date {
 
 // MARK: - JSON Utilities
 
+/// Actor that owns cached ISO8601DateFormatter instances for safe concurrent access.
+private actor CachedDateFormatters {
+    private let formatterWithFractional: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+    
+    private let formatterWithoutFractional: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+    
+    func date(from string: String, withFractionalSeconds: Bool) -> Date? {
+        let formatter = withFractionalSeconds ? formatterWithFractional : formatterWithoutFractional
+        return formatter.date(from: string)
+    }
+}
+
+private let cachedFormatters = CachedDateFormatters()
+
 extension JSONDecoder {
     /// Create a decoder with ISO 8601 date decoding strategy that handles
     /// Hue's specific ISO 8601 flavor, including fractional seconds.
-    /// Hue's SSE stream occasionally sends timestamps like
-    /// "2026-01-15T10:30:00.123Z" which the standard `.iso8601` strategy rejects.
+    /// Cached formatters are managed by a dedicated actor for Swift 6.3
+    /// strict concurrency safety while avoiding per-call formatter allocation.
     static var hueDecoder: JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
             let dateString = try container.decode(String.self)
             
-            // Try standard ISO8601DateFormatter first
-            let formatter = ISO8601DateFormatter()
-            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            if let date = formatter.date(from: dateString) {
+            // Try standard ISO8601DateFormatter with fractional seconds first
+            if let date = await cachedFormatters.date(from: dateString, withFractionalSeconds: true) {
                 return date
             }
             
-            // Fallback: try parsing with various fractional second formats
-            let parsers: [ISO8601DateFormatter] = [
-                {
-                    let f = ISO8601DateFormatter()
-                    f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-                    return f
-                }(),
-                {
-                    let f = ISO8601DateFormatter()
-                    f.formatOptions = [.withInternetDateTime]
-                    return f
-                }(),
-            ]
-            
-            for formatter in parsers {
-                if let date = formatter.date(from: dateString) {
-                    return date
-                }
+            // Fallback: try without fractional seconds
+            if let date = await cachedFormatters.date(from: dateString, withFractionalSeconds: false) {
+                return date
             }
             
             throw DecodingError.dataCorruptedError(

@@ -176,9 +176,25 @@ actor AppNotificationSystem {
 @MainActor
 final class HueStateStream {
     
-    private(set) var lights: [HueLightResource] = []
-    private(set) var scenes: [HueSceneResource] = []
-    private(set) var groups: [BridgeGroup] = []
+    /// Internal storage keyed by resource ID for O(1) lookup and merge.
+    private var _lights: [String: HueLightResource] = [:]
+    private var _scenes: [String: HueSceneResource] = [:]
+    private var _groups: [String: BridgeGroup] = [:]
+    
+    /// Computed array of lights for SwiftUI observation and UI consumption.
+    var lights: [HueLightResource] {
+        _lights.values.sorted { $0.id < $1.id }
+    }
+    
+    /// Computed array of scenes for SwiftUI observation and UI consumption.
+    var scenes: [HueSceneResource] {
+        _scenes.values.sorted { $0.id < $1.id }
+    }
+    
+    /// Computed array of groups for SwiftUI observation and UI consumption.
+    var groups: [BridgeGroup] {
+        _groups.values.sorted { $0.id < $1.id }
+    }
     
     var isConnected: Bool = false
     var bridgeConfig: BridgeConfig?
@@ -213,15 +229,17 @@ final class HueStateStream {
             }
         }
         
-        if persistence.isUsingInMemoryStorage {
-            let inMemoryError = NSError(
-                domain: "FixturePersistence",
-                code: 1,
-                userInfo: [
-                    NSLocalizedDescriptionKey: "Fixture mappings are stored in memory only and will be lost when the app closes. Persistent storage is unavailable."
-                ]
-            )
-            reportError(inMemoryError, severity: .critical, source: "FixturePersistence")
+        Task { [persistence] in
+            if await persistence.isUsingInMemoryStorage {
+                let inMemoryError = NSError(
+                    domain: "FixturePersistence",
+                    code: 1,
+                    userInfo: [
+                        NSLocalizedDescriptionKey: "Fixture mappings are stored in memory only and will be lost when the app closes. Persistent storage is unavailable."
+                    ]
+                )
+                reportError(inMemoryError, severity: .critical, source: "FixturePersistence")
+            }
         }
     }
     
@@ -241,40 +259,34 @@ final class HueStateStream {
     /// Process a partial resource update from the SSE stream.
     func applyUpdate(_ update: ResourceUpdate) {
         if let lights = update.lights {
-            self.lights = merge(existing: self.lights, incoming: lights)
+            _ = merge(into: &_lights, incoming: lights)
         }
         
         if let scenes = update.scenes {
-            self.scenes = merge(existing: self.scenes, incoming: scenes)
+            _ = merge(into: &_scenes, incoming: scenes)
         }
         
         if let groups = update.groups {
-            self.groups = merge(existing: self.groups, incoming: groups)
+            _ = merge(into: &_groups, incoming: groups)
         }
     }
     
-    /// Merge incoming identifiable resources into the existing collection,
-    /// replacing entries with matching IDs and appending new ones.
-    private func merge<T: Identifiable>(existing: [T], incoming: [T]) -> [T]
+    /// Merge incoming identifiable resources into the dictionary-backed store,
+    /// replacing entries with matching IDs in O(1). Returns the updated array
+    /// for SwiftUI observation.
+    private func merge<T: Identifiable>(into store: inout [String: T], incoming: [T]) -> [T]
     where T.ID == String {
-        var result = existing
-        let incomingById = Dictionary(grouping: incoming) { $0.id }
-        
-        for (id, newItems) in incomingById {
-            guard let newItem = newItems.last else { continue }
-            if let idx = result.firstIndex(where: { $0.id == id }) {
-                result[idx] = newItem
-            } else {
-                result.append(newItem)
-            }
+        for item in incoming {
+            store[item.id] = item
         }
-        
-        return result
+        return store.values.sorted { first, second in
+            first.id < second.id
+        }
     }
     
     /// Resolve a light by its bridge-assigned ID.
     func light(by id: String) -> HueLightResource? {
-        lights.first { $0.id == id }
+        _lights[id]
     }
     
     /// Resolve a light that is mapped to a local fixture UUID.
@@ -303,12 +315,12 @@ final class HueStateStream {
     
     /// Resolve a scene by its ID.
     func scene(by id: String) -> HueSceneResource? {
-        scenes.first { $0.id == id }
+        _scenes[id]
     }
     
     /// Get all lights belonging to a group.
     func lights(inGroup groupId: String) -> [HueLightResource] {
-        guard let group = groups.first(where: { $0.id == groupId }) else { return [] }
+        guard let group = _groups[groupId] else { return [] }
         return group.lights.compactMap { light(by: $0) }
     }
     

@@ -7,8 +7,7 @@ import os
 /// and spatial coordinates. Provides atomic transactions for all
 /// persistence operations with background isolation to prevent
 /// main-thread blocking as the fixture count grows.
-@ModelActor
-final class FixturePersistence {
+actor FixturePersistence {
     
     let modelContainer: ModelContainer
     let modelContext: ModelContext
@@ -56,12 +55,14 @@ final class FixturePersistence {
     }
     
     /// Load all persisted fixture mappings from SwiftData.
-    func loadMappings() async -> [FixtureMapping] {
+    func loadMappings() async -> [(uuid: UUID, lightId: String?)] {
         let descriptor = FetchDescriptor<FixtureMapping>()
         
         do {
             let mappings = try modelContext.fetch(descriptor)
-            return mappings.sorted { $0.updatedAt > $1.updatedAt }
+            return mappings
+                .map { ($0.uuid, $0.lightId) }
+                .sorted { $0.1 ?? "" < $1.1 ?? "" }
         } catch {
             logger.error("Failed to load fixture mappings: \(error.localizedDescription)")
             return []

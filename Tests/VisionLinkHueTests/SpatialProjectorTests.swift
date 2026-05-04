@@ -225,4 +225,68 @@ final class SpatialProjectorTests: XCTestCase {
         XCTAssertEqual(ProjectionError.invalidIntrinsics.errorDescription, "Invalid camera intrinsics")
         XCTAssertEqual(ProjectionError.noSession.errorDescription, "ARSession not configured")
     }
+    
+    // MARK: - EMA Depth Smoothing Tests
+    
+    /// Verify that EMA returns the initial depth when no prior EMA exists.
+    func testEmaReturnsInitialDepth() {
+        let projector = SpatialProjector()
+        let depth = 3.0
+        let result = projector.updateEMA(depth: depth, currentEma: nil, alpha: 0.2)
+        XCTAssertEqual(result, 3.0, accuracy: 0.01)
+    }
+    
+    /// Verify that EMA blends new depth with existing EMA using the smoothing factor.
+    func testEmaBlendsWithExistingValue() {
+        let projector = SpatialProjector()
+        let alpha: Float = 0.2
+        let newDepth: Float = 5.0
+        let existingEma: Float = 3.0
+        
+        let result = projector.updateEMA(depth: newDepth, currentEma: existingEma, alpha: alpha)
+        
+        // EMA formula: alpha * new + (1 - alpha) * old
+        // 0.2 * 5.0 + 0.8 * 3.0 = 1.0 + 2.4 = 3.4
+        let expected = alpha * newDepth + (1 - alpha) * existingEma
+        XCTAssertEqual(result, expected, accuracy: 0.01)
+    }
+    
+    /// Verify that EMA resists spurious depth spikes (mirror/window reflection).
+    func testEmaResistsDepthSpikes() {
+        let projector = SpatialProjector()
+        let alpha: Float = 0.2
+        
+        // Start with a normal depth reading
+        var ema: Float = 2.0
+        ema = projector.updateEMA(depth: 2.0, currentEma: ema, alpha: alpha)
+        
+        // Simulate a spurious spike (e.g., mirror reflection at 10m)
+        let spikeDepth: Float = 10.0
+        ema = projector.updateEMA(depth: spikeDepth, currentEma: ema, alpha: alpha)
+        
+        // The EMA should be much closer to 2.0 than to 10.0
+        // 0.2 * 10.0 + 0.8 * 2.0 = 2.0 + 1.6 = 3.6
+        XCTAssertLessThan(ema, 4.0, "EMA should resist depth spikes")
+        XCTAssertGreaterThan(ema, 2.0, "EMA should reflect some influence from spike")
+        
+        // After returning to normal depth, EMA should recover
+        ema = projector.updateEMA(depth: 2.0, currentEma: ema, alpha: alpha)
+        // 0.2 * 2.0 + 0.8 * 3.6 = 0.4 + 2.88 = 3.28
+        XCTAssertLessThan(ema, 4.0, "EMA should recover after spike")
+    }
+    
+    /// Verify that EMA gradually converges toward a stable depth value.
+    func testEmaConvergesToStableDepth() {
+        let projector = SpatialProjector()
+        let alpha: Float = 0.2
+        let stableDepth: Float = 4.0
+        
+        var ema: Float?
+        for _ in 0..<20 {
+            ema = projector.updateEMA(depth: stableDepth, currentEma: ema, alpha: alpha)
+        }
+        
+        // After many iterations, EMA should be close to the stable depth
+        XCTAssertEqual(ema!, stableDepth, accuracy: 0.5, "EMA should converge to stable depth")
+    }
 }

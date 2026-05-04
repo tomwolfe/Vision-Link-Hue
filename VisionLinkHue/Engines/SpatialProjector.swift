@@ -30,8 +30,12 @@ final class SpatialProjector {
     private let provider: CameraConfigurationProvider
     private weak var session: ARSession?
     
-    /// Last known average depth from successful raycasts for dynamic fallback.
-    private var lastKnownAverageDepth: Float?
+    /// Exponential Moving Average of successful depth measurements for
+    /// robust fallback distance estimation. The smoothing factor (0.2)
+    /// balances responsiveness to real depth changes against resistance
+    /// to spurious readings from mirrors, windows, or reflective surfaces.
+    private var emaDepth: Float?
+    private let emaSmoothingFactor: Float = 0.2
     
     init(session: ARSession? = nil, configuration: Configuration = .init(), provider: CameraConfigurationProvider? = nil) {
         self.configuration = configuration
@@ -79,7 +83,7 @@ final class SpatialProjector {
             return .anchored(fixture)
         }
         
-        let fallbackDistance: Float = lastKnownAverageDepth ?? DetectionConstants.fallbackDistanceMeters
+        let fallbackDistance: Float = emaDepth ?? DetectionConstants.fallbackDistanceMeters
         let fallbackPosition = SpatialMath.fallbackPosition(
             normalized: normalizedPoint,
             cameraTransform: frame.camera.transform,
@@ -219,7 +223,7 @@ final class SpatialProjector {
         
         let orientation = simd_quatf(hit.worldTransform)
         let distance = length(position)
-        lastKnownAverageDepth = distance
+        emaDepth = updateEMA(depth: distance, currentEma: emaDepth, alpha: emaSmoothingFactor)
         
         let adjustedPosition = position + configuration.hudOffset
         
@@ -288,7 +292,7 @@ final class SpatialProjector {
         let rotationMatrix = SpatialMath.rotationMatrix(from: frame.camera.transform)
         let orientation = simd_quatf(rotationMatrix)
         
-        lastKnownAverageDepth = depthMeters
+        emaDepth = updateEMA(depth: depthMeters, currentEma: emaDepth, alpha: emaSmoothingFactor)
         
         let adjustedPosition = position + configuration.hudOffset
         
@@ -357,6 +361,25 @@ final class SpatialProjector {
         }
         
         return depthMeters
+    }
+}
+
+// MARK: - EMA Depth Smoothing
+
+extension SpatialProjector {
+    /// Apply an Exponential Moving Average (EMA) filter to depth measurements.
+    /// The EMA smooths out spurious depth readings (e.g., from mirrors or windows)
+    /// while still adapting to genuine depth changes over time.
+    ///
+    /// - Parameters:
+    ///   - depth: The new depth measurement in meters.
+    ///   - currentEma: The current EMA value, or nil for the first measurement.
+    ///   - alpha: The smoothing factor in (0, 1]. Lower values produce smoother
+    ///     output but slower adaptation to genuine changes.
+    /// - Returns: The updated EMA value.
+    private func updateEMA(depth: Float, currentEma: Float?, alpha: Float) -> Float {
+        guard let currentEma = currentEma else { return depth }
+        return alpha * depth + (1 - alpha) * currentEma
     }
 }
 
