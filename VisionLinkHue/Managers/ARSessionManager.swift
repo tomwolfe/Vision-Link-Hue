@@ -31,6 +31,8 @@ enum LookDirection: Sendable {
     case closer
     /// Move the device farther from the environment.
     case farther
+    /// Quadrant-based environmental guidance with specific direction description.
+    case environmental(description: String, icon: String)
     
     /// Human-readable instruction for the HUD.
     var instruction: String {
@@ -42,6 +44,7 @@ enum LookDirection: Sendable {
         case .down: return "Look down to help reconnect"
         case .closer: return "Move your device closer to the room"
         case .farther: return "Move your device farther from the room"
+        case .environmental(let description, _): return description
         }
     }
     
@@ -55,6 +58,7 @@ enum LookDirection: Sendable {
         case .down: return "arrow.down.circle.fill"
         case .closer: return "arrow.inward.circle.fill"
         case .farther: return "arrow.outward.circle.fill"
+        case .environmental(_, let icon): return icon
         }
     }
 }

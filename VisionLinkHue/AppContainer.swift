@@ -49,6 +49,13 @@ protocol MatterBridgeServiceFactory {
     func create() -> MatterBridgeService
 }
 
+/// Protocol for creating `SpatialSyncService` instances.
+/// Enables dependency injection of mock sync services in tests.
+@MainActor
+protocol SpatialSyncServiceFactory {
+    func create() -> SpatialSyncService
+}
+
 /// Default implementations of all factory protocols.
 /// Used by `AppContainer` for production dependency creation.
 @MainActor
@@ -60,6 +67,7 @@ final class DefaultFactories: @unchecked Sendable {
     let spatialProjectorFactory: SpatialProjectorFactory
     let arSessionManagerFactory: ARSessionManagerFactory
     let matterBridgeServiceFactory: MatterBridgeServiceFactory
+    let spatialSyncServiceFactory: SpatialSyncServiceFactory
     
     init(
         stateStreamFactory: HueStateStreamFactory = DefaultHueStateStreamFactory(),
@@ -67,7 +75,8 @@ final class DefaultFactories: @unchecked Sendable {
         detectionEngineFactory: DetectionEngineFactory = DefaultDetectionEngineFactory(),
         spatialProjectorFactory: SpatialProjectorFactory = DefaultSpatialProjectorFactory(),
         arSessionManagerFactory: ARSessionManagerFactory = DefaultARSessionManagerFactory(),
-        matterBridgeServiceFactory: MatterBridgeServiceFactory = DefaultMatterBridgeServiceFactory()
+        matterBridgeServiceFactory: MatterBridgeServiceFactory = DefaultMatterBridgeServiceFactory(),
+        spatialSyncServiceFactory: SpatialSyncServiceFactory = DefaultSpatialSyncServiceFactory()
     ) {
         self.stateStreamFactory = stateStreamFactory
         self.hueClientFactory = hueClientFactory
@@ -75,6 +84,7 @@ final class DefaultFactories: @unchecked Sendable {
         self.spatialProjectorFactory = spatialProjectorFactory
         self.arSessionManagerFactory = arSessionManagerFactory
         self.matterBridgeServiceFactory = matterBridgeServiceFactory
+        self.spatialSyncServiceFactory = spatialSyncServiceFactory
     }
 }
 
@@ -142,6 +152,14 @@ final class DefaultMatterBridgeServiceFactory: MatterBridgeServiceFactory {
     }
 }
 
+/// Default factory for `SpatialSyncService`.
+@MainActor
+final class DefaultSpatialSyncServiceFactory: SpatialSyncServiceFactory {
+    func create() -> SpatialSyncService {
+        SpatialSyncService()
+    }
+}
+
 /// Centralized dependency injection container for the application.
 /// Initializes all core services once at app launch and provides
 /// deterministic access to dependencies throughout the view hierarchy.
@@ -159,6 +177,7 @@ final class AppContainer {
     let arSessionManager: ARSessionManager
     let spatialProjector: SpatialProjector
     let matterService: MatterBridgeService
+    let spatialSyncService: SpatialSyncService
     
     private let factories: DefaultFactories
     
@@ -188,11 +207,14 @@ final class AppContainer {
         let matterService = factories.matterBridgeServiceFactory.create()
         client.matterService = matterService
         
+        let spatialSyncService = factories.spatialSyncServiceFactory.create()
+        
         self.stateStream = stream
         self.hueClient = client
         self.detectionEngine = detector
         self.arSessionManager = manager
         self.spatialProjector = projector
         self.matterService = matterService
+        self.spatialSyncService = spatialSyncService
     }
 }

@@ -28,7 +28,7 @@ actor FixturePersistence {
     /// Create a new ModelContainer with the FixtureMapping schema.
     /// Falls back to an in-memory container if persistent storage fails.
     private init() {
-        let schema = Schema([FixtureMapping.self])
+        let schema = Schema([FixtureMapping.self, SpatialSyncRecord.self])
         
         do {
             modelContainer = try ModelContainer(for: schema, configurations: [ModelConfiguration()])
@@ -395,5 +395,19 @@ actor FixturePersistence {
         } catch {
             logger.error("Failed to delete ARWorldMap: \(error.localizedDescription)")
         }
+    }
+    
+    // MARK: - CloudKit Spatial Sync
+    
+    /// Trigger a CloudKit spatial sync operation via the SpatialSyncService.
+    /// This is called from the UI to initiate bidirectional sync of
+    /// fixture mappings across the user's devices.
+    func triggerSpatialSync() async -> SpatialSyncResult {
+        await SpatialSyncService().sync()
+    }
+    
+    /// Check if CloudKit spatial sync is available.
+    func checkSpatialSyncAvailability() async -> Bool {
+        await SpatialSyncService().checkCloudKitAvailability()
     }
 }

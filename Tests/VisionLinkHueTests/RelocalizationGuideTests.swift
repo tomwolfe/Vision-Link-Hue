@@ -47,6 +47,25 @@ final class RelocalizationGuideTests: XCTestCase {
         XCTAssertEqual(LookDirection.none.icon, "arrow.forward.circle")
     }
     
+    func testLookDirectionEnvironmentalCase() {
+        let description = "Look toward the upper right to improve tracking"
+        let icon = "arrow.up.right.circle.fill"
+        let direction = LookDirection.environmental(description: description, icon: icon)
+        
+        XCTAssertEqual(direction.instruction, description)
+        XCTAssertEqual(direction.icon, icon)
+    }
+    
+    func testLookDirectionEnvironmentalCaseWithHint() {
+        let description = "Look toward the upper right to improve tracking — Ceiling or upper walls often have the best tracking features"
+        let icon = "arrow.up.right.circle.fill"
+        let direction = LookDirection.environmental(description: description, icon: icon)
+
+        
+        XCTAssertEqual(direction.instruction, description)
+        XCTAssertEqual(direction.icon, icon)
+    }
+    
     // MARK: - Feature Density Tracking Tests
     
     func testUpdateFeatureDensityStoresValue() {
@@ -102,6 +121,22 @@ final class RelocalizationGuideTests: XCTestCase {
     func testAnalyzeFrameReturnsNoneOnSimulator() {
         let direction = guide.analyzeFrame(mockFrame(), confidence: 0.3)
         XCTAssertEqual(direction, .none, "Should return .none on simulator")
+    }
+    
+    // MARK: - Depth Quadrant Tests
+    
+    func testDepthQuadrantLabels() {
+        XCTAssertEqual(DepthQuadrant.topLeft.label, "upper left")
+        XCTAssertEqual(DepthQuadrant.topRight.label, "upper right")
+        XCTAssertEqual(DepthQuadrant.bottomLeft.label, "lower left")
+        XCTAssertEqual(DepthQuadrant.bottomRight.label, "lower right")
+    }
+    
+    func testDepthQuadrantOpposites() {
+        XCTAssertEqual(DepthQuadrant.topLeft.opposite, .bottomRight)
+        XCTAssertEqual(DepthQuadrant.topRight.opposite, .bottomLeft)
+        XCTAssertEqual(DepthQuadrant.bottomLeft.opposite, .topRight)
+        XCTAssertEqual(DepthQuadrant.bottomRight.opposite, .topLeft)
     }
     
     // MARK: - Helper Methods
