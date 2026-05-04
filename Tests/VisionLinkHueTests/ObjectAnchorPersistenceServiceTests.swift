@@ -279,6 +279,96 @@ final class ObjectAnchorPersistenceServiceTests: XCTestCase {
         XCTAssertEqual(service.unmatchedCount, 1)
     }
     
+    // MARK: - Extended Relocalization Tests
+    
+    func testExtendedRelocalizationRegistersRecessedFixtures() {
+        let settings = DetectionSettings()
+        settings.extendedRelocalizationMode = true
+        let extendedService = ObjectAnchorPersistenceService(detectionSettings: settings)
+        
+        let position = SIMD3<Float>(1.0, 2.0, 3.0)
+        let orientation = simd_quatf(angle: .pi / 4, axis: SIMD3<Float>(0, 1, 0))
+        
+        extendedService.registerArchetype(
+            fixtureType: .recessed,
+            objectAnchorName: "fixture_recessed_extended",
+            position: position,
+            orientation: orientation,
+            confidence: 0.90
+        )
+        
+        XCTAssertEqual(extendedService.archetypes.count, 1)
+        XCTAssertEqual(extendedService.archetypes[0].fixtureType, .recessed)
+        XCTAssertTrue(extendedService.hasActiveAnchors)
+    }
+    
+    func testExtendedRelocalizationRegistersCeilingFixtures() {
+        let settings = DetectionSettings()
+        settings.extendedRelocalizationMode = true
+        let extendedService = ObjectAnchorPersistenceService(detectionSettings: settings)
+        
+        extendedService.registerArchetype(
+            fixtureType: .ceiling,
+            objectAnchorName: "fixture_ceiling_extended",
+            position: SIMD3<Float>(2, 3, 4),
+            orientation: simd_quatf.identity,
+            confidence: 0.85
+        )
+        
+        XCTAssertEqual(extendedService.archetypes.count, 1)
+        XCTAssertEqual(extendedService.archetypes[0].fixtureType, .ceiling)
+    }
+    
+    func testExtendedRelocalizationRegistersStripFixtures() {
+        let settings = DetectionSettings()
+        settings.extendedRelocalizationMode = true
+        let extendedService = ObjectAnchorPersistenceService(detectionSettings: settings)
+        
+        extendedService.registerArchetype(
+            fixtureType: .strip,
+            objectAnchorName: "fixture_strip_extended",
+            position: SIMD3<Float>(3, 4, 5),
+            orientation: simd_quatf.identity,
+            confidence: 0.80
+        )
+        
+        XCTAssertEqual(extendedService.archetypes.count, 1)
+        XCTAssertEqual(extendedService.archetypes[0].fixtureType, .strip)
+    }
+    
+    func testStandardModeStillSkipsRecessedFixtures() {
+        let standardSettings = DetectionSettings()
+        standardSettings.extendedRelocalizationMode = false
+        let standardService = ObjectAnchorPersistenceService(detectionSettings: standardSettings)
+        
+        standardService.registerArchetype(
+            fixtureType: .recessed,
+            objectAnchorName: "fixture_recessed_standard",
+            position: SIMD3<Float>(1, 2, 3),
+            orientation: simd_quatf.identity,
+            confidence: 0.90
+        )
+        
+        XCTAssertTrue(standardService.archetypes.isEmpty)
+        XCTAssertFalse(standardService.hasActiveAnchors)
+    }
+    
+    func testExtendedModeStillSkipsLampFixtures() {
+        let settings = DetectionSettings()
+        settings.extendedRelocalizationMode = true
+        let extendedService = ObjectAnchorPersistenceService(detectionSettings: settings)
+        
+        extendedService.registerArchetype(
+            fixtureType: .lamp,
+            objectAnchorName: "fixture_lamp_extended",
+            position: SIMD3<Float>(1, 2, 3),
+            orientation: simd_quatf.identity,
+            confidence: 0.85
+        )
+        
+        XCTAssertTrue(extendedService.archetypes.isEmpty)
+    }
+    
     // MARK: - FixtureArchetype Tests
     
     func testFixtureArchetypeCreation() {

@@ -75,12 +75,14 @@ struct QuadrantCounts: ~Copyable {
     }
     
     /// Find the quadrant index with the minimum count.
+    /// Uses Span-based iteration to avoid unintended copies during
+    /// high-frequency frame analysis per Swift 6.3 InlineArray best practices.
     borrowing func sparsest() -> Int {
         var minIdx = 0
         var minVal = values[0]
-        for i in 1..<4 {
-            if values[i] < minVal {
-                minVal = values[i]
+        for (i, count) in asSpan().enumerated().dropFirst() {
+            if count < minVal {
+                minVal = count
                 minIdx = i
             }
         }
@@ -88,12 +90,14 @@ struct QuadrantCounts: ~Copyable {
     }
     
     /// Find the quadrant index with the maximum count.
+    /// Uses Span-based iteration to avoid unintended copies during
+    /// high-frequency frame analysis per Swift 6.3 InlineArray best practices.
     borrowing func richest() -> Int {
         var maxIdx = 0
         var maxVal = values[0]
-        for i in 1..<4 {
-            if values[i] > maxVal {
-                maxVal = values[i]
+        for (i, count) in asSpan().enumerated().dropFirst() {
+            if count > maxVal {
+                maxVal = count
                 maxIdx = i
             }
         }
@@ -150,12 +154,14 @@ struct QuadrantDensities: ~Copyable {
     }
     
     /// Find the quadrant index with the minimum density.
+    /// Uses Span-based iteration to avoid unintended copies during
+    /// high-frequency frame analysis per Swift 6.3 InlineArray best practices.
     borrowing func sparsest() -> Int {
         var minIdx = 0
         var minVal = values[0]
-        for i in 1..<4 {
-            if values[i] < minVal {
-                minVal = values[i]
+        for (i, density) in asSpan().enumerated().dropFirst() {
+            if density < minVal {
+                minVal = density
                 minIdx = i
             }
         }
@@ -163,12 +169,14 @@ struct QuadrantDensities: ~Copyable {
     }
     
     /// Find the quadrant index with the maximum density.
+    /// Uses Span-based iteration to avoid unintended copies during
+    /// high-frequency frame analysis per Swift 6.3 InlineArray best practices.
     borrowing func richest() -> Int {
         var maxIdx = 0
         var maxVal = values[0]
-        for i in 1..<4 {
-            if values[i] > maxVal {
-                maxVal = values[i]
+        for (i, density) in asSpan().enumerated().dropFirst() {
+            if density > maxVal {
+                maxVal = density
                 maxIdx = i
             }
         }

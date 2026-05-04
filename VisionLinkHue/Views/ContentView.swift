@@ -11,6 +11,7 @@ struct ContentView: View {
     @Environment(DetectionEngine.self) private var detectionEngine
     @Environment(ARSessionManager.self) private var arSessionManager
     @Environment(SpatialProjector.self) private var spatialProjector
+    @Environment(DetectionSettings.self) private var detectionSettings
     
     @State private var showSettings: Bool = false
     @State private var showBridgeDiscovery: Bool = false
@@ -226,6 +227,29 @@ struct SettingsView: View {
                             Text("Manual Placement")
                         }
                     }
+                }
+                
+                // Detection
+                Section("Detection") {
+                    HStack {
+                        Text("Battery Saver")
+                        Spacer()
+                        Toggle("", isOn: $detectionSettings.batterySaverMode)
+                            .labelsHidden()
+                    }
+                    Text("Disables Neural Surface Synthesis material classification to reduce battery usage")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    
+                    HStack {
+                        Text("Extended Relocalization")
+                        Spacer()
+                        Toggle("", isOn: $detectionSettings.extendedRelocalizationMode)
+                            .labelsHidden()
+                    }
+                    Text("Anchors all fixture types for better relocalization in feature-sparse environments")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
                 
                 // Actions

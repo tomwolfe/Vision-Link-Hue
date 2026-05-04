@@ -100,6 +100,7 @@ final class ARSessionManager {
     private let relocalizationGuide: RelocalizationGuide
     private let objectAnchorService: ObjectAnchorPersistenceService
     private let clusterEngine: SpatialClusterEngine
+    private let detectionSettings: DetectionSettings
     
     private var arView: ARView?
     private var anchorEntity: AnchorEntity?
@@ -136,7 +137,8 @@ final class ARSessionManager {
         provider: CameraConfigurationProvider = DefaultCameraConfigurationProvider(),
         relocalizationGuide: RelocalizationGuide = RelocalizationGuide(),
         objectAnchorService: ObjectAnchorPersistenceService = ObjectAnchorPersistenceService(),
-        clusterEngine: SpatialClusterEngine = SpatialClusterEngine()
+        clusterEngine: SpatialClusterEngine = SpatialClusterEngine(),
+        detectionSettings: DetectionSettings = DetectionSettings()
     ) {
         self.detectionEngine = detectionEngine
         self.spatialProjector = spatialProjector
@@ -148,6 +150,7 @@ final class ARSessionManager {
         self.relocalizationGuide = relocalizationGuide
         self.objectAnchorService = objectAnchorService
         self.clusterEngine = clusterEngine
+        self.detectionSettings = detectionSettings
         
         clusterEngine.onClustersChange = { [weak self] _ in
             self?.stateStream.clusters = self?.clusterEngine.clusters ?? []

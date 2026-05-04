@@ -60,6 +60,10 @@ struct FixtureArchetype: Identifiable, Codable, Sendable {
 /// As of iOS 26, ARKit can recognize and track common object categories
 /// using Neural Surface Synthesis features. This service persists recognized
 /// fixture archetypes and attempts to re-anchor them on subsequent sessions.
+///
+/// Extended Relocalization mode (configurable via `DetectionSettings`) enables
+/// object anchor registration for all fixture types, including generic recessed
+/// lights and ceiling lights, for improved tracking in feature-sparse environments.
 @MainActor
 @Observable
 final class ObjectAnchorPersistenceService {
@@ -83,6 +87,9 @@ final class ObjectAnchorPersistenceService {
         category: "ObjectAnchorPersistence"
     )
     
+    /// User-configurable detection settings controlling battery/performance trade-offs.
+    private let detectionSettings: DetectionSettings
+    
     /// The file URL where object anchors are persisted.
     private var archetypesURL: URL {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
@@ -90,7 +97,9 @@ final class ObjectAnchorPersistenceService {
     }
     
     /// Initialize the service by loading any persisted archetypes.
-    init() {
+    /// - Parameter detectionSettings: User-configurable detection settings for battery/performance trade-offs.
+    init(detectionSettings: DetectionSettings = DetectionSettings()) {
+        self.detectionSettings = detectionSettings
         loadPersistedArchetypes()
     }
     
@@ -200,7 +209,20 @@ final class ObjectAnchorPersistenceService {
     /// Check if a specific archetype type is archetypal (benefits from object tracking).
     /// Archetypal fixtures have characteristic geometric signatures that ARKit
     /// can recognize consistently across sessions.
+    ///
+    /// When Extended Relocalization mode is enabled, all fixture types including
+    /// generic recessed lights and ceiling lights are registered as object anchors
+    /// to provide better tracking in feature-sparse environments.
     private func isArchetypal(_ type: FixtureType) -> Bool {
+        if detectionSettings.extendedRelocalizationMode {
+            switch type {
+            case .chandelier, .sconce, .deskLamp, .pendant, .recessed, .ceiling, .strip:
+                return true
+            case .lamp:
+                return false
+            }
+        }
+        
         switch type {
         case .chandelier, .sconce, .deskLamp, .pendant:
             return true

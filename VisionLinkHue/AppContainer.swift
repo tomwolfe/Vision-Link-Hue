@@ -19,7 +19,7 @@ protocol HueClientFactory {
 /// Enables dependency injection of mock engines in tests.
 @MainActor
 protocol DetectionEngineFactory {
-    func create(stateStream: HueStateStream) -> DetectionEngine
+    func create(stateStream: HueStateStream, detectionSettings: DetectionSettings) -> DetectionEngine
 }
 
 /// Protocol for creating `SpatialProjector` instances.
@@ -40,7 +40,8 @@ protocol ARSessionManagerFactory {
         stateStream: HueStateStream,
         fixturePersistence: FixturePersistence,
         objectAnchorService: ObjectAnchorPersistenceService,
-        clusterEngine: SpatialClusterEngine
+        clusterEngine: SpatialClusterEngine,
+        detectionSettings: DetectionSettings
     ) -> ARSessionManager
 }
 
@@ -113,8 +114,8 @@ final class DefaultHueClientFactory: HueClientFactory {
 /// Default factory for `DetectionEngine`.
 @MainActor
 final class DefaultDetectionEngineFactory: DetectionEngineFactory {
-    func create(stateStream: HueStateStream) -> DetectionEngine {
-        DetectionEngine(stateStream: stateStream)
+    func create(stateStream: HueStateStream, detectionSettings: DetectionSettings) -> DetectionEngine {
+        DetectionEngine(stateStream: stateStream, detectionSettings: detectionSettings)
     }
 }
 
@@ -136,7 +137,8 @@ final class DefaultARSessionManagerFactory: ARSessionManagerFactory {
         stateStream: HueStateStream,
         fixturePersistence: FixturePersistence,
         objectAnchorService: ObjectAnchorPersistenceService,
-        clusterEngine: SpatialClusterEngine
+        clusterEngine: SpatialClusterEngine,
+        detectionSettings: DetectionSettings
     ) -> ARSessionManager {
         ARSessionManager(
             detectionEngine: detectionEngine,
@@ -184,6 +186,7 @@ final class AppContainer {
     let spatialProjector: SpatialProjector
     let matterService: MatterBridgeService
     let spatialSyncService: SpatialSyncService
+    let detectionSettings: DetectionSettings
     
     private let factories: DefaultFactories
     
@@ -191,12 +194,13 @@ final class AppContainer {
         self.factories = factories
         
         let persistence = FixturePersistence.shared
-        let objectAnchorService = ObjectAnchorPersistenceService()
+        let detectionSettings = DetectionSettings()
+        let objectAnchorService = ObjectAnchorPersistenceService(detectionSettings: detectionSettings)
         
         // Create dependencies through factories for testability.
         let stream = factories.stateStreamFactory.create(persistence: persistence)
         let client = factories.hueClientFactory.create(stateStream: stream)
-        let detector = factories.detectionEngineFactory.create(stateStream: stream)
+        let detector = factories.detectionEngineFactory.create(stateStream: stream, detectionSettings: detectionSettings)
         let projector = factories.spatialProjectorFactory.create()
         let clusterEngine = SpatialClusterEngine()
         
@@ -207,7 +211,8 @@ final class AppContainer {
             stateStream: stream,
             fixturePersistence: persistence,
             objectAnchorService: objectAnchorService,
-            clusterEngine: clusterEngine
+            clusterEngine: clusterEngine,
+            detectionSettings: detectionSettings
         )
         
         // Wire up calibration persistence to the spatial service's engine

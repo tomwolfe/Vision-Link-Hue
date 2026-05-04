@@ -182,6 +182,27 @@ final class DetectionEngineTests: XCTestCase {
         XCTAssertEqual(rect.height, 0.6, accuracy: 0.001, "Height should be preserved after flip")
     }
     
+    // MARK: - Battery Saver Tests
+    
+    func testDefaultBatterySaverModeIsDisabled() {
+        let engine = DetectionEngine(stateStream: nil)
+        XCTAssertFalse(engine.isBatterySaverMode)
+    }
+    
+    func testBatterySaverModeCanBeEnabled() {
+        let settings = DetectionSettings()
+        settings.batterySaverMode = true
+        let engine = DetectionEngine(stateStream: nil, detectionSettings: settings)
+        XCTAssertTrue(engine.isBatterySaverMode)
+    }
+    
+    func testBatterySaverModeCanBeDisabled() {
+        let settings = DetectionSettings()
+        settings.batterySaverMode = false
+        let engine = DetectionEngine(stateStream: nil, detectionSettings: settings)
+        XCTAssertFalse(engine.isBatterySaverMode)
+    }
+    
     // MARK: - Model Quantization Tests
     
     func testModelQuantizationFlagExists() {

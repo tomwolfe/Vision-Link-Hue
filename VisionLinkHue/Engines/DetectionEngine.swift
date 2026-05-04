@@ -17,6 +17,8 @@ import os
 ///
 /// Supports ARKit 2026 Neural Surface Synthesis for material-based
 /// fixture classification (Glass, Metal, Wood, etc.) via ARMeshMaterialLabel.
+/// Battery Saver mode (configurable via `DetectionSettings`) disables
+/// Neural Surface Synthesis to reduce computational overhead.
 @Observable
 @MainActor
 final class DetectionEngine {
@@ -37,6 +39,11 @@ final class DetectionEngine {
     /// Whether low-power AR mode is active to prevent thermal throttling.
     var isLowPowerMode: Bool = false
     
+    /// Whether Battery Saver mode is active, disabling Neural Surface Synthesis.
+    var isBatterySaverMode: Bool {
+        detectionSettings.batterySaverMode
+    }
+    
     private let logger = Logger(subsystem: "com.tomwolfe.visionlinkhue", category: "DetectionEngine")
     
     /// Minimum confidence threshold for returning detections.
@@ -54,6 +61,9 @@ final class DetectionEngine {
     
     /// Neural surface material classifier for ARKit 2026 material detection.
     private let materialClassifier: NeuralSurfaceMaterialClassifier
+    
+    /// User-configurable detection settings controlling battery/performance trade-offs.
+    private let detectionSettings: DetectionSettings
     
     /// CoreML model for object detection (loaded lazily).
     private var objectDetectionModel: MLModel?
@@ -86,11 +96,13 @@ final class DetectionEngine {
     ///   - configSignature: Optional ECDSA signature for verifying config authenticity.
     ///   - configKeyID: Optional key identifier for multi-key rotation support.
     ///   - stateStream: Optional reference to the state stream for reporting quantization fallback events.
-    init(onModelLoadingProgress: (@Sendable (Double) -> Void)? = nil, configSignature: Data? = nil, configKeyID: String? = nil, stateStream: HueStateStream? = nil) {
+    ///   - detectionSettings: User-configurable detection settings for battery/performance trade-offs.
+    init(onModelLoadingProgress: (@Sendable (Double) -> Void)? = nil, configSignature: Data? = nil, configKeyID: String? = nil, stateStream: HueStateStream? = nil, detectionSettings: DetectionSettings = DetectionSettings()) {
         self.materialClassifier = NeuralSurfaceMaterialClassifier(
             materialFixtureMapping: NeuralSurfaceMaterialClassifier.loadMaterialMapping(signature: configSignature, keyID: configKeyID),
             materialIndexMapping: NeuralSurfaceMaterialClassifier.loadMaterialIndexMapping(signature: configSignature, keyID: configKeyID)
         )
+        self.detectionSettings = detectionSettings
         self.thermalMonitor = ThermalMonitor()
         self.onModelLoadingProgress = onModelLoadingProgress
         self.stateStream = stateStream
@@ -588,7 +600,13 @@ final class DetectionEngine {
     /// chandeliers) that would otherwise sample the background behind the fixture.
     /// Returns material labels like "Glass", "Metal", "Wood" based on
     /// the ARMeshMaterialLabel of the detected surface.
+    ///
+    /// Returns `nil` immediately when Battery Saver mode is enabled to avoid
+    /// the computational cost of Neural Surface Synthesis material classification.
     func classifyMaterial(from frame: ARFrame, at region: NormalizedRect? = nil) -> String? {
+        guard !isBatterySaverMode else {
+            return nil
+        }
         #if !targetEnvironment(simulator)
         guard let sceneDepth = frame.sceneDepth else {
             return nil

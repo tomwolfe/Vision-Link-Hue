@@ -32,7 +32,8 @@ final class AppContainerTests: XCTestCase {
         let factory = DefaultDetectionEngineFactory()
         let persistence = FixturePersistence.shared
         let stream = HueStateStream(persistence: persistence)
-        let engine = factory.create(stateStream: stream)
+        let settings = DetectionSettings()
+        let engine = factory.create(stateStream: stream, detectionSettings: settings)
         XCTAssertNotNil(engine)
         XCTAssertTrue(engine is DetectionEngine)
     }
@@ -52,13 +53,15 @@ final class AppContainerTests: XCTestCase {
         let client = HueClient(stateStream: stream)
         let engine = DetectionEngine(stateStream: stream)
         let projector = SpatialProjector()
+        let settings = DetectionSettings()
         
         let manager = factory.create(
             detectionEngine: engine,
             spatialProjector: projector,
             hueClient: client,
             stateStream: stream,
-            fixturePersistence: persistence
+            fixturePersistence: persistence,
+            detectionSettings: settings
         )
         XCTAssertNotNil(manager)
         XCTAssertTrue(manager is ARSessionManager)
@@ -82,6 +85,7 @@ final class AppContainerTests: XCTestCase {
         XCTAssertNotNil(container.detectionEngine)
         XCTAssertNotNil(container.arSessionManager)
         XCTAssertNotNil(container.spatialProjector)
+        XCTAssertNotNil(container.detectionSettings)
     }
     
     func testAppContainerWithCustomFactories() {
@@ -129,8 +133,8 @@ final class AppContainerTests: XCTestCase {
     }
     
     private final class MockDetectionEngineFactory: DetectionEngineFactory {
-        func create(stateStream: HueStateStream) -> DetectionEngine {
-            DetectionEngine(stateStream: stateStream)
+        func create(stateStream: HueStateStream, detectionSettings: DetectionSettings) -> DetectionEngine {
+            DetectionEngine(stateStream: stateStream, detectionSettings: detectionSettings)
         }
     }
     
@@ -146,14 +150,16 @@ final class AppContainerTests: XCTestCase {
             spatialProjector: SpatialProjector,
             hueClient: HueClient,
             stateStream: HueStateStream,
-            fixturePersistence: FixturePersistence
+            fixturePersistence: FixturePersistence,
+            detectionSettings: DetectionSettings
         ) -> ARSessionManager {
             ARSessionManager(
                 detectionEngine: detectionEngine,
                 spatialProjector: spatialProjector,
                 hueClient: hueClient,
                 stateStream: stateStream,
-                fixturePersistence: fixturePersistence
+                fixturePersistence: fixturePersistence,
+                detectionSettings: detectionSettings
             )
         }
     }
