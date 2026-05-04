@@ -98,6 +98,7 @@ final class ARSessionManager {
     private let provider: CameraConfigurationProvider
     private let fixturePersistence: FixturePersistence
     private let relocalizationGuide: RelocalizationGuide
+    private let objectAnchorService: ObjectAnchorPersistenceService
     
     private var arView: ARView?
     private var anchorEntity: AnchorEntity?
@@ -105,6 +106,9 @@ final class ARSessionManager {
     
     /// Task that monitors for world map capture during relocalization.
     private var worldMapCaptureTask: Task<ARWorldMap?, Never>?
+    
+    /// Task that monitors for object anchor matches during relocalization.
+    private var objectAnchorMatchTask: Task<Void, Never>?
     
     /// Serial task queue for AR frame processing.
     /// Cancels any in-progress frame processing before starting a new one,
@@ -129,7 +133,8 @@ final class ARSessionManager {
         fixturePersistence: FixturePersistence = FixturePersistence.shared,
         hudFactory: FixtureHUDFactory = FixtureHUDFactory(),
         provider: CameraConfigurationProvider = DefaultCameraConfigurationProvider(),
-        relocalizationGuide: RelocalizationGuide = RelocalizationGuide()
+        relocalizationGuide: RelocalizationGuide = RelocalizationGuide(),
+        objectAnchorService: ObjectAnchorPersistenceService = ObjectAnchorPersistenceService()
     ) {
         self.detectionEngine = detectionEngine
         self.spatialProjector = spatialProjector
@@ -139,6 +144,7 @@ final class ARSessionManager {
         self.hudFactory = hudFactory
         self.provider = provider
         self.relocalizationGuide = relocalizationGuide
+        self.objectAnchorService = objectAnchorService
     }
     
     // MARK: - Session Lifecycle
@@ -174,6 +180,8 @@ final class ARSessionManager {
         detectionEngine.stop()
         worldMapCaptureTask?.cancel()
         worldMapCaptureTask = nil
+        objectAnchorMatchTask?.cancel()
+        objectAnchorMatchTask = nil
         isSessionActive = false
         isRelocalizing = false
         relocalizationState = .none
@@ -190,11 +198,16 @@ final class ARSessionManager {
     
     /// Attempt to relocalize the AR session using a previously saved world map.
     /// Displays a "Connecting" indicator while relocalization is in progress.
+    /// Also configures object anchor tracking for faster fixture-specific relocalization.
     private func attemptRelocalization(using worldMap: ARWorldMap, in arView: ARView) async {
         guard let session = arView.session as? ARSession else { return }
         
         // Reset relocalization guide state for the new attempt.
         relocalizationGuide.reset()
+        
+        // Reset object anchor matching state.
+        objectAnchorService.isRelocalized = false
+        objectAnchorService.matchedArchetype = nil
         
         isRelocalizing = true
         relocalizationState = .relocalizing(progress: 0.0)
@@ -204,6 +217,14 @@ final class ARSessionManager {
         let config = provider.makeARConfiguration()
         config.initialWorldMap = worldMap
         config.worldMappingMode = .none
+        
+        // Enable object anchor tracking for fixture-specific relocalization.
+        // As of iOS 26, object anchors provide faster relocalization than
+        // generic world-mapping for known fixture archetypes.
+        if objectAnchorService.hasActiveAnchors {
+            config.objectTrackingMode = .enabled
+            logger.info("Object anchor tracking enabled with \(objectAnchorService.archetypes.count) archetype(s)")
+        }
         
         // Start a monitoring task to track relocalization progress
         worldMapCaptureTask = Task { [weak self] in
@@ -226,6 +247,13 @@ final class ARSessionManager {
                 }
                 
                 try? await Task.sleep(for: .milliseconds(200))
+            }
+        }
+        
+        // Start object anchor matching monitor when object anchors are available.
+        if objectAnchorService.hasActiveAnchors {
+            objectAnchorMatchTask = Task { [weak self] in
+                await self?.monitorObjectAnchorMatches()
             }
         }
         
@@ -304,6 +332,45 @@ final class ARSessionManager {
         }
     }
     
+    /// Monitor ARKit anchors for object anchor matches during relocalization.
+    /// Continuously checks for new anchors and matches them against persisted
+    /// fixture archetypes for faster relocalization.
+    private func monitorObjectAnchorMatches() async {
+        guard let session = arView?.session as? ARSession else { return }
+        
+        let checkInterval = Duration.milliseconds(500)
+        let timeout = Duration.seconds(12)
+        let startTime = ContinuousClock.now
+        
+        while !Task.isCancelled {
+            let elapsed = ContinuousClock.now - startTime
+            if elapsed >= timeout {
+                break
+            }
+            
+            // Check current anchors for object anchor matches.
+            let anchors = session.currentFrame?.anchors ?? []
+            let objectAnchorIDs = anchors.compactMap { anchor -> String? in
+                if let objectAnchor = anchor as? ARObjectAnchor {
+                    return objectAnchor.name
+                }
+                return nil
+            }
+            
+            if !objectAnchorIDs.isEmpty {
+                await MainActor.run {
+                    self.objectAnchorService.matchObjectAnchors(to: objectAnchorIDs)
+                }
+                
+                if objectAnchorService.isRelocalized {
+                    break
+                }
+            }
+            
+            try? await Task.sleep(for: checkInterval)
+        }
+    }
+    
     /// Capture and persist the current AR session state as a world map.
     /// This should be called after a fixture has been successfully linked
     /// to save the spatial anchor for future sessions.
@@ -330,6 +397,8 @@ final class ARSessionManager {
     /// Clear the persisted world map and reset relocalization state.
     func clearSavedWorldMap() {
         fixturePersistence.deleteWorldMap()
+        fixturePersistence.deleteObjectAnchors()
+        objectAnchorService.clearAllArchetypes()
         isRelocalizing = false
         relocalizationProgress = 0.0
         relocalizationState = .none
@@ -538,11 +607,24 @@ final class ARSessionManager {
     
     /// Called after a fixture is successfully linked to a Hue light.
     /// Captures the current AR session as a world map for future relocalization.
+    /// Also registers archetypal fixtures as object anchors for faster relocalization.
     func onFixtureLinked(_ fixture: TrackedFixture) async {
         // Update the fixture's mapped light ID
         if let idx = trackedFixtures.firstIndex(where: { $0.id == fixture.id }) {
             trackedFixtures[idx].mappedHueLightId = fixture.mappedHueLightId
         }
+        
+        // Register archetypal fixtures as object anchors for faster relocalization.
+        // Archetypal types (Chandelier, Sconce, Desk Lamp, Pendant) benefit most
+        // from object anchor tracking as ARKit can recognize their geometric signatures.
+        let objectAnchorName = "fixture_\(fixture.type.rawValue)_\(fixture.id.uuidString.prefix(8))"
+        objectAnchorService.registerArchetype(
+            fixtureType: fixture.type,
+            objectAnchorName: objectAnchorName,
+            position: fixture.position,
+            orientation: fixture.orientation,
+            confidence: Float(fixture.confidence)
+        )
         
         // Capture and save the world map for session persistence
         await captureAndSaveWorldMap()

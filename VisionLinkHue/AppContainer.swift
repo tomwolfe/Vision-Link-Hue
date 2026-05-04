@@ -38,7 +38,8 @@ protocol ARSessionManagerFactory {
         spatialProjector: SpatialProjector,
         hueClient: HueClient,
         stateStream: HueStateStream,
-        fixturePersistence: FixturePersistence
+        fixturePersistence: FixturePersistence,
+        objectAnchorService: ObjectAnchorPersistenceService
     ) -> ARSessionManager
 }
 
@@ -132,14 +133,16 @@ final class DefaultARSessionManagerFactory: ARSessionManagerFactory {
         spatialProjector: SpatialProjector,
         hueClient: HueClient,
         stateStream: HueStateStream,
-        fixturePersistence: FixturePersistence
+        fixturePersistence: FixturePersistence,
+        objectAnchorService: ObjectAnchorPersistenceService
     ) -> ARSessionManager {
         ARSessionManager(
             detectionEngine: detectionEngine,
             spatialProjector: spatialProjector,
             hueClient: hueClient,
             stateStream: stateStream,
-            fixturePersistence: fixturePersistence
+            fixturePersistence: fixturePersistence,
+            objectAnchorService: objectAnchorService
         )
     }
 }
@@ -185,6 +188,7 @@ final class AppContainer {
         self.factories = factories
         
         let persistence = FixturePersistence.shared
+        let objectAnchorService = ObjectAnchorPersistenceService()
         
         // Create dependencies through factories for testability.
         let stream = factories.stateStreamFactory.create(persistence: persistence)
@@ -196,7 +200,8 @@ final class AppContainer {
             spatialProjector: projector,
             hueClient: client,
             stateStream: stream,
-            fixturePersistence: persistence
+            fixturePersistence: persistence,
+            objectAnchorService: objectAnchorService
         )
         
         // Wire up calibration persistence to the spatial service's engine

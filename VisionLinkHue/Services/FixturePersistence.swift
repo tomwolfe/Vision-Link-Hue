@@ -397,6 +397,61 @@ actor FixturePersistence {
         }
     }
     
+    // MARK: - Object Anchor Persistence
+    
+    /// The file URL where object anchor data is persisted.
+    private var objectAnchorURL: URL {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        return docs.appendingPathComponent("fixture_object_anchors.json")
+    }
+    
+    /// Save fixture object anchors for faster relocalization.
+    /// Object anchors provide quicker relocalization than world maps
+    /// for known fixture archetypes (Chandelier, Sconce, Desk Lamp, Pendant).
+    func saveObjectAnchors(_ anchors: [Data]) {
+        do {
+            try anchors.forEach { data in
+                try data.write(to: objectAnchorURL, options: .atomic)
+            }
+            logger.info("Saved \(anchors.count) fixture object anchor(s)")
+        } catch {
+            logger.error("Failed to save object anchors: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Load persisted object anchors for relocalization.
+    func loadObjectAnchors() -> [Data] {
+        guard FileManager.default.fileExists(atPath: objectAnchorURL.path) else {
+            return []
+        }
+        
+        do {
+            let data = try Data(contentsOf: objectAnchorURL)
+            logger.info("Loaded fixture object anchor data")
+            return [data]
+        } catch {
+            logger.error("Failed to load object anchors: \(error.localizedDescription)")
+            return []
+        }
+    }
+    
+    /// Check if persisted object anchors exist.
+    func hasObjectAnchors() -> Bool {
+        FileManager.default.fileExists(atPath: objectAnchorURL.path)
+    }
+    
+    /// Delete persisted object anchors.
+    func deleteObjectAnchors() {
+        do {
+            if FileManager.default.fileExists(atPath: objectAnchorURL.path) {
+                try FileManager.default.removeItem(at: objectAnchorURL)
+                logger.info("Object anchors deleted")
+            }
+        } catch {
+            logger.error("Failed to delete object anchors: \(error.localizedDescription)")
+        }
+    }
+    
     // MARK: - CloudKit Spatial Sync
     
     /// Trigger a CloudKit spatial sync operation via the SpatialSyncService.

@@ -4,11 +4,16 @@ import Foundation
 import os
 
 /// Represents one of the four quadrants of the depth map.
-enum DepthQuadrant: Int, Sendable {
+/// Uses `RawRepresentable` with `RawValue` matching `InlineArray` indices
+/// for zero-cost indexing into `Span`-backed quadrant arrays.
+enum DepthQuadrant: Int, Sendable, CaseIterable {
     case topLeft
     case topRight
     case bottomLeft
     case bottomRight
+    
+    /// Returns the index for use with `InlineArray`/`Span` storage.
+    var index: Int { rawValue }
     
     /// Human-readable label for the quadrant.
     var label: String {
@@ -28,6 +33,144 @@ enum DepthQuadrant: Int, Sendable {
         case .bottomLeft: return .topRight
         case .bottomRight: return .topLeft
         }
+    }
+}
+
+/// Fixed-size storage for exactly 4 quadrant values.
+/// Uses Swift 6.3 `InlineArray` to avoid heap allocation during
+/// CVPixelBuffer depth map analysis, reducing memory pressure during
+/// high-frequency feature density computation.
+@_fixed_layout
+struct QuadrantCounts: ~Copyable {
+    @InlineArray(4)
+    var values: [Int]
+    
+    /// Initialize with all counts set to zero.
+    init() {
+        for i in 0..<4 {
+            values[i] = 0
+        }
+    }
+    
+    /// Access the count for a specific quadrant by index.
+    subscript(quadrant: DepthQuadrant) -> Int {
+        get { values[quadrant.index] }
+        set { values[quadrant.index] = newValue }
+    }
+    
+    /// Convert to a `Span` over the raw values for iteration.
+    func asSpan() -> Span<Int> {
+        Span(values)
+    }
+    
+    /// Compute the sum of all quadrant counts.
+    func total() -> Int {
+        var sum = 0
+        for count in asSpan() {
+            sum += count
+        }
+        return sum
+    }
+    
+    /// Find the quadrant index with the minimum count.
+    func sparsest() -> Int {
+        var minIdx = 0
+        var minVal = values[0]
+        for i in 1..<4 {
+            if values[i] < minVal {
+                minVal = values[i]
+                minIdx = i
+            }
+        }
+        return minIdx
+    }
+    
+    /// Find the quadrant index with the maximum count.
+    func richest() -> Int {
+        var maxIdx = 0
+        var maxVal = values[0]
+        for i in 1..<4 {
+            if values[i] > maxVal {
+                maxVal = values[i]
+                maxIdx = i
+            }
+        }
+        return maxIdx
+    }
+}
+
+/// Fixed-size density array backed by `InlineArray` for Shannon entropy
+/// computation on quadrant feature distributions.
+@_fixed_layout
+struct QuadrantDensities: ~Copyable {
+    @InlineArray(4)
+    var values: [Float]
+    
+    /// Initialize with all densities set to zero.
+    init() {
+        for i in 0..<4 {
+            values[i] = 0.0
+        }
+    }
+    
+    /// Access the density for a specific quadrant by index.
+    subscript(quadrant: DepthQuadrant) -> Float {
+        get { values[quadrant.index] }
+        set { values[quadrant.index] = newValue }
+    }
+    
+    /// Convert to a `Span` over the raw values for iteration.
+    func asSpan() -> Span<Float> {
+        Span(values)
+    }
+    
+    /// Compute the total density across all quadrants.
+    func total() -> Float {
+        var sum: Float = 0.0
+        for density in asSpan() {
+            sum += density
+        }
+        return sum
+    }
+    
+    /// Compute Shannon entropy of the normalized density distribution.
+    func entropy() -> Float {
+        let total = self.total()
+        guard total > 0 else { return 0.0 }
+        
+        var entropy: Float = 0.0
+        for density in asSpan() {
+            let probability = density / total
+            guard probability > 0 else { continue }
+            entropy -= probability * log(probability)
+        }
+        return entropy
+    }
+    
+    /// Find the quadrant index with the minimum density.
+    func sparsest() -> Int {
+        var minIdx = 0
+        var minVal = values[0]
+        for i in 1..<4 {
+            if values[i] < minVal {
+                minVal = values[i]
+                minIdx = i
+            }
+        }
+        return minIdx
+    }
+    
+    /// Find the quadrant index with the maximum density.
+    func richest() -> Int {
+        var maxIdx = 0
+        var maxVal = values[0]
+        for i in 1..<4 {
+            if values[i] > maxVal {
+                maxVal = values[i]
+                maxIdx = i
+            }
+        }
+        return maxIdx
     }
 }
 
@@ -174,6 +317,10 @@ final class RelocalizationGuide {
     /// specific environmental guidance directing the user toward the quadrant
     /// with the most visual features.
     ///
+    /// Uses Swift 6.3 `InlineArray`/`Span` for zero-allocation quadrant
+    /// storage during CVPixelBuffer iteration, reducing memory pressure
+    /// during high-frequency feature density analysis.
+    ///
     /// - Parameters:
     ///   - depthMap: The ARKit depth map CVPixelBuffer.
     ///   - imageBufferSize: The dimensions of the captured image.
@@ -195,11 +342,9 @@ final class RelocalizationGuide {
         let midX = width / 2
         let midY = height / 2
         
-        // Count valid depth pixels in each quadrant.
-        var quadrantCounts = [DepthQuadrant: Int]()
-        for quadrant in [DepthQuadrant.topLeft, .topRight, .bottomLeft, .bottomRight] {
-            quadrantCounts[quadrant] = 0
-        }
+        // Use InlineArray-backed storage for quadrant counts — zero heap
+        // allocation during the hot path of CVPixelBuffer iteration.
+        var quadrantCounts = QuadrantCounts()
         
         // Sample every 2nd pixel per quadrant for performance.
         let sampleStride = 2
@@ -222,29 +367,28 @@ final class RelocalizationGuide {
                     quadrant = y < midY ? .topRight : .bottomRight
                 }
                 
-                quadrantCounts[quadrant] = (quadrantCounts[quadrant] ?? 0) + 1
+                quadrantCounts[quadrant] += 1
             }
         }
         
         // Compute total samples per quadrant for density calculation.
         let samplesPerQuadrant = (width / sampleStride / 2) * (height / sampleStride / 2)
         
-        // Convert counts to densities (0.0 to 1.0).
-        var densities: [DepthQuadrant: Float] = [:]
-        for (quadrant, count) in quadrantCounts {
-            densities[quadrant] = Float(count) / Float(samplesPerQuadrant)
+        // Convert counts to densities (0.0 to 1.0) using InlineArray-backed storage.
+        var densities = QuadrantDensities()
+        for quadrant in DepthQuadrant.allCases {
+            densities[quadrant] = Float(quadrantCounts[quadrant]) / Float(samplesPerQuadrant)
         }
         
-        // Compute Shannon entropy of the quadrant distribution.
-        let entropy = computeQuadrantEntropy(densities: densities)
+        // Compute Shannon entropy of the quadrant distribution via Span iteration.
+        let entropy = densities.entropy()
         
         // Find the quadrant with the lowest feature density.
-        guard let sparsestQuadrant = densities.min(by: { $0.value < $1.value })?.key else {
-            return .none
-        }
+        let sparsestIdx = densities.sparsest()
+        let richestIdx = densities.richest()
         
-        // Find the quadrant with the highest feature density.
-        guard let richestQuadrant = densities.max(by: { $0.value < $1.value })?.key else {
+        guard let sparsestQuadrant = DepthQuadrant(rawValue: sparsestIdx),
+              let richestQuadrant = DepthQuadrant(rawValue: richestIdx) else {
             return .none
         }
         
@@ -260,41 +404,13 @@ final class RelocalizationGuide {
         let guidance = environmentalGuidance(from: sparsestQuadrant, richest: richestQuadrant, densities: densities)
         
         // Validate that the guidance is meaningful (enough density difference).
-        let densitySpread = densities[richestQuadrant]! - densities[sparsestQuadrant]!
+        let densitySpread = densities[richestQuadrant] - densities[sparsestQuadrant]
         if densitySpread < 0.15 {
             // Not enough difference to give specific guidance.
             return .none
         }
         
         return guidance
-    }
-    
-    /// Compute Shannon entropy of the quadrant feature density distribution.
-    /// Returns a value between 0.0 (all features in one quadrant) and
-    /// log(4.0) ~ 1.386 (features evenly distributed across all quadrants).
-    ///
-    /// - Parameter densities: Map of quadrant to feature density (0.0-1.0).
-    /// - Returns: Shannon entropy in bits.
-    private func computeQuadrantEntropy(densities: [DepthQuadrant: Float]) -> Float {
-        let totalDensity = densities.values.reduce(0.0, +)
-        
-        // Normalize densities to form a probability distribution.
-        guard totalDensity > 0 else {
-            return 0.0
-        }
-        
-        var entropy: Float = 0.0
-        
-        for density in densities.values {
-            let probability = Float(density) / totalDensity
-            
-            // Skip zero probabilities (0 * log(0) = 0 by convention).
-            guard probability > 0 else { continue }
-            
-            entropy -= probability * log(probability)
-        }
-        
-        return entropy
     }
     
     /// Generate environmental guidance based on quadrant analysis.
@@ -304,12 +420,12 @@ final class RelocalizationGuide {
     /// - Parameters:
     ///   - sparsestQuadrant: The quadrant with the fewest visual features.
     ///   - richest: The quadrant with the most visual features.
-    ///   - densities: Full density map for all quadrants.
+    ///   - densities: Full density map for all quadrants via InlineArray-backed storage.
     /// - Returns: A LookDirection.environmental with specific guidance text.
     private func environmentalGuidance(
         from sparsestQuadrant: DepthQuadrant,
         richest: DepthQuadrant,
-        densities: [DepthQuadrant: Float]
+        densities: QuadrantDensities
     ) -> LookDirection {
         // Generate specific guidance based on which quadrant is sparsest.
         // The user should look toward the opposite (richest) quadrant.
@@ -333,8 +449,8 @@ final class RelocalizationGuide {
         
         // Enhance the instruction with environmental context if there's
         // a strong directional bias (entropy is very low).
-        let totalDensity = densities.values.reduce(0.0, +)
-        let richestDensity = densities[richest] ?? 0
+        let totalDensity = densities.total()
+        let richestDensity = densities[richest]
         let dominanceRatio = Float(richestDensity) / totalDensity
         
         if dominanceRatio > 0.45 {
