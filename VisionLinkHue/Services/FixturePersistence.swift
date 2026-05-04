@@ -21,7 +21,11 @@ enum SchemaMigration {
     static let currentVersion: SchemaVersion = .v2
     
     /// Migrate data from an older schema version to the current version.
-    /// This is called automatically when the ModelContainer detects a schema mismatch.
+    /// Note: This custom migration block is only invoked when using a custom
+    /// `migrationStrategy` (e.g., `.custom`). With the current `.inline` strategy
+    /// in `ModelContainer` initialization, this function is dead code and is never
+    /// called. If you switch to a custom migration strategy in the future, ensure
+    /// you delete old models after migrating to avoid duplicate records.
     static func migrate(from oldContainer: ModelContainer, to newContainer: ModelContainer) async throws {
         let oldContext = oldContainer.mainContext
         let newContext = newContainer.mainContext

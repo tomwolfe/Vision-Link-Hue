@@ -58,6 +58,9 @@ final class DetectionEngine {
     /// CoreML model for object detection (loaded lazily).
     private var objectDetectionModel: MLModel?
     
+    /// Cached VNCoreMLRequest for object detection — created once when model loads.
+    private var objectDetectionRequest: VNCoreMLRequest?
+    
     /// Whether the CoreML object detection model has been loaded.
     private var isObjectModelLoaded: Bool = false
     
@@ -225,6 +228,16 @@ final class DetectionEngine {
             }.value
             isCoreMLAvailable = true
             isObjectModelLoaded = true
+            
+            // Pre-create the VNCoreMLRequest to avoid per-frame allocation churn.
+            objectDetectionRequest = VNCoreMLRequest(model: objectDetectionModel!) { [weak self] request, error in
+                if let error {
+                    Logger(subsystem: "com.tomwolfe.visionlinkhue", category: "DetectionEngine")
+                        .warning("CoreML object detection failed: \(error.localizedDescription)")
+                }
+            }
+            objectDetectionRequest?.imageCropAndScaleOption = .scaleFill
+            
             logger.info("CoreML lighting archetype model loaded successfully")
         } catch {
             logger.warning("Failed to load CoreML model: \(error.localizedDescription)")
@@ -243,6 +256,7 @@ final class DetectionEngine {
         onModelLoadingProgress?(0.0)
         isObjectModelLoaded = false
         objectDetectionModel = nil
+        objectDetectionRequest = nil
         intentClassifier = CoreMLIntentClassifier()
         Task { await loadObjectDetectionModel() }
         Task { await loadIntentClassifierModel() }
@@ -294,16 +308,7 @@ final class DetectionEngine {
         pixelBuffer: CVPixelBuffer
     ) async throws -> [FixtureDetection] {
         guard let model = objectDetectionModel else { return [] }
-        
-        let coreMLRequest = VNCoreMLRequest(model: model) { [weak self] request, error in
-            // Completion handler (called on a background thread)
-            if let error {
-                Logger(subsystem: "com.tomwolfe.visionlinkhue", category: "DetectionEngine")
-                    .warning("CoreML object detection failed: \(error.localizedDescription)")
-            }
-        }
-        
-        coreMLRequest.imageCropAndScaleOption = .scaleFill
+        guard let coreMLRequest = objectDetectionRequest else { return [] }
         
         let priority: TaskPriority = .userInitiated
         

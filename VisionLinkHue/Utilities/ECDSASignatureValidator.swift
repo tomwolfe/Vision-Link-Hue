@@ -20,6 +20,23 @@ enum ECDSASignatureValidator {
     
     private static let signatureKeychainPrefix = "com.tomwolfe.visionlinkhue.ecdsa.pub."
     
+    /// Default ECDSA P-256 public key for OTA config verification, embedded at compile time.
+    /// Replace this with your actual public key before shipping.
+    /// The key is stored as DER-encoded SubjectPublicKeyInfo (SPKI) format.
+    private static let defaultPublicKeyData: Data? = {
+        #if DEBUG
+        // Development placeholder — replace with actual key before shipping.
+        return nil
+        #else
+        // Production key embedded at compile time via build settings.
+        // Set ECDSA_DEFAULT_PUBLIC_KEY in your Build Configuration.
+        guard let keyString = ProcessInfo.processInfo.environment["ECDSA_DEFAULT_PUBLIC_KEY"] else {
+            return nil
+        }
+        return Data(base64Encoded: keyString)
+        #endif
+    }()
+    
     /// The elliptic curve used for signature verification.
     /// P-256 provides 128-bit security and is supported by CryptoKit.
     enum Curve: String {
@@ -112,6 +129,27 @@ enum ECDSASignatureValidator {
     ) throws -> T {
         try verifySignature(payload: data, signature: signature, keyID: keyID)
         return try decoder.decode(T.self, from: data)
+    }
+    
+    /// Seed the default public key into the Keychain if none exists yet.
+    /// Call this during app initialization to ensure the first OTA update
+    /// has a valid public key for verification on fresh installs.
+    static func seedDefaultPublicKeyIfNeeded() throws {
+        guard let defaultKeyData = defaultPublicKeyData else {
+            logger.warning("No default public key configured — OTA signature verification will fail on fresh install")
+            return
+        }
+        
+        let keychainKey = signatureKeychainPrefix + "default"
+        
+        // Check if a key already exists in the Keychain.
+        guard try KeychainManager.shared.loadECDSAPublicKey(forKey: keychainKey) == nil else {
+            logger.info("ECDSA public key already exists in Keychain, skipping seed")
+            return
+        }
+        
+        try KeychainManager.shared.saveECDSAPublicKey(defaultKeyData, forKey: keychainKey)
+        logger.info("ECDSA default public key seeded into Keychain for fresh install")
     }
     
     /// Store a public key in the Keychain for future signature verification.

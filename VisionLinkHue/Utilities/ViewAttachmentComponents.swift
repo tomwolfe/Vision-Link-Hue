@@ -27,9 +27,7 @@ final class FixtureHUDFactory {
         
         entity.components.set(BillboardComponent())
         
-        // SwiftUI view rendering via ViewAttachmentComponent requires
-        // RealityKit 2026+ ViewAttachmentComponent API.
-        // entity.components.set(ViewAttachmentComponent(FixtureHUDView(fixture: fixture)))
+        entity.components.set(ViewAttachmentComponent(FixtureHUDView(fixture: fixture)))
         
         anchor.addChild(entity)
         

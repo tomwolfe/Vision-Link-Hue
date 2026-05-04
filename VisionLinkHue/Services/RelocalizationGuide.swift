@@ -59,12 +59,12 @@ struct QuadrantCounts: ~Copyable {
     }
     
     /// Convert to a `Span` over the raw values for iteration.
-    func asSpan() -> Span<Int> {
+    borrowing func asSpan() -> Span<Int> {
         Span(values)
     }
     
     /// Compute the sum of all quadrant counts.
-    func total() -> Int {
+    borrowing func total() -> Int {
         var sum = 0
         for count in asSpan() {
             sum += count
@@ -73,7 +73,7 @@ struct QuadrantCounts: ~Copyable {
     }
     
     /// Find the quadrant index with the minimum count.
-    func sparsest() -> Int {
+    borrowing func sparsest() -> Int {
         var minIdx = 0
         var minVal = values[0]
         for i in 1..<4 {
@@ -86,7 +86,7 @@ struct QuadrantCounts: ~Copyable {
     }
     
     /// Find the quadrant index with the maximum count.
-    func richest() -> Int {
+    borrowing func richest() -> Int {
         var maxIdx = 0
         var maxVal = values[0]
         for i in 1..<4 {
@@ -120,12 +120,12 @@ struct QuadrantDensities: ~Copyable {
     }
     
     /// Convert to a `Span` over the raw values for iteration.
-    func asSpan() -> Span<Float> {
+    borrowing func asSpan() -> Span<Float> {
         Span(values)
     }
     
     /// Compute the total density across all quadrants.
-    func total() -> Float {
+    borrowing func total() -> Float {
         var sum: Float = 0.0
         for density in asSpan() {
             sum += density
@@ -134,7 +134,7 @@ struct QuadrantDensities: ~Copyable {
     }
     
     /// Compute Shannon entropy of the normalized density distribution.
-    func entropy() -> Float {
+    borrowing func entropy() -> Float {
         let total = self.total()
         guard total > 0 else { return 0.0 }
         
@@ -148,7 +148,7 @@ struct QuadrantDensities: ~Copyable {
     }
     
     /// Find the quadrant index with the minimum density.
-    func sparsest() -> Int {
+    borrowing func sparsest() -> Int {
         var minIdx = 0
         var minVal = values[0]
         for i in 1..<4 {
@@ -161,7 +161,7 @@ struct QuadrantDensities: ~Copyable {
     }
     
     /// Find the quadrant index with the maximum density.
-    func richest() -> Int {
+    borrowing func richest() -> Int {
         var maxIdx = 0
         var maxVal = values[0]
         for i in 1..<4 {
@@ -425,7 +425,7 @@ final class RelocalizationGuide {
     private func environmentalGuidance(
         from sparsestQuadrant: DepthQuadrant,
         richest: DepthQuadrant,
-        densities: QuadrantDensities
+        densities: borrowing QuadrantDensities
     ) -> LookDirection {
         // Generate specific guidance based on which quadrant is sparsest.
         // The user should look toward the opposite (richest) quadrant.

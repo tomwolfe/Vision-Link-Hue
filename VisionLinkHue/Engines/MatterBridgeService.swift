@@ -229,10 +229,11 @@ enum ControlPath: Sendable {
 extension MatterBridgeService: HMHomeManagerDelegate {
     
     func homeManagerDidUpdateHomes(_ manager: HMHomeManager) {
+        let previousReachability = hasReachableDevices
         homes = manager.homes
         
         // Notify state stream of device availability change
-        if hasReachableDevices != (state.lights.filter { $0.isReachable }.count > 0) {
+        if previousReachability != hasReachableDevices {
             // Devices reached or lost reachability
             for light in state.lights {
                 onDeviceStateChanged?(light)

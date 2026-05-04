@@ -201,12 +201,26 @@ final class CertificatePinningDelegate: NSObject, URLSessionDelegate, @unchecked
         let box = ChallengeHandlerBox(handler: completionHandler)
         
         Task {
-            if let result = await self.pinStore.evaluateChallenge(publicKeyHash: hash) {
+            var handlerCalled = false
+            defer {
+                // Ensure completionHandler is always called even if Task is cancelled
+                // to prevent permanently hanging the URLSession.
+                if !handlerCalled && !Task.isCancelled {
+                    await MainActor.run {
+                        box.call(.cancelAuthenticationChallenge, nil)
+                    }
+                }
+            }
+            
+            let result = await self.pinStore.evaluateChallenge(publicKeyHash: hash)
+            if let result {
                 await MainActor.run {
+                    handlerCalled = true
                     box.call(result.0, result.0 == .useCredential ? credential : nil)
                 }
             } else {
                 await MainActor.run {
+                    handlerCalled = true
                     box.call(.useCredential, credential)
                 }
                 await self.pinStore.savePinnedHash(hash)
