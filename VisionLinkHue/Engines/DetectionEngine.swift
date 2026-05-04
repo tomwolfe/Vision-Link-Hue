@@ -48,6 +48,10 @@ final class DetectionEngine {
     /// Heuristic classifier for fixture type and confidence.
     private var classifier = FixtureHeuristicClassifier()
     
+    /// Intent-based classifier using CoreML for architectural archetype recognition.
+    /// Overrides heuristic classification when CoreML confidence exceeds threshold.
+    private var intentClassifier = CoreMLIntentClassifier()
+    
     /// Neural surface material classifier for ARKit 2026 material detection.
     private let materialClassifier: NeuralSurfaceMaterialClassifier
     
@@ -73,6 +77,7 @@ final class DetectionEngine {
         )
         self.onModelLoadingProgress = onModelLoadingProgress
         Task { await loadObjectDetectionModel() }
+        Task { await loadIntentClassifierModel() }
     }
     
     /// Timestamp of the last inference pass (monotonic clock).
@@ -225,7 +230,22 @@ final class DetectionEngine {
         onModelLoadingProgress?(0.0)
         isObjectModelLoaded = false
         objectDetectionModel = nil
+        intentClassifier = CoreMLIntentClassifier()
         Task { await loadObjectDetectionModel() }
+        Task { await loadIntentClassifierModel() }
+    }
+    
+    /// Load the intent classifier CoreML model asynchronously.
+    /// Runs in parallel with the object detection model loading.
+    private func loadIntentClassifierModel() async {
+        do {
+            var classifier = intentClassifier
+            try await classifier.loadModel()
+            intentClassifier = classifier
+            logger.info("Intent classifier model loaded successfully")
+        } catch {
+            logger.warning("Failed to load intent classifier model: \(error.localizedDescription)")
+        }
     }
     
     // MARK: - Hybrid Detection Pipeline
@@ -297,9 +317,10 @@ final class DetectionEngine {
             try box.run()
         }).value
         
-        // Classify observations using the object detection results
-        // The CoreML model provides archetype labels that override heuristics
-        return classifyObjects(from: observations)
+        // Classify observations using intent classification (CoreML) with
+        // heuristic fallback. Intent classification takes priority when
+        // CoreML confidence exceeds the override threshold.
+        return await classifyObjects(from: observations)
     }
     
     /// Run Vision rectangle detection as fallback.
@@ -371,7 +392,7 @@ final class DetectionEngine {
     
     /// Classify CoreML object detections into fixture types.
     /// CoreML archetype labels override heuristic classification when confidence is high.
-    private func classifyObjects(from observations: [ObservationData]) -> [FixtureDetection] {
+    private func classifyObjects(from observations: [ObservationData]) async -> [FixtureDetection] {
         var detections: [FixtureDetection] = []
         
         for observation in observations {
@@ -383,11 +404,24 @@ final class DetectionEngine {
                 bottomRight: SIMD2<Float>(Float(observation.boundingBox.maxX), Float(1.0 - observation.boundingBox.minY))
             )
             
-            // Classify using heuristics as fallback, but CoreML labels take priority
-            let type = classifier.classify(typeFrom: observation)
-            let confidence = classifier.calculateConfidence(from: observation)
+            // Run intent classification via CoreML
+            let intentResult = await intentClassifier.classify(observation)
             
-            detections.append(FixtureDetection(type: type, region: region, confidence: confidence))
+            // Use intent classification when CoreML confidence is high enough
+            // to override heuristic scoring, reducing false positives
+            if CoreMLIntentClassifier.shouldOverrideHeuristics(confidence: intentResult.confidence) {
+                let intentConfidence = intentResult.confidence + DetectionConstants.proximityBonus
+                detections.append(FixtureDetection(
+                    type: intentResult.type,
+                    region: region,
+                    confidence: min(intentConfidence, DetectionConstants.maxConfidence)
+                ))
+            } else {
+                // Fall back to heuristic classification
+                let type = classifier.classify(typeFrom: observation)
+                let confidence = classifier.calculateConfidence(from: observation)
+                detections.append(FixtureDetection(type: type, region: region, confidence: confidence))
+            }
         }
         
         return nonMaxSuppression(detections, iouThreshold: DetectionConstants.nmsIoUThreshold)

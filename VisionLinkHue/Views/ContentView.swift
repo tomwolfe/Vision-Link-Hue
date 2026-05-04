@@ -98,23 +98,14 @@ struct ContentView: View {
             
             Spacer()
             
-                    Button {
-                        dismissedErrorId = error.id
-                        stateStream.dismissError(error)
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                    }
-                    .accessibilityLabel(Text("Dismiss error"))
-                    .buttonStyle(.plain)
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(.ultraThinMaterial, in: Rectangle())
-                .shadow(radius: 5)
+            Button {
+                dismissedErrorId = error.id
+                stateStream.dismissError(error)
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.secondary)
             }
-        }
-    }
+            .accessibilityLabel(Text("Dismiss error"))
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 16)
