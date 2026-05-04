@@ -4,7 +4,7 @@
 > Detect, map, and control your real-world lighting fixtures using on-device AI and Apple's spatial computing stack.
 
 [![Swift](https://img.shields.io/badge/Swift-6.3-orange.svg)](https://swift.org/)
-[![Platform](https://img.shields.io/badge/iOS-18.0+-blue.svg)](https://developer.apple.com/ios/)
+[![Platform](https://img.shields.io/badge/iOS-19.0+-blue.svg)](https://developer.apple.com/ios/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![CI](https://github.com/tomwolfe/Vision-Link-Hue/workflows/CI/badge.svg)](.github/workflows/ci.yml)
 
@@ -23,6 +23,8 @@ Built with Swift concurrency, strict type safety, and modern Apple frameworks, V
 - **Kabsch Calibration**: Advanced affine transformation solver using Newton-Raphson polar decomposition for precise mapping between ARKit space and Hue Bridge Room Space.
 - **Material Recognition**: Leverages ARKit 2026 Neural Surface Synthesis to classify fixture materials (Glass, Metal, Wood, etc.).
 - **Hue Bridge Integration**: Full CLIP v2 API support, mTLS with Trust-On-First-Use (TOFU) certificate pinning, and real-time state updates via Server-Sent Events (SSE).
+- **Matter/Thread Fallback**: Cross-manufacturer smart light support via Matter protocol with automatic fallback when Hue Bridge is unavailable, enabling control of Thread-based lights from any Matter-certified manufacturer.
+- **Unified Device Control**: Single control surface for both Hue CLIP v2 and Matter devices with intelligent routing based on availability and latency.
 - **Adaptive Thermal Management**: Dynamic inference throttling based on device thermal state to prevent LiDAR/Camera shutdown.
 - **OTA-Updatable Rules**: Classification logic is driven by a JSON config, allowing detection rules to be updated without app recompilation.
 - **Persistent Mappings**: SwiftData-powered storage for fixture-to-light associations with atomic transactions and spatial validation.
@@ -34,8 +36,8 @@ Built with Swift concurrency, strict type safety, and modern Apple frameworks, V
 
 | Dependency | Version |
 |------------|---------|
-| **iOS** | 18.0+ |
-| **Xcode** | 16.2+ |
+| **iOS** | 19.0+ |
+| **Xcode** | 17.0+ |
 | **Swift** | 6.3 |
 | **macOS** | 15.0 (Sequoia) for CI/build |
 
@@ -49,10 +51,12 @@ Vision-Link Hue
 │   ├── DetectionEngine.swift        # Vision + Heuristic classification
 │   ├── SpatialCalibrationEngine.swift # Kabsch algorithm (Newton-Raphson polar decomposition)
 │   ├── HueClient.swift              # CLIP v2 + SSE + mTLS
+│   ├── MatterBridgeService.swift    # Matter/Thread fallback communication
 │   ├── SpatialProjector.swift       # ARKit raycast & depth unprojection
 │   └── ThermalMonitor.swift         # Adaptive throttling
 ├── 📦 Models/
 │   ├── HueModels.swift              # Bridge resources (Lights, Scenes, Groups)
+│   ├── MatterModels.swift           # Matter device & accessory models
 │   ├── FixtureModels.swift          # Tracked fixtures & detection data
 │   └── HueStateStream.swift         # Centralized state & notification actor
 ├── 🗄️ Services/
@@ -69,6 +73,7 @@ Vision-Link Hue
 - **Actor Isolation**: `AppNotificationSystem` and `HueEventStreamActor` isolate high-frequency network events from the MainActor.
 - **Dependency Injection**: Centralized `AppContainer` provides deterministic access to services.
 - **Protocol-Oriented**: `HueClientProtocol` and `HueNetworkClientProtocol` enable full testability with `MockHueClient`.
+- **Fallback Strategy**: `MatterBridgeService` provides Matter/Thread-based control as a fallback when Hue Bridge is unavailable, ensuring continuous lighting control.
 
 ---
 
@@ -85,7 +90,7 @@ Vision-Link Hue
    open VisionLinkHue.xcodeproj
    ```
 
-3. Select an iOS 18+ simulator or physical device and build (`⌘B`).
+3. Select an iOS 19+ simulator or physical device and build (`⌘B`).
 
 > ⚠️ **Note**: ARKit features require a physical device. Simulator uses safe fallbacks for detection and spatial math.
 
@@ -98,6 +103,7 @@ Vision-Link Hue
 3. **Calibrate (Optional)**: For room-scale accuracy, tap known fixture positions to establish an ARKit-to-Bridge transformation.
 4. **Detect Fixtures**: Point your camera at lights. The HUD will overlay detected fixtures with confidence indicators.
 5. **Link & Control**: Tap a detected fixture to link it to a Hue light/group. Use the control panel to adjust brightness, color temperature, or recall scenes.
+6. **Matter Fallback**: If your Hue Bridge is unavailable, the app automatically discovers and connects to Matter-certified lights on your Thread network, providing seamless control across manufacturers.
 
 ---
 

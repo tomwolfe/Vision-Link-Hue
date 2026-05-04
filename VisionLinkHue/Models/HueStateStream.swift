@@ -183,6 +183,7 @@ final class HueStateStream {
     private var _lights: [String: HueLightResource] = [:]
     private var _scenes: [String: HueSceneResource] = [:]
     private var _groups: [String: BridgeGroup] = [:]
+    private var _matterDevices: [String: MatterLightDevice] = [:]
     
     /// Whether the lights array needs re-sorting before UI access.
     private var _lightsNeedsResort = false
@@ -193,6 +194,9 @@ final class HueStateStream {
     /// Whether the groups array needs re-sorting before UI access.
     private var _groupsNeedsResort = false
     
+    /// Whether the Matter devices array needs re-sorting before UI access.
+    private var _matterDevicesNeedsResort = false
+    
     /// Cached sorted lights array to avoid redundant sorting.
     private var _lightsCache: [HueLightResource]?
     
@@ -201,6 +205,9 @@ final class HueStateStream {
     
     /// Cached sorted groups array to avoid redundant sorting.
     private var _groupsCache: [BridgeGroup]?
+    
+    /// Cached sorted Matter devices array to avoid redundant sorting.
+    private var _matterDevicesCache: [MatterLightDevice]?
     
     /// Computed array of lights for SwiftUI observation and UI consumption.
     /// Uses lazy sorting with caching to avoid O(n log n) on every SSE packet.
@@ -230,6 +237,16 @@ final class HueStateStream {
             _groupsNeedsResort = false
         }
         return _groupsCache!
+    }
+    
+    /// Computed array of Matter devices for SwiftUI observation and UI consumption.
+    /// Uses lazy sorting with caching to avoid O(n log n) on every update.
+    var matterDevices: [MatterLightDevice] {
+        if _matterDevicesNeedsResort || _matterDevicesCache == nil {
+            _matterDevicesCache = _matterDevices.values.sorted { $0.id < $1.id }
+            _matterDevicesNeedsResort = false
+        }
+        return _matterDevicesCache!
     }
     
     var isConnected: Bool = false
@@ -312,6 +329,14 @@ final class HueStateStream {
             mergeIntoDictionary(&self._groups, incoming: groups)
             _groupsNeedsResort = true
             _groupsCache = nil
+        }
+        
+        if let matterLights = update.matterLights {
+            for device in matterLights {
+                _matterDevices[device.id] = device
+            }
+            _matterDevicesNeedsResort = true
+            _matterDevicesCache = nil
         }
     }
     
@@ -449,9 +474,30 @@ final class HueStateStream {
         _lightsNeedsResort = true
         _scenesNeedsResort = true
         _groupsNeedsResort = true
+        _matterDevicesNeedsResort = true
         _lightsCache = nil
         _scenesCache = nil
         _groupsCache = nil
+        _matterDevicesCache = nil
+    }
+    
+    /// Update Matter device state from the MatterBridgeService.
+    func updateMatterDevices(_ devices: [MatterLightDevice]) {
+        for device in devices {
+            _matterDevices[device.id] = device
+        }
+        _matterDevicesNeedsResort = true
+        _matterDevicesCache = nil
+    }
+    
+    /// Resolve a Matter device by its ID.
+    func matterDevice(by id: String) -> MatterLightDevice? {
+        _matterDevices[id]
+    }
+    
+    /// Check if Matter fallback has reachable devices.
+    var hasReachableMatterDevices: Bool {
+        _matterDevices.values.contains { $0.isReachable }
     }
     
     /// Report a certificate pin mismatch to the user.

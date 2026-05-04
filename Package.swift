@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "Vision-Link-Hue",
     platforms: [
-        .iOS(.v18)
+        .iOS(.v19)
     ],
     dependencies: [],
     targets: [

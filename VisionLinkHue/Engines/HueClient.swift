@@ -66,12 +66,16 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
     /// Service for spatial awareness and coordinate transformation.
     var spatialService: HueSpatialService?
     
+    /// Service for Matter/Thread fallback lighting control.
+    var matterService: MatterBridgeService?
+    
     // MARK: - Initialization
     
     init(stateStream: HueStateStream) {
         self.stateStream = stateStream
         self.discoveryService = HueDiscoveryService()
         self.spatialService = HueSpatialService(stateStream: stateStream)
+        self.matterService = MatterBridgeService()
         self.onCertificatePinMismatch = { _, _ in }
         setupURLSession()
     }
@@ -326,6 +330,58 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
     /// Whether a valid 3+ point calibration has been established.
     /// Delegates to `HueSpatialService`.
     var isCalibrated: Bool { spatialService?.isCalibrated ?? false }
+    
+    // MARK: - Matter Fallback
+    
+    var isMatterFallbackAvailable: Bool {
+        matterService?.hasReachableDevices ?? false
+    }
+    
+    var preferredControlPath: ControlPath {
+        matterService?.preferredControlPath(hueBridgeAvailable: bridgeIP != nil) ?? .none
+    }
+    
+    func fetchMatterDevices() async throws -> MatterBridgeState {
+        guard let matterService else {
+            throw MatterError.homeKitNotAvailable
+        }
+        return try await matterService.fetchDevices()
+    }
+    
+    func setMatterPower(deviceId: String, on: Bool) async throws {
+        guard let matterService else {
+            throw MatterError.homeKitNotAvailable
+        }
+        try await matterService.setPower(deviceId: deviceId, on: on)
+    }
+    
+    func setMatterBrightness(deviceId: String, brightness: Int, transitionDuration: Int = 4) async throws {
+        guard let matterService else {
+            throw MatterError.homeKitNotAvailable
+        }
+        try await matterService.setBrightness(deviceId: deviceId, brightness: brightness, transitionDuration: transitionDuration)
+    }
+    
+    func setMatterColorTemperature(deviceId: String, mireds: Int, transitionDuration: Int = 4) async throws {
+        guard let matterService else {
+            throw MatterError.homeKitNotAvailable
+        }
+        try await matterService.setColorTemperature(deviceId: deviceId, mireds: mireds, transitionDuration: transitionDuration)
+    }
+    
+    func setMatterColorXY(deviceId: String, x: Double, y: Double, transitionDuration: Int = 4) async throws {
+        guard let matterService else {
+            throw MatterError.homeKitNotAvailable
+        }
+        try await matterService.setColorXY(deviceId: deviceId, x: x, y: y, transitionDuration: transitionDuration)
+    }
+    
+    func patchMatterLight(deviceId: String, patch: MatterLightStatePatch) async throws {
+        guard let matterService else {
+            throw MatterError.homeKitNotAvailable
+        }
+        try await matterService.patch(deviceId: deviceId, patch: patch)
+    }
     
     // MARK: - SSE Event Stream
     
@@ -667,6 +723,8 @@ enum HueError: Error, LocalizedError {
     case spatialAwareNotSupported(currentFirmware: String, requiredFirmware: String)
     case spatialAwareSyncFailed(errors: [SpatialAwareSyncError])
     case spatialServiceUnavailable
+    case matterFallbackUnavailable
+    case matterControlFailed(deviceId: String, error: String)
     
     var errorDescription: String? {
         switch self {
@@ -686,6 +744,10 @@ enum HueError: Error, LocalizedError {
             return "SpatialAware sync failed: \(messages)"
         case .spatialServiceUnavailable:
             return "Spatial service is not available"
+        case .matterFallbackUnavailable:
+            return "Matter fallback is not available"
+        case .matterControlFailed(let deviceId, let error):
+            return "Matter control failed for device \(deviceId): \(error)"
         }
     }
 }

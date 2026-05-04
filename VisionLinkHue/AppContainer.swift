@@ -42,6 +42,13 @@ protocol ARSessionManagerFactory {
     ) -> ARSessionManager
 }
 
+/// Protocol for creating `MatterBridgeService` instances.
+/// Enables dependency injection of mock Matter services in tests.
+@MainActor
+protocol MatterBridgeServiceFactory {
+    func create() -> MatterBridgeService
+}
+
 /// Default implementations of all factory protocols.
 /// Used by `AppContainer` for production dependency creation.
 @MainActor
@@ -52,19 +59,22 @@ final class DefaultFactories: @unchecked Sendable {
     let detectionEngineFactory: DetectionEngineFactory
     let spatialProjectorFactory: SpatialProjectorFactory
     let arSessionManagerFactory: ARSessionManagerFactory
+    let matterBridgeServiceFactory: MatterBridgeServiceFactory
     
     init(
         stateStreamFactory: HueStateStreamFactory = DefaultHueStateStreamFactory(),
         hueClientFactory: HueClientFactory = DefaultHueClientFactory(),
         detectionEngineFactory: DetectionEngineFactory = DefaultDetectionEngineFactory(),
         spatialProjectorFactory: SpatialProjectorFactory = DefaultSpatialProjectorFactory(),
-        arSessionManagerFactory: ARSessionManagerFactory = DefaultARSessionManagerFactory()
+        arSessionManagerFactory: ARSessionManagerFactory = DefaultARSessionManagerFactory(),
+        matterBridgeServiceFactory: MatterBridgeServiceFactory = DefaultMatterBridgeServiceFactory()
     ) {
         self.stateStreamFactory = stateStreamFactory
         self.hueClientFactory = hueClientFactory
         self.detectionEngineFactory = detectionEngineFactory
         self.spatialProjectorFactory = spatialProjectorFactory
         self.arSessionManagerFactory = arSessionManagerFactory
+        self.matterBridgeServiceFactory = matterBridgeServiceFactory
     }
 }
 
@@ -124,6 +134,14 @@ final class DefaultARSessionManagerFactory: ARSessionManagerFactory {
     }
 }
 
+/// Default factory for `MatterBridgeService`.
+@MainActor
+final class DefaultMatterBridgeServiceFactory: MatterBridgeServiceFactory {
+    func create() -> MatterBridgeService {
+        MatterBridgeService()
+    }
+}
+
 /// Centralized dependency injection container for the application.
 /// Initializes all core services once at app launch and provides
 /// deterministic access to dependencies throughout the view hierarchy.
@@ -140,6 +158,7 @@ final class AppContainer {
     let detectionEngine: DetectionEngine
     let arSessionManager: ARSessionManager
     let spatialProjector: SpatialProjector
+    let matterService: MatterBridgeService
     
     private let factories: DefaultFactories
     
@@ -166,10 +185,14 @@ final class AppContainer {
         let calibrationStore = KeychainCalibrationStore(keychainManager: keychainManager)
         client.spatialService?.calibrationEngine.persistenceStore = calibrationStore
         
+        let matterService = factories.matterBridgeServiceFactory.create()
+        client.matterService = matterService
+        
         self.stateStream = stream
         self.hueClient = client
         self.detectionEngine = detector
         self.arSessionManager = manager
         self.spatialProjector = projector
+        self.matterService = matterService
     }
 }

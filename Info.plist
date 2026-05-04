@@ -6,6 +6,8 @@
 	<string>Vision-Link Hue uses your camera to detect lighting fixtures in your environment via on-device AI and anchor AR controls to them.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Vision-Link Hue discovers your Philips Hue bridge on your local network to control lights.</string>
+	<key>NSHomeKitUsageDescription</key>
+	<string>Vision-Link Hue uses HomeKit to discover and control Matter-certified smart lights as a fallback when your Hue Bridge is unavailable.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

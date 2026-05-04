@@ -134,6 +134,24 @@ struct ResourceUpdate: Codable, Sendable {
     let scenes: [HueSceneResource]?
     let groups: [BridgeGroup]?
     let spatial_awareness: SpatialAwareInfo?
+    let matter_lights: [MatterLightDevice]?
+    let matter_devices_changed: Bool
+    
+    init(
+        lights: [HueLightResource]? = nil,
+        scenes: [HueSceneResource]? = nil,
+        groups: [BridgeGroup]? = nil,
+        spatial_awareness: SpatialAwareInfo? = nil,
+        matter_lights: [MatterLightDevice]? = nil,
+        matter_devices_changed: Bool = false
+    ) {
+        self.lights = lights
+        self.scenes = scenes
+        self.groups = groups
+        self.spatial_awareness = spatial_awareness
+        self.matter_lights = matter_lights
+        self.matter_devices_changed = matter_devices_changed
+    }
 }
 
 /// Spatial awareness info from the bridge.

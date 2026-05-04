@@ -85,4 +85,30 @@ protocol HueClientProtocol: AnyObject {
     
     /// Reconnect to the bridge (re-authenticate and restart SSE).
     func reconnect() async
+    
+    // MARK: - Matter Fallback
+    
+    /// Whether Matter fallback is available as an alternative control path.
+    var isMatterFallbackAvailable: Bool { get }
+    
+    /// Get the preferred control path based on current availability.
+    var preferredControlPath: ControlPath { get }
+    
+    /// Fetch Matter device state when Hue Bridge is unavailable.
+    func fetchMatterDevices() async throws -> MatterBridgeState
+    
+    /// Set power for a Matter light device (fallback path).
+    func setMatterPower(deviceId: String, on: Bool) async throws
+    
+    /// Set brightness for a Matter light device (fallback path).
+    func setMatterBrightness(deviceId: String, brightness: Int, transitionDuration: Int) async throws
+    
+    /// Set color temperature for a Matter light device (fallback path).
+    func setMatterColorTemperature(deviceId: String, mireds: Int, transitionDuration: Int) async throws
+    
+    /// Set XY color for a Matter light device (fallback path).
+    func setMatterColorXY(deviceId: String, x: Double, y: Double, transitionDuration: Int) async throws
+    
+    /// Patch a Matter light with multiple state changes (fallback path).
+    func patchMatterLight(deviceId: String, patch: MatterLightStatePatch) async throws
 }
