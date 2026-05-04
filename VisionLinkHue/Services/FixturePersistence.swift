@@ -96,7 +96,7 @@ actor FixturePersistence {
         )
         
         do {
-            let count = try modelContext.count(descriptor)
+            let count = try modelContext.fetchCount(descriptor)
             return count > 0
         } catch {
             logger.error("Failed to check for bridge-space mappings: \(error.localizedDescription)")

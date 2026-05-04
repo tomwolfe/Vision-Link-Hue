@@ -71,8 +71,9 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
     init(stateStream: HueStateStream) {
         self.stateStream = stateStream
         self.discoveryService = HueDiscoveryService()
+        self.spatialService = HueSpatialService(stateStream: stateStream)
+        self.onCertificatePinMismatch = { _, _ in }
         setupURLSession()
-        self.spatialService = HueSpatialService(hueClient: self, stateStream: stateStream)
     }
     
     deinit {
@@ -444,9 +445,11 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
     
     private func setupURLSession() {
         let config = URLSessionConfiguration.default
+        let currentPinnedHash = pinnedHash
+        let currentBridgeIP = bridgeIP
         
         // Load pinned hash from Keychain for TOFU.
-        if let ip = bridgeIP {
+        if let ip = currentBridgeIP {
             let key = KeychainKeys.key(for: ip)
             Task {
                 if let hash = try? await KeychainManager.shared.loadCertPin(from: key) {
@@ -457,9 +460,9 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
         
         // Create a shared certificate pinning delegate for all REST calls.
         // This ensures REST API calls use the same TOFU pinning as the SSE stream.
-        let keychainKey = bridgeIP.map { KeychainKeys.key(for: $0) }
+        let keychainKey = currentBridgeIP.map { KeychainKeys.key(for: $0) }
         pinningDelegate = CertificatePinningDelegate(
-            pinnedHash: pinnedHash,
+            pinnedHash: currentPinnedHash,
             keychainKey: keychainKey
         ) { [weak self] trustedHash in
             Task { @MainActor [weak self] in

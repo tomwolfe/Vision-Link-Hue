@@ -24,6 +24,7 @@ final class AppContainer {
         stream.configure()
         
         let client = HueClient(stateStream: stream)
+        client.spatialService?.setHueClient(client)
         let detector = DetectionEngine()
         let projector = SpatialProjector()
         let manager = ARSessionManager(

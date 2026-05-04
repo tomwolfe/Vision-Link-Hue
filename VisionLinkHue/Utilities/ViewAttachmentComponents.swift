@@ -26,10 +26,6 @@ final class FixtureHUDFactory {
         entity.orientation = fixture.orientation
         
         entity.components.set(BillboardComponent())
-        entity.components.set(ViewAttachmentComponent(rootView: FixtureHUDView(fixture: fixture)))
-        entity.components.set(CollisionComponent(
-            shapes: [.boundingSphere(radius: 0.15)]
-        ))
         
         anchor.addChild(entity)
         

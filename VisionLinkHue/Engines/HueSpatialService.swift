@@ -18,7 +18,7 @@ final class HueSpatialService {
     private let calibrationEngine = SpatialCalibrationEngine()
     
     /// The Hue client for making REST API calls.
-    private let hueClient: HueClient
+    private weak var hueClient: HueClient?
     
     /// State stream for reporting errors and accessing bridge config.
     private let stateStream: HueStateStream?
@@ -36,9 +36,12 @@ final class HueSpatialService {
     /// - Parameters:
     ///   - hueClient: The authenticated Hue client for REST API calls.
     ///   - stateStream: Optional state stream for error reporting.
-    init(hueClient: HueClient, stateStream: HueStateStream?) {
-        self.hueClient = hueClient
+    init(stateStream: HueStateStream?) {
         self.stateStream = stateStream
+    }
+    
+    func setHueClient(_ client: HueClient) {
+        self.hueClient = client
     }
     
     // MARK: - Calibration
@@ -125,21 +128,21 @@ final class HueSpatialService {
     /// Verify firmware compatibility before attempting SpatialAware sync.
     /// Returns the bridge spatial info if supported, throws otherwise.
     func verifySpatialAwareCompatibility() async throws -> BridgeSpatialInfo {
-        guard let username = hueClient.apiKey else {
+        guard let username = hueClient?.apiKey else {
             throw HueError.noApiKey
         }
         
-        guard let ip = hueClient.bridgeIP else {
+        guard let ip = hueClient?.bridgeIP else {
             throw HueError.noBridgeConfigured
         }
         
-        let url = URL(string: "https://\(ip):\(hueClient.bridgePort)/api/\(username)/config")
+        let url = URL(string: "https://\(ip):\(hueClient?.bridgePort ?? 443)/api/\(username)/config")
         
         guard let url else {
             throw HueError.invalidURL
         }
         
-        let (data, _) = try await hueClient.authenticatedRequest(url: url, method: "GET")
+        let (data, _) = try await hueClient!.authenticatedRequest(url: url, method: "GET")
         
         // Decode bridge config to extract firmware version using type-safe Codable
         let bridgeConfig = try JSONDecoder().decode(BridgeConfigResponse.self, from: data)
@@ -182,24 +185,24 @@ final class HueSpatialService {
     /// Bridges Pro firmware v1976+ supports room-relative coordinate offsets.
     /// Automatically verifies firmware compatibility before syncing.
     func syncSpatialAwareness(fixtures: [SpatialAwarePosition]) async throws {
-        guard let username = hueClient.apiKey else {
+        guard let username = hueClient?.apiKey else {
             throw HueError.noApiKey
         }
         
-        guard let ip = hueClient.bridgeIP else {
+        guard let ip = hueClient?.bridgeIP else {
             throw HueError.noBridgeConfigured
         }
         
         // Verify firmware compatibility before sync
         _ = try await verifySpatialAwareCompatibility()
         
-        guard let url = URL(string: "https://\(ip):\(hueClient.bridgePort)/api/\(username)/spatial_awareness") else {
+        guard let url = URL(string: "https://\(ip):\(hueClient?.bridgePort ?? 443)/api/\(username)/spatial_awareness") else {
             throw HueError.invalidURL
         }
         
         let request = SpatialAwareSyncRequest(fixtures: fixtures)
         
-        let (data, response) = try await hueClient.authenticatedRequest(url: url, method: "POST", body: request)
+        let (data, response) = try await hueClient?.authenticatedRequest(url: url, method: "POST", body: request) ?? (Data(), nil)
         
         guard let httpResponse = response as? HTTPURLResponse,
               (200...299).contains(httpResponse.statusCode) else {
@@ -229,19 +232,19 @@ final class HueSpatialService {
     
     /// Get current spatial awareness data from the bridge.
     func fetchSpatialAwareness() async throws -> [SpatialAwarePosition] {
-        guard let username = hueClient.apiKey else {
+        guard let username = hueClient?.apiKey else {
             throw HueError.noApiKey
         }
         
-        guard let ip = hueClient.bridgeIP else {
+        guard let ip = hueClient?.bridgeIP else {
             throw HueError.noBridgeConfigured
         }
         
-        guard let url = URL(string: "https://\(ip):\(hueClient.bridgePort)/api/\(username)/resources/spatial_awareness") else {
+        guard let url = URL(string: "https://\(ip):\(hueClient?.bridgePort ?? 443)/api/\(username)/resources/spatial_awareness") else {
             throw HueError.invalidURL
         }
         
-        let (data, _) = try await hueClient.authenticatedRequest(url: url, method: "GET")
+        let (data, _) = try await hueClient?.authenticatedRequest(url: url, method: "GET") ?? (Data(), nil)
         
         let response = try JSONDecoder().decode(SpatialAwareSyncResponse.self, from: data)
         

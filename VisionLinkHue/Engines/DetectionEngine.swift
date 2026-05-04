@@ -99,7 +99,9 @@ final class DetectionEngine {
         guard isRunning else { return [] }
         
         let now = ContinuousClock.now
-        guard now - lastInferenceInstant >= currentInferenceInterval else {
+        let intervalSeconds = Int64(currentInferenceInterval)
+        let intervalNanoseconds = Int64((currentInferenceInterval - Double(intervalSeconds)) * 1_000_000_000)
+        guard now - lastInferenceInstant >= Duration(secondsComponent: intervalSeconds, attosecondsComponent: intervalNanoseconds * 1_000_000) else {
             return []
         }
         lastInferenceInstant = now
@@ -121,8 +123,8 @@ final class DetectionEngine {
         
         let detections = try await runVisionDetection(pixelBuffer, lowPower: useLowPower)
         
-        let elapsed = ContinuousClock.now.duration(from: start).milliseconds
-        inferenceLatencyMs = Double(elapsed)
+        let elapsed = ContinuousClock.now - start
+        inferenceLatencyMs = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
         
         let filtered = detections.filter { $0.confidence >= minConfidence }
         
@@ -131,7 +133,8 @@ final class DetectionEngine {
         }
         
         if !filtered.isEmpty {
-            logger.debug("Detected \(filtered.count) fixture(s) in \(String(format: "%.1f", elapsed))ms")
+            let elapsedMs = Double(elapsed.components.seconds) * 1000.0 + Double(elapsed.components.attoseconds) / 1e12
+            logger.debug("Detected \(filtered.count) fixture(s) in \(String(format: "%.1f", elapsedMs))ms")
         }
         
         return filtered
@@ -156,15 +159,26 @@ final class DetectionEngine {
         // that forces LiDAR shut-off.
         let priority: TaskPriority = lowPower ? .utility : .userInitiated
         
-        let observations = try await Task.detached(priority: priority) {
-            try handler.perform([request])
-            
-            guard let results = request.results as? [VNRectangleObservation] else {
-                return [ObservationData]()
+        final class VisionHandlerBox: @unchecked Sendable {
+            let handler: VNImageRequestHandler
+            let request: VNDetectRectanglesRequest
+            init(handler: VNImageRequestHandler, request: VNDetectRectanglesRequest) {
+                self.handler = handler
+                self.request = request
             }
-            
-            return results.map { ObservationData(boundingBox: $0.boundingBox) }
-        }.value
+            func run() throws -> [ObservationData] {
+                try handler.perform([request])
+                guard let results = request.results as? [VNRectangleObservation] else {
+                    return [ObservationData]()
+                }
+                return results.map { ObservationData(boundingBox: $0.boundingBox) }
+            }
+        }
+        
+        let box = VisionHandlerBox(handler: handler, request: request)
+        let observations = try await Task.detached(priority: priority, operation: { [box] in
+            try box.run()
+        }).value
         
         return classifyFixtures(from: observations)
     }
@@ -227,7 +241,9 @@ final class DetectionEngine {
     /// - Parameter url: URL pointing to the JSON config file.
     /// - Throws: `ClassificationConfigError` if the config is invalid.
     func reloadRules(from url: URL) async throws {
-        try await classifier.loadRules(from: url)
+        var c = classifier
+        try await c.loadRules(from: url)
+        classifier = c
         logger.info("Classification rules reloaded from \(url.path)")
     }
     

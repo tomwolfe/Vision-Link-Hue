@@ -2,6 +2,17 @@ import Foundation
 import Security
 import os
 
+/// Sendable wrapper for the completionHandler to avoid data race warnings.
+private final class ChallengeHandlerBox: @unchecked Sendable {
+    let handler: (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    init(handler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        self.handler = handler
+    }
+    func call(_ disposition: URLSession.AuthChallengeDisposition, _ credential: URLCredential?) {
+        handler(disposition, credential)
+    }
+}
+
 /// Result of evaluating a certificate challenge against pinned state.
 enum CertificateEvaluationResult: Sendable {
     /// Certificate matches the pinned hash - trust it.
@@ -106,7 +117,7 @@ actor CertificatePinStore {
 /// The delegate itself is stateless and only holds a reference to the actor.
 /// All mutable state is isolated within the actor, satisfying Swift 6.1
 /// strict concurrency without `@unchecked Sendable`.
-final class CertificatePinningDelegate: NSObject, URLSessionDelegate {
+final class CertificatePinningDelegate: NSObject, URLSessionDelegate, @unchecked Sendable {
     
     private let logger = Logger(
         subsystem: "com.tomwolfe.visionlinkhue",
@@ -129,7 +140,7 @@ final class CertificatePinningDelegate: NSObject, URLSessionDelegate {
         super.init()
     }
     
-    func urlSession(
+    nonisolated func urlSession(
         _ session: URLSession,
         didReceive challenge: URLAuthenticationChallenge,
         completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
@@ -140,7 +151,7 @@ final class CertificatePinningDelegate: NSObject, URLSessionDelegate {
             return
         }
         
-        guard let publicKey = SecTrustCopyPublicKey(secTrust),
+        guard let publicKey = SecTrustCopyPublicKey(serverTrust),
               let publicKeyData = SecKeyCopyExternalRepresentation(publicKey, nil) as Data? else {
             logger.warning("Failed to extract public key from server trust")
             completionHandler(.cancelAuthenticationChallenge, nil)
@@ -149,15 +160,17 @@ final class CertificatePinningDelegate: NSObject, URLSessionDelegate {
         
         let hash = publicKeyData.sha256()
         let credential = URLCredential(trust: serverTrust)
+        let box = ChallengeHandlerBox(handler: completionHandler)
         
-        Task { [weak self] in
-            guard let self else { return }
-            
+        Task {
             if let result = await self.pinStore.evaluateChallenge(publicKeyHash: hash) {
-                completionHandler(result.0, result.0 == .useCredential ? credential : nil)
+                await MainActor.run {
+                    box.call(result.0, result.0 == .useCredential ? credential : nil)
+                }
             } else {
-                // TOFU mode: trust the certificate and save asynchronously.
-                completionHandler(.useCredential, credential)
+                await MainActor.run {
+                    box.call(.useCredential, credential)
+                }
                 await self.pinStore.savePinnedHash(hash)
             }
         }
@@ -166,7 +179,7 @@ final class CertificatePinningDelegate: NSObject, URLSessionDelegate {
     /// Update the pinned hash via TOFU after external confirmation.
     func updatePinnedHash(_ hash: Data) {
         Task { [weak self] in
-            await self?.pinStore.pinnedHash = hash
+            await self?.pinStore.savePinnedHash(hash)
         }
     }
     

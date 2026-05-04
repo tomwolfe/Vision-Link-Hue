@@ -38,33 +38,31 @@ extension Date {
 
 // MARK: - JSON Utilities
 
-/// Actor that owns cached ISO8601DateFormatter instances for safe concurrent access.
-private actor CachedDateFormatters {
-    private let formatterWithFractional: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
-    }()
-    
-    private let formatterWithoutFractional: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime]
-        return f
-    }()
-    
-    func date(from string: String, withFractionalSeconds: Bool) -> Date? {
-        let formatter = withFractionalSeconds ? formatterWithFractional : formatterWithoutFractional
-        return formatter.date(from: string)
+private final class ISO8601DateFormatterBox: @unchecked Sendable {
+    let formatter: ISO8601DateFormatter
+    init(_ formatter: ISO8601DateFormatter) {
+        self.formatter = formatter
+    }
+    func date(from string: String) -> Date? {
+        formatter.date(from: string)
     }
 }
 
-private let cachedFormatters = CachedDateFormatters()
+private let iso8601FormatterWithFractional: ISO8601DateFormatterBox = {
+    let f = ISO8601DateFormatter()
+    f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return ISO8601DateFormatterBox(f)
+}()
+
+private let iso8601FormatterWithoutFractional: ISO8601DateFormatterBox = {
+    let f = ISO8601DateFormatter()
+    f.formatOptions = [.withInternetDateTime]
+    return ISO8601DateFormatterBox(f)
+}()
 
 extension JSONDecoder {
     /// Create a decoder with ISO 8601 date decoding strategy that handles
     /// Hue's specific ISO 8601 flavor, including fractional seconds.
-    /// Cached formatters are managed by a dedicated actor for Swift 6.3
-    /// strict concurrency safety while avoiding per-call formatter allocation.
     static var hueDecoder: JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { decoder in
@@ -72,12 +70,12 @@ extension JSONDecoder {
             let dateString = try container.decode(String.self)
             
             // Try standard ISO8601DateFormatter with fractional seconds first
-            if let date = await cachedFormatters.date(from: dateString, withFractionalSeconds: true) {
+            if let date = iso8601FormatterWithFractional.date(from: dateString) {
                 return date
             }
             
             // Fallback: try without fractional seconds
-            if let date = await cachedFormatters.date(from: dateString, withFractionalSeconds: false) {
+            if let date = iso8601FormatterWithoutFractional.date(from: dateString) {
                 return date
             }
             
