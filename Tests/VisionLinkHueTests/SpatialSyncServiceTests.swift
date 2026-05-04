@@ -240,4 +240,83 @@ final class SpatialSyncServiceTests: XCTestCase {
         XCTAssertFalse(result.success)
         XCTAssertEqual(result.changes, 0)
     }
+    
+    // MARK: - CRDT Vector Clock Tests
+    
+    func testCRDTMergeLocalWins() {
+        let localClock: [String: Int64] = ["device-1": 5, "device-2": 3]
+        let remoteClock: [String: Int64] = ["device-1": 3, "device-2": 2]
+        
+        let result = CRDTConflictResolver.merge(
+            localClock: localClock,
+            remoteClock: remoteClock,
+            localVersion: 5,
+            remoteVersion: 3
+        )
+        
+        XCTAssertEqual(result, .localWins, "Local should win when all clock entries are higher")
+    }
+    
+    func testCRDTMergeRemoteWins() {
+        let localClock: [String: Int64] = ["device-1": 2, "device-2": 1]
+        let remoteClock: [String: Int64] = ["device-1": 4, "device-2": 3]
+        
+        let result = CRDTConflictResolver.merge(
+            localClock: localClock,
+            remoteClock: remoteClock,
+            localVersion: 2,
+            remoteVersion: 4
+        )
+        
+        XCTAssertEqual(result, .remoteWins, "Remote should win when all clock entries are higher")
+    }
+    
+    func testCRDTMergeEquivalent() {
+        let localClock: [String: Int64] = ["device-1": 3, "device-2": 2]
+        let remoteClock: [String: Int64] = ["device-1": 3, "device-2": 2]
+        
+        let result = CRDTConflictResolver.merge(
+            localClock: localClock,
+            remoteClock: remoteClock,
+            localVersion: 3,
+            remoteVersion: 3
+        )
+        
+        XCTAssertEqual(result, .equivalent, "Identical clocks should be equivalent")
+    }
+    
+    func testCRDTMergeConcurrentWithLocalPreference() {
+        // Concurrent: device-1 is ahead locally, device-2 is ahead remotely
+        let localClock: [String: Int64] = ["device-1": 5, "device-2": 2]
+        let remoteClock: [String: Int64] = ["device-1": 3, "device-2": 4]
+        
+        let result = CRDTConflictResolver.merge(
+            localClock: localClock,
+            remoteClock: remoteClock,
+            localVersion: 5,
+            remoteVersion: 4
+        )
+        
+        XCTAssertEqual(result, .localWins, "Local should win concurrent updates with higher explicit version")
+    }
+    
+    func testCRDTMergeClocks() {
+        let clockA: [String: Int64] = ["device-1": 3, "device-2": 1]
+        let clockB: [String: Int64] = ["device-1": 2, "device-3": 4]
+        
+        let merged = CRDTConflictResolver.mergeClocks(clockA, clockB)
+        
+        XCTAssertEqual(merged["device-1"], 3, "Should take max of device-1 entries")
+        XCTAssertEqual(merged["device-2"], 1, "Should preserve device-2 from clockA")
+        XCTAssertEqual(merged["device-3"], 4, "Should add device-3 from clockB")
+    }
+    
+    func testCRDTIncrementVersion() {
+        let clock: [String: Int64] = ["device-1": 3, "device-2": 2]
+        
+        let incremented = CRDTConflictResolver.incrementVersion(clock, for: "device-1")
+        
+        XCTAssertEqual(incremented["device-1"], 4, "Should increment device-1 version")
+        XCTAssertEqual(incremented["device-2"], 2, "Should preserve other entries")
+    }
 }

@@ -35,6 +35,33 @@ final class GazeTargetingTests: XCTestCase {
         XCTAssertEqual(gazeSystem.configuration.maxTargetDistance, 5.0)
     }
     
+    func testGazeSystemDefaultInputTypeIsGazePinch() {
+        XCTAssertEqual(gazeSystem.inputType, .gazePinch, "Default input type should be gazePinch for Vision Pro gaze-plus-pinch confirmation")
+    }
+    
+    func testGazePinchSelectionConfirmedOnEndSelection() {
+        gazeSystem.inputType = .gazePinch
+        let fixture = createFixture(position: SIMD3<Float>(0, 1.5, -1.0))
+        gazeSystem.configure(trackedFixtures: [fixture])
+        
+        let gazeOrigin = SIMD3<Float>(0, 1.6, 0)
+        let gazeDirection = simd_normalize(SIMD3<Float>(0, -0.1, -1.0))
+        
+        gazeSystem.updateGazeTarget(
+            gazeOrigin: gazeOrigin,
+            gazeDirection: gazeDirection,
+            cameraTransform: .identity
+        )
+        
+        XCTAssertEqual(gazeSystem.targetedFixtureID, fixture.id)
+        
+        gazeSystem.beginSelection()
+        XCTAssertTrue(gazeSystem.isSelecting)
+        
+        gazeSystem.endSelection()
+        XCTAssertFalse(gazeSystem.isSelecting)
+    }
+    
     // MARK: - Configuration Tests
     
     func testConfigureWithTrackedFixtures() {

@@ -104,7 +104,8 @@ final class GazeTargetingSystem: SpatialInputHandler, Sendable {
     var onBrightnessChange: ((Int) -> Void)?
     
     /// The type of gaze input currently in use.
-    var inputType: SpatialInputType = .gazeDwell
+    /// Defaults to `.gazePinch` for Vision Pro gaze-plus-pinch confirmation.
+    var inputType: SpatialInputType = .gazePinch
     
     /// Configuration for gaze targeting behavior.
     private var configuration: GazeTargetingConfiguration

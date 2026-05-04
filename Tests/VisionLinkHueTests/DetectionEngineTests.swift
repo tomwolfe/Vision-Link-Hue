@@ -10,7 +10,7 @@ final class DetectionEngineTests: XCTestCase {
     
     override func setUp() {
         super.setUp()
-        engine = DetectionEngine()
+        engine = DetectionEngine(stateStream: nil)
     }
     
     override func tearDown() {
@@ -185,12 +185,12 @@ final class DetectionEngineTests: XCTestCase {
     // MARK: - Model Quantization Tests
     
     func testModelQuantizationFlagExists() {
-        let engine = DetectionEngine()
+        let engine = DetectionEngine(stateStream: nil)
         XCTAssertFalse(engine.isModelQuantized, "Model should not be quantized by default")
     }
     
     func testReloadResetsQuantizationFlag() {
-        let engine = DetectionEngine()
+        let engine = DetectionEngine(stateStream: nil)
         let initialQuantized = engine.isModelQuantized
         
         engine.reloadObjectDetectionModel()

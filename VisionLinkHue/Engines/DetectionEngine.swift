@@ -67,6 +67,9 @@ final class DetectionEngine {
     /// Whether the model is using 4-bit weight quantization.
     var isModelQuantized: Bool = false
     
+    /// Reference to the state stream for reporting quantization fallback events.
+    private weak var stateStream: HueStateStream?
+    
     /// Progress of model loading (0.0 to 1.0).
     var modelLoadingProgress: Double = 0.0
     
@@ -82,13 +85,15 @@ final class DetectionEngine {
     ///   - onModelLoadingProgress: Callback for model loading progress updates.
     ///   - configSignature: Optional ECDSA signature for verifying config authenticity.
     ///   - configKeyID: Optional key identifier for multi-key rotation support.
-    init(onModelLoadingProgress: (@Sendable (Double) -> Void)? = nil, configSignature: Data? = nil, configKeyID: String? = nil) {
+    ///   - stateStream: Optional reference to the state stream for reporting quantization fallback events.
+    init(onModelLoadingProgress: (@Sendable (Double) -> Void)? = nil, configSignature: Data? = nil, configKeyID: String? = nil, stateStream: HueStateStream? = nil) {
         self.materialClassifier = NeuralSurfaceMaterialClassifier(
             materialFixtureMapping: NeuralSurfaceMaterialClassifier.loadMaterialMapping(signature: configSignature, keyID: configKeyID),
             materialIndexMapping: NeuralSurfaceMaterialClassifier.loadMaterialIndexMapping(signature: configSignature, keyID: configKeyID)
         )
         self.thermalMonitor = ThermalMonitor()
         self.onModelLoadingProgress = onModelLoadingProgress
+        self.stateStream = stateStream
         Task { await loadObjectDetectionModel() }
         Task { await loadIntentClassifierModel() }
     }
@@ -251,6 +256,19 @@ final class DetectionEngine {
                 quantizationApplied = true
             } catch {
                 logger.debug("4-bit quantization not available for model, falling back to unquantized: \(error.localizedDescription)")
+                
+                // Report quantization fallback to stateStream for thermal model baseline tracking.
+                if let stateStream {
+                    let fallbackError = NSError(
+                        domain: "DetectionEngine",
+                        code: 2,
+                        userInfo: [
+                            NSLocalizedDescriptionKey: "4-bit quantization unavailable, falling back to full precision model. This will increase inference latency and may impact the predictive thermal model baseline."
+                        ]
+                    )
+                    stateStream.reportError(fallbackError, severity: .warning, source: "DetectionEngine.quantization_fallback")
+                }
+                
                 loadedModel = try await Task.detached(priority: .userInitiated) {
                     try MLModel(contentsOf: compiledModelURL, configuration: baseConfig)
                 }.value

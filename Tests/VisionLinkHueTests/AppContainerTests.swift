@@ -30,7 +30,9 @@ final class AppContainerTests: XCTestCase {
     
     func testDefaultDetectionEngineFactoryCreatesEngine() {
         let factory = DefaultDetectionEngineFactory()
-        let engine = factory.create()
+        let persistence = FixturePersistence.shared
+        let stream = HueStateStream(persistence: persistence)
+        let engine = factory.create(stateStream: stream)
         XCTAssertNotNil(engine)
         XCTAssertTrue(engine is DetectionEngine)
     }
@@ -48,7 +50,7 @@ final class AppContainerTests: XCTestCase {
         let stream = HueStateStream(persistence: persistence)
         stream.configure()
         let client = HueClient(stateStream: stream)
-        let engine = DetectionEngine()
+        let engine = DetectionEngine(stateStream: stream)
         let projector = SpatialProjector()
         
         let manager = factory.create(
@@ -127,8 +129,8 @@ final class AppContainerTests: XCTestCase {
     }
     
     private final class MockDetectionEngineFactory: DetectionEngineFactory {
-        func create() -> DetectionEngine {
-            DetectionEngine()
+        func create(stateStream: HueStateStream) -> DetectionEngine {
+            DetectionEngine(stateStream: stateStream)
         }
     }
     

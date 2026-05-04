@@ -19,7 +19,7 @@ protocol HueClientFactory {
 /// Enables dependency injection of mock engines in tests.
 @MainActor
 protocol DetectionEngineFactory {
-    func create() -> DetectionEngine
+    func create(stateStream: HueStateStream) -> DetectionEngine
 }
 
 /// Protocol for creating `SpatialProjector` instances.
@@ -113,8 +113,8 @@ final class DefaultHueClientFactory: HueClientFactory {
 /// Default factory for `DetectionEngine`.
 @MainActor
 final class DefaultDetectionEngineFactory: DetectionEngineFactory {
-    func create() -> DetectionEngine {
-        DetectionEngine()
+    func create(stateStream: HueStateStream) -> DetectionEngine {
+        DetectionEngine(stateStream: stateStream)
     }
 }
 
@@ -196,7 +196,7 @@ final class AppContainer {
         // Create dependencies through factories for testability.
         let stream = factories.stateStreamFactory.create(persistence: persistence)
         let client = factories.hueClientFactory.create(stateStream: stream)
-        let detector = factories.detectionEngineFactory.create()
+        let detector = factories.detectionEngineFactory.create(stateStream: stream)
         let projector = factories.spatialProjectorFactory.create()
         let clusterEngine = SpatialClusterEngine()
         
