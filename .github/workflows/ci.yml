@@ -24,18 +24,20 @@ jobs:
           xcode-version: '26.3.0'
 
       - name: Build
-        run: xcodebuild build-for-testing \
-          -scheme Vision-Link-Hue \
-          -destination 'platform=iOS Simulator,name=iPhone 16' \
-          -configuration Release \
-          2>&1 | xcpretty
+        run: |
+          xcodebuild build-for-testing \
+            -scheme Vision-Link-Hue \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -configuration Release \
+            2>&1 | xcpretty
 
       - name: Test
-        run: xcodebuild test-without-building \
-          -scheme Vision-Link-Hue \
-          -destination 'platform=iOS Simulator,name=iPhone 16' \
-          -configuration Release \
-          2>&1 | xcpretty
+        run: |
+          xcodebuild test-without-building \
+            -scheme Vision-Link-Hue \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -configuration Release \
+            2>&1 | xcpretty
 
   lint:
     name: Lint
