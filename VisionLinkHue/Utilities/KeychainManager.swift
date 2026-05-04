@@ -80,4 +80,54 @@ actor KeychainManager {
         ]
         SecItemDelete(query as CFDictionary)
     }
+    
+    // MARK: - ECDSA Keychain Operations
+    
+    /// Save an ECDSA public key to the Keychain.
+    /// - Parameters:
+    ///   - publicKeyData: The raw public key bytes.
+    ///   - keyID: The account key for this ECDSA key.
+    func saveECDSAPublicKey(_ publicKeyData: Data, forKey keyID: String) throws {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassKey,
+            kSecAttrService as String: KeychainKeys.service,
+            kSecAttrAccount as String: keyID,
+            kSecValueData as String: publicKeyData,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
+        ]
+        SecItemDelete(query as CFDictionary)
+        guard SecItemAdd(query as CFDictionary, nil) == errSecSuccess else {
+            throw KeychainError.addFailed
+        }
+    }
+    
+    /// Load an ECDSA public key from the Keychain.
+    /// - Parameter keyID: The account key for this ECDSA key.
+    /// - Returns: The stored public key bytes, or `nil` if not found.
+    func loadECDSAPublicKey(forKey keyID: String) throws -> Data? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassKey,
+            kSecAttrService as String: KeychainKeys.service,
+            kSecAttrAccount as String: keyID,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        var result: AnyObject?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess else {
+            return nil
+        }
+        return result as? Data
+    }
+    
+    /// Delete an ECDSA public key from the Keychain.
+    /// - Parameter keyID: The account key for this ECDSA key.
+    func deleteECDSAPublicKey(forKey keyID: String) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassKey,
+            kSecAttrService as String: KeychainKeys.service,
+            kSecAttrAccount as String: keyID,
+        ]
+        SecItemDelete(query as CFDictionary)
+    }
 }

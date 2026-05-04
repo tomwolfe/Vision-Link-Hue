@@ -4,7 +4,7 @@
 > Detect, map, and control your real-world lighting fixtures using on-device AI and Apple's spatial computing stack.
 
 [![Swift](https://img.shields.io/badge/Swift-6.3-orange.svg)](https://swift.org/)
-[![Platform](https://img.shields.io/badge/iOS-19.0+-blue.svg)](https://developer.apple.com/ios/)
+[![Platform](https://img.shields.io/badge/iOS-26.0+-blue.svg)](https://developer.apple.com/ios/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![CI](https://github.com/tomwolfe/Vision-Link-Hue/workflows/CI/badge.svg)](.github/workflows/ci.yml)
 
@@ -36,7 +36,7 @@ Built with Swift concurrency, strict type safety, and modern Apple frameworks, V
 
 | Dependency | Version |
 |------------|---------|
-| **iOS** | 19.0+ |
+| **iOS** | 26.0+ |
 | **Xcode** | 17.0+ |
 | **Swift** | 6.3 |
 | **macOS** | 15.0 (Sequoia) for CI/build |
@@ -90,7 +90,7 @@ Vision-Link Hue
    open VisionLinkHue.xcodeproj
    ```
 
-3. Select an iOS 19+ simulator or physical device and build (`⌘B`).
+3. Select an iOS 26+ simulator or physical device and build (`⌘B`).
 
 > ⚠️ **Note**: ARKit features require a physical device. Simulator uses safe fallbacks for detection and spatial math.
 

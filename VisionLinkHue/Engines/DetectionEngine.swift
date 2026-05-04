@@ -71,9 +71,15 @@ final class DetectionEngine {
     private var onModelLoadingProgress: (@Sendable (Double) -> Void)?
     
     /// Initialize with material fixture mapping loaded from classification_rules.json.
-    init(onModelLoadingProgress: (@Sendable (Double) -> Void)? = nil) {
+    /// Optionally verifies an ECDSA signature for OTA config authenticity.
+    /// - Parameters:
+    ///   - onModelLoadingProgress: Callback for model loading progress updates.
+    ///   - configSignature: Optional ECDSA signature for verifying config authenticity.
+    ///   - configKeyID: Optional key identifier for multi-key rotation support.
+    init(onModelLoadingProgress: (@Sendable (Double) -> Void)? = nil, configSignature: Data? = nil, configKeyID: String? = nil) {
         self.materialClassifier = NeuralSurfaceMaterialClassifier(
-            materialFixtureMapping: NeuralSurfaceMaterialClassifier.loadMaterialMapping()
+            materialFixtureMapping: NeuralSurfaceMaterialClassifier.loadMaterialMapping(signature: configSignature, keyID: configKeyID),
+            materialIndexMapping: NeuralSurfaceMaterialClassifier.loadMaterialIndexMapping(signature: configSignature, keyID: configKeyID)
         )
         self.thermalMonitor = ThermalMonitor()
         self.onModelLoadingProgress = onModelLoadingProgress
@@ -489,11 +495,15 @@ final class DetectionEngine {
     
     /// Reload classification rules from a JSON config file.
     /// Enables OTA updates to detection logic without recompiling.
-    /// - Parameter url: URL pointing to the JSON config file.
+    /// Optionally verifies an ECDSA signature for config authenticity.
+    /// - Parameters:
+    ///   - url: URL pointing to the JSON config file.
+    ///   - signature: Optional ECDSA signature for verifying config authenticity.
+    ///   - keyID: Optional key identifier for multi-key rotation support.
     /// - Throws: `ClassificationConfigError` if the config is invalid.
-    func reloadRules(from url: URL) async throws {
+    func reloadRules(from url: URL, signature: Data? = nil, keyID: String? = nil) async throws {
         var c = classifier
-        try await c.loadRules(from: url)
+        try await c.loadRules(from: url, signature: signature, keyID: keyID)
         classifier = c
         logger.info("Classification rules reloaded from \(url.path)")
     }

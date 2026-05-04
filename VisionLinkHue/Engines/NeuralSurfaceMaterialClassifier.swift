@@ -67,12 +67,29 @@ struct NeuralSurfaceMaterialClassifier: Sendable {
     }
     
     /// Load the material-to-fixture-type mapping from classification_rules.json.
+    /// Verifies an optional ECDSA signature before parsing to prevent
+    /// injection of malicious classification rules.
     /// Falls back to the default mapping if the config file is unavailable.
-    static func loadMaterialMapping() -> [String: [FixtureType]] {
+    /// - Parameters:
+    ///   - signature: Optional ECDSA signature for verifying config authenticity.
+    ///   - keyID: Optional key identifier for multi-key rotation support.
+    /// - Returns: The material-to-fixture-type mapping.
+    static func loadMaterialMapping(signature: Data? = nil, keyID: String? = nil) -> [String: [FixtureType]] {
         // Try to load from the bundled classification_rules.json
         guard let url = Bundle.main.url(forResource: "classification_rules", withExtension: "json"),
-              let data = try? Data(contentsOf: url),
-              let config = try? JSONDecoder().decode(ClassificationConfigFile.self, from: data),
+              let data = try? Data(contentsOf: url) else {
+            return defaultMaterialFixtureMapping
+        }
+        
+        if let signature {
+            do {
+                try ECDSASignatureValidator.verifySignature(payload: data, signature: signature, keyID: keyID)
+            } catch {
+                return defaultMaterialFixtureMapping
+            }
+        }
+        
+        guard let config = try? JSONDecoder().decode(ClassificationConfigFile.self, from: data),
               let mapping = config.config?.materialFixtureMapping else {
             return defaultMaterialFixtureMapping
         }
@@ -86,12 +103,29 @@ struct NeuralSurfaceMaterialClassifier: Sendable {
     }
     
     /// Load the material index-to-label mapping from classification_rules.json.
+    /// Verifies an optional ECDSA signature before parsing to prevent
+    /// injection of malicious classification rules.
     /// Falls back to the default mapping if the config file is unavailable.
-    static func loadMaterialIndexMapping() -> [UInt8: String] {
+    /// - Parameters:
+    ///   - signature: Optional ECDSA signature for verifying config authenticity.
+    ///   - keyID: Optional key identifier for multi-key rotation support.
+    /// - Returns: The material index-to-label mapping.
+    static func loadMaterialIndexMapping(signature: Data? = nil, keyID: String? = nil) -> [UInt8: String] {
         // Try to load from the bundled classification_rules.json
         guard let url = Bundle.main.url(forResource: "classification_rules", withExtension: "json"),
-              let data = try? Data(contentsOf: url),
-              let config = try? JSONDecoder().decode(ClassificationConfigFile.self, from: data),
+              let data = try? Data(contentsOf: url) else {
+            return defaultMaterialIndexMapping
+        }
+        
+        if let signature {
+            do {
+                try ECDSASignatureValidator.verifySignature(payload: data, signature: signature, keyID: keyID)
+            } catch {
+                return defaultMaterialIndexMapping
+            }
+        }
+        
+        guard let config = try? JSONDecoder().decode(ClassificationConfigFile.self, from: data),
               let indexMapping = config.config?.materialIndexMapping else {
             return defaultMaterialIndexMapping
         }

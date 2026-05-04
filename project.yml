@@ -2,7 +2,7 @@ name: VisionLinkHue
 options:
   bundleIdPrefix: com.visionlinkhue
   deploymentTarget:
-    iOS: "19.0"
+    iOS: "26.0"
   creationAssemblyFlags:
     OTHER_CFLAGS: -DDEBUG=1
   generateAdditionalTargets: false

@@ -210,16 +210,27 @@ struct FixtureHeuristicClassifier {
     /// Load classification rules from a JSON config file.
     /// This enables OTA updates to detection logic without recompiling.
     /// Uses Swift 6.2 Resource trait for bundled resource access.
-    /// - Parameter url: URL pointing to the JSON config file.
+    /// - Parameters:
+    ///   - url: URL pointing to the JSON config file.
+    ///   - signature: Optional ECDSA signature for verifying config authenticity.
+    ///   - keyID: Optional key identifier for multi-key rotation support.
     /// - Returns: The loaded rules array.
     /// - Throws: `ClassificationConfigError` if the config is invalid or cannot be loaded.
-    mutating func loadRules(from url: URL) async throws {
+    mutating func loadRules(from url: URL, signature: Data? = nil, keyID: String? = nil) async throws {
         let (data, response): (Data, URLResponse)
         
         if url.scheme == "http" || url.scheme == "https" {
             (data, response) = try await URLSession.shared.data(from: url)
         } else {
             data = try await Task.detached { try Data(contentsOf: url) }.value
+        }
+        
+        if let signature {
+            do {
+                try ECDSASignatureValidator.verifySignature(payload: data, signature: signature, keyID: keyID)
+            } catch {
+                throw ClassificationConfigError.signatureInvalid(error.localizedDescription)
+            }
         }
         
         let decoder = JSONDecoder()
@@ -403,6 +414,7 @@ enum ClassificationConfigError: Error, LocalizedError {
     case invalidRange(String)
     case fileNotFound(URL)
     case versionMismatch(expected: String, actual: String)
+    case signatureInvalid(String)
     
     var errorDescription: String? {
         switch self {
@@ -412,6 +424,8 @@ enum ClassificationConfigError: Error, LocalizedError {
         case .fileNotFound(let url): return "Config file not found: \(url.path)"
         case .versionMismatch(let expected, let actual):
             return "Classification config version mismatch: expected \(expected), got \(actual)"
+        case .signatureInvalid(let reason):
+            return "Configuration signature invalid: \(reason)"
         }
     }
 }
