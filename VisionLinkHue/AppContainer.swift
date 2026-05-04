@@ -25,6 +25,7 @@ final class AppContainer {
         
         let client = HueClient(stateStream: stream)
         client.spatialService?.setHueClient(client)
+        
         let detector = DetectionEngine()
         let projector = SpatialProjector()
         let manager = ARSessionManager(
@@ -33,6 +34,11 @@ final class AppContainer {
             hueClient: client,
             stateStream: stream
         )
+        
+        // Wire up calibration persistence to the spatial service's engine
+        let keychainManager = KeychainManager()
+        let calibrationStore = KeychainCalibrationStore(keychainManager: keychainManager)
+        client.spatialService?.calibrationEngine.persistenceStore = calibrationStore
         
         self.stateStream = stream
         self.hueClient = client

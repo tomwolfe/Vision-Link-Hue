@@ -7,6 +7,9 @@ import os
 ///
 /// The Kabsch algorithm uses singular value decomposition (SVD) to find the optimal
 /// rotation matrix that minimizes the RMSD between two centered point sets.
+///
+/// Supports persistence of the transformation matrix via `PersistenceStore` protocol,
+/// enabling automatic calibration restoration when ARKit re-localizes in a known room.
 @MainActor
 final class SpatialCalibrationEngine {
     
@@ -18,6 +21,13 @@ final class SpatialCalibrationEngine {
     /// Computed transformation matrix (rotation + translation).
     /// `nil` until at least 3 calibration points are available.
     var transformation: Transformation?
+    
+    // MARK: - Persistence
+    
+    /// Optional persistence store for saving/loading calibration transformation.
+    /// When set, the engine automatically saves the transformation after computation
+    /// and attempts to restore it on `loadPersistedCalibration()`.
+    weak var persistenceStore: SpatialCalibrationPersistenceStore?
     
     /// Maximum number of calibration points to retain.
     private static let maxCalibrationPoints = 6
@@ -71,6 +81,7 @@ final class SpatialCalibrationEngine {
     func clearCalibration() {
         calibrationPoints.removeAll()
         transformation = nil
+        clearPersistedCalibration()
         logger.info("Calibration cleared")
     }
     
@@ -92,6 +103,53 @@ final class SpatialCalibrationEngine {
         let bridgePosition = mapToBridgeSpace(arKitPosition)
         let bridgeOrientation = arKitOrientation
         return (bridgePosition, bridgeOrientation)
+    }
+    
+    // MARK: - Persistence
+    
+    /// Load a previously persisted calibration transformation.
+    /// Returns `true` if a valid transformation was restored.
+    func loadPersistedCalibration() async -> Bool {
+        guard let store = persistenceStore else { return false }
+        
+        let persisted = await store.loadCalibration()
+        
+        guard let rotationData = persisted?.rotationData,
+              let translationData = persisted?.translationData else {
+            return false
+        }
+        
+        do {
+            let rotation = try simd_float3x3(data: rotationData)
+            let translation = try SIMD3<Float>(data: translationData)
+            
+            transformation = Transformation(rotation: rotation, translation: translation)
+            logger.info("Loaded persisted calibration: rotation=[\(String(format: "%.3f", rotation.columns.0.x)), ...], translation=[\(String(format: "%.3f", translation.x)), \(String(format: "%.3f", translation.y)), \(String(format: "%.3f", translation.z))])")
+            return true
+        } catch {
+            logger.warning("Failed to load persisted calibration: \(error.localizedDescription)")
+            return false
+        }
+    }
+    
+    /// Save the current transformation to the persistence store.
+    func savePersistedCalibration() {
+        guard let store = persistenceStore,
+              let transform = transformation else { return }
+        
+        Task { [rotationData = transform.rotation.data, translationData = transform.translation.data] in
+            await store.saveCalibration(rotationData: rotationData, translationData: translationData)
+            logger.debug("Saved calibration transformation to persistence store")
+        }
+    }
+    
+    /// Clear persisted calibration data.
+    func clearPersistedCalibration() {
+        guard let store = persistenceStore else { return }
+        Task {
+            await store.clearCalibration()
+            logger.info("Cleared persisted calibration data")
+        }
     }
     
     // MARK: - Kabsch Algorithm Implementation
@@ -139,6 +197,8 @@ final class SpatialCalibrationEngine {
         logger.debug(
             "Kabsch transformation computed from \(n) points. Translation: (\(String(format: "%.3f", translation.x)), \(String(format: "%.3f", translation.y)), \(String(format: "%.3f", translation.z)))"
         )
+        
+        savePersistedCalibration()
     }
     
     /// Compute the optimal rotation matrix using the Kabsch algorithm.

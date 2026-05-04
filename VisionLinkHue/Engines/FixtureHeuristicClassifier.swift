@@ -98,6 +98,7 @@ struct ClassificationConfigFile: Codable {
     struct ConfigSection: Codable {
         let specificity: [String: Int]?
         let materialFixtureMapping: [String: [String]]?
+        let materialIndexMapping: [String: String]?
     }
 }
 

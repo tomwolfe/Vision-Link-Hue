@@ -34,6 +34,14 @@
             "Fabric": ["lamp", "pendant"],
             "Plaster": ["ceiling", "recessed"],
             "Concrete": ["ceiling", "recessed"]
+        },
+        "materialIndexMapping": {
+            "0": "Glass",
+            "1": "Metal",
+            "2": "Wood",
+            "3": "Fabric",
+            "4": "Plaster",
+            "5": "Concrete"
         }
     },
     "rules": [

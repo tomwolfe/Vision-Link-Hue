@@ -15,7 +15,7 @@ final class HueSpatialService {
     
     /// Dedicated engine for computing ARKit-to-Bridge coordinate transformations
     /// using the Kabsch algorithm with SVD for numerical stability.
-    private let calibrationEngine = SpatialCalibrationEngine()
+    let calibrationEngine = SpatialCalibrationEngine()
     
     /// The Hue client for making REST API calls.
     private weak var hueClient: HueClient?
@@ -38,6 +38,12 @@ final class HueSpatialService {
     ///   - stateStream: Optional state stream for error reporting.
     init(stateStream: HueStateStream?) {
         self.stateStream = stateStream
+        Task {
+            let loaded = await calibrationEngine.loadPersistedCalibration()
+            if loaded {
+                logger.info("Calibration restored from persistence")
+            }
+        }
     }
     
     func setHueClient(_ client: HueClient) {

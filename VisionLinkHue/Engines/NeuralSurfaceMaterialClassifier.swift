@@ -35,16 +35,35 @@ struct NeuralSurfaceMaterialClassifier: Sendable {
         "Concrete": [.ceiling, .recessed]
     ]
     
+    /// Default material index to label mapping (used when config is unavailable).
+    private static let defaultMaterialIndexMapping: [UInt8: String] = [
+        0: "Glass",
+        1: "Metal",
+        2: "Wood",
+        3: "Fabric",
+        4: "Plaster",
+        5: "Concrete"
+    ]
+    
     /// Material-to-fixture-type mapping loaded from classification_rules.json.
     private let materialFixtureMapping: [String: [FixtureType]]
+    
+    /// Material index to label mapping loaded from classification_rules.json.
+    private let materialIndexMapping: [UInt8: String]
     
     /// Number of sample points to use for voting-based material classification.
     private static let sampleRadius: Float = 0.03
     
-    /// Initialize with a material fixture mapping from the classification config.
-    /// - Parameter mapping: Material-to-fixture-type mapping loaded from `classification_rules.json`.
-    init(materialFixtureMapping: [String: [FixtureType]] = NeuralSurfaceMaterialClassifier.defaultMaterialFixtureMapping) {
+    /// Initialize with material mappings from the classification config.
+    /// - Parameters:
+    ///   - materialFixtureMapping: Material-to-fixture-type mapping loaded from `classification_rules.json`.
+    ///   - materialIndexMapping: Material index-to-label mapping loaded from `classification_rules.json`.
+    init(
+        materialFixtureMapping: [String: [FixtureType]] = NeuralSurfaceMaterialClassifier.defaultMaterialFixtureMapping,
+        materialIndexMapping: [UInt8: String] = NeuralSurfaceMaterialClassifier.defaultMaterialIndexMapping
+    ) {
         self.materialFixtureMapping = materialFixtureMapping
+        self.materialIndexMapping = materialIndexMapping
     }
     
     /// Load the material-to-fixture-type mapping from classification_rules.json.
@@ -64,6 +83,27 @@ struct NeuralSurfaceMaterialClassifier: Sendable {
         }
         
         return result.isEmpty ? defaultMaterialFixtureMapping : result
+    }
+    
+    /// Load the material index-to-label mapping from classification_rules.json.
+    /// Falls back to the default mapping if the config file is unavailable.
+    static func loadMaterialIndexMapping() -> [UInt8: String] {
+        // Try to load from the bundled classification_rules.json
+        guard let url = Bundle.main.url(forResource: "classification_rules", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let config = try? JSONDecoder().decode(ClassificationConfigFile.self, from: data),
+              let indexMapping = config.config?.materialIndexMapping else {
+            return defaultMaterialIndexMapping
+        }
+        
+        var result: [UInt8: String] = [:]
+        for (indexStr, label) in indexMapping {
+            if let index = UInt8(indexStr) {
+                result[index] = label
+            }
+        }
+        
+        return result.isEmpty ? defaultMaterialIndexMapping : result
     }
     
     /// Sample the material label at a normalized position in the AR frame.
@@ -149,16 +189,10 @@ struct NeuralSurfaceMaterialClassifier: Sendable {
     
     /// Map an ARKit neural surface material index to its string label.
     /// ARKit 2026 assigns indices to material types in the depth/material pipeline.
+    /// Uses the mapping loaded from `classification_rules.json` for OTA-updatable
+    /// index-to-label associations.
     private func materialIndexToLabel(_ index: UInt8) -> String? {
-        switch index {
-        case 0: return "Glass"
-        case 1: return "Metal"
-        case 2: return "Wood"
-        case 3: return "Fabric"
-        case 4: return "Plaster"
-        case 5: return "Concrete"
-        default: return nil
-        }
+        materialIndexMapping[index]
     }
     
     /// Get fixture types that are commonly associated with a material.

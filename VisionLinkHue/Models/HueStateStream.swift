@@ -172,6 +172,9 @@ actor AppNotificationSystem {
 ///
 /// Delegates error notification handling to the `AppNotificationSystem`
 /// actor to prevent main-thread hangs during SSE reconnection bursts.
+///
+/// Optimizes SSE event processing by deferring array sorting until UI
+/// consumption, avoiding O(n log n) re-sorting on every update packet.
 @Observable
 @MainActor
 final class HueStateStream {
@@ -181,19 +184,52 @@ final class HueStateStream {
     private var _scenes: [String: HueSceneResource] = [:]
     private var _groups: [String: BridgeGroup] = [:]
     
+    /// Whether the lights array needs re-sorting before UI access.
+    private var _lightsNeedsResort = false
+    
+    /// Whether the scenes array needs re-sorting before UI access.
+    private var _scenesNeedsResort = false
+    
+    /// Whether the groups array needs re-sorting before UI access.
+    private var _groupsNeedsResort = false
+    
+    /// Cached sorted lights array to avoid redundant sorting.
+    private var _lightsCache: [HueLightResource]?
+    
+    /// Cached sorted scenes array to avoid redundant sorting.
+    private var _scenesCache: [HueSceneResource]?
+    
+    /// Cached sorted groups array to avoid redundant sorting.
+    private var _groupsCache: [BridgeGroup]?
+    
     /// Computed array of lights for SwiftUI observation and UI consumption.
+    /// Uses lazy sorting with caching to avoid O(n log n) on every SSE packet.
     var lights: [HueLightResource] {
-        _lights.values.sorted { $0.id < $1.id }
+        if _lightsNeedsResort || _lightsCache == nil {
+            _lightsCache = _lights.values.sorted { $0.id < $1.id }
+            _lightsNeedsResort = false
+        }
+        return _lightsCache!
     }
     
     /// Computed array of scenes for SwiftUI observation and UI consumption.
+    /// Uses lazy sorting with caching to avoid O(n log n) on every SSE packet.
     var scenes: [HueSceneResource] {
-        _scenes.values.sorted { $0.id < $1.id }
+        if _scenesNeedsResort || _scenesCache == nil {
+            _scenesCache = _scenes.values.sorted { $0.id < $1.id }
+            _scenesNeedsResort = false
+        }
+        return _scenesCache!
     }
     
     /// Computed array of groups for SwiftUI observation and UI consumption.
+    /// Uses lazy sorting with caching to avoid O(n log n) on every SSE packet.
     var groups: [BridgeGroup] {
-        _groups.values.sorted { $0.id < $1.id }
+        if _groupsNeedsResort || _groupsCache == nil {
+            _groupsCache = _groups.values.sorted { $0.id < $1.id }
+            _groupsNeedsResort = false
+        }
+        return _groupsCache!
     }
     
     var isConnected: Bool = false
@@ -257,30 +293,37 @@ final class HueStateStream {
     var selectedGroupId: String?
     
     /// Process a partial resource update from the SSE stream.
+    /// Merges incoming resources into the dictionary store in O(1) per item,
+    /// deferring sorting until UI access to avoid O(n log n) on every packet.
     func applyUpdate(_ update: ResourceUpdate) {
         if let lights = update.lights {
-            _ = merge(into: &_lights, incoming: lights)
+            mergeIntoDictionary(&self._lights, incoming: lights)
+            _lightsNeedsResort = true
+            _lightsCache = nil
         }
         
         if let scenes = update.scenes {
-            _ = merge(into: &_scenes, incoming: scenes)
+            mergeIntoDictionary(&self._scenes, incoming: scenes)
+            _scenesNeedsResort = true
+            _scenesCache = nil
         }
         
         if let groups = update.groups {
-            _ = merge(into: &_groups, incoming: groups)
+            mergeIntoDictionary(&self._groups, incoming: groups)
+            _groupsNeedsResort = true
+            _groupsCache = nil
         }
     }
     
-    /// Merge incoming identifiable resources into the dictionary-backed store,
-    /// replacing entries with matching IDs in O(1). Returns the updated array
-    /// for SwiftUI observation.
-    private func merge<T: Identifiable>(into store: inout [String: T], incoming: [T]) -> [T]
-    where T.ID == String {
+    /// Merge incoming identifiable resources into a dictionary-backed store,
+    /// replacing entries with matching IDs in O(1). Does not sort - sorting
+    /// is deferred until UI access via the `needsResort` flag.
+    private func mergeIntoDictionary<T: Identifiable>(
+        _ store: inout [String: T],
+        incoming: [T]
+    ) where T.ID == String {
         for item in incoming {
             store[item.id] = item
-        }
-        return store.values.sorted { first, second in
-            first.id < second.id
         }
     }
     
@@ -398,6 +441,17 @@ final class HueStateStream {
             await persistence.clearAllMappings()
         }
         fixtureLightMapping.removeAll()
+    }
+    
+    /// Force re-sort all resource arrays.
+    /// Called when the UI explicitly requests a refresh.
+    func refreshSortedArrays() {
+        _lightsNeedsResort = true
+        _scenesNeedsResort = true
+        _groupsNeedsResort = true
+        _lightsCache = nil
+        _scenesCache = nil
+        _groupsCache = nil
     }
     
     /// Report a certificate pin mismatch to the user.
