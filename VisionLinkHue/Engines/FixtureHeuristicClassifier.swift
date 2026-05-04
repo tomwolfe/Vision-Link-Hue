@@ -205,7 +205,7 @@ struct FixtureHeuristicClassifier {
         if url.scheme == "http" || url.scheme == "https" {
             (data, response) = try await URLSession.shared.data(from: url)
         } else {
-            data = try Data(contentsOf: url)
+            data = try await Task.detached { try Data(contentsOf: url) }.value
         }
         
         let decoder = JSONDecoder()

@@ -214,7 +214,7 @@ actor HueEventStreamActor {
             return
         }
         
-        let decoder = JSONDecoder()
+        let decoder = JSONDecoder.hueDecoder
         guard let data = trimmed.data(using: .utf8) else { throw HueError.invalidResponse }
         let update = try decoder.decode(ResourceUpdate.self, from: data)
         

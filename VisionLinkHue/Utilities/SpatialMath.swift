@@ -132,7 +132,7 @@ enum SpatialMath {
         
         let offset = SIMD3<Float>(
             (normalized.x - 0.5) * 2.0,
-            (normalized.y - 0.5) * 2.0,
+            -(normalized.y - 0.5) * 2.0,
             0
         )
         
@@ -144,7 +144,7 @@ enum SpatialMath {
     /// Returns nil if worldUp and forward are parallel (singularity).
     static func lookAt(from: SIMD3<Float>, at: SIMD3<Float>, worldUp: SIMD3<Float>) -> simd_quatf {
         let forward = normalize(at - from)
-        let right = normalize(cross(worldUp, forward))
+        let right = normalize(cross(forward, worldUp))
         let up = cross(forward, right)
         
         let rotationMatrix = simd_float3x3(
@@ -160,7 +160,7 @@ enum SpatialMath {
     /// Use this when worldUp alignment cannot be guaranteed (e.g., camera pointing straight up/down).
     static func lookAtSafe(from: SIMD3<Float>, at: SIMD3<Float>, worldUp: SIMD3<Float>) -> simd_quatf? {
         let forward = normalize(at - from)
-        let crossProduct = cross(worldUp, forward)
+        let crossProduct = cross(forward, worldUp)
         
         let crossLength = length(crossProduct)
         guard crossLength > Float(DetectionConstants.singularityThreshold) else {

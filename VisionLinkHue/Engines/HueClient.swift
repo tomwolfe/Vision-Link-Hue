@@ -109,7 +109,7 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
             throw HueError.authenticationFailed
         }
         
-        let apiKeyResponse = try JSONDecoder().decode(CreateApiKeyResponse.self, from: data)
+        let apiKeyResponse = try JSONDecoder.hueDecoder.decode(CreateApiKeyResponse.self, from: data)
         
         guard let username = apiKeyResponse.success?.username else {
             throw HueError.noUsernameReturned
@@ -137,7 +137,7 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
         
         let (data, _) = try await authenticatedRequest(url: url, method: "GET")
         
-        return try JSONDecoder().decode(HueBridgeState.self, from: data)
+        return try JSONDecoder.hueDecoder.decode(HueBridgeState.self, from: data)
     }
     
     /// Patch light state via CLIP v2 API.
@@ -534,7 +534,7 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.httpBody = try JSONEncoder().encode(body)
+        request.httpBody = try JSONEncoder.hueEncoder.encode(body)
         
         let session = urlSession ?? URLSession.shared
         

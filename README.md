@@ -20,7 +20,7 @@ Built with Swift concurrency, strict type safety, and modern Apple frameworks, V
 
 - **AI-Powered Detection**: Real-time bounding box detection using `VNDetectRectanglesRequest` with heuristic classification for ceiling, recessed, pendant, lamp, and strip lights.
 - **3D Spatial Mapping**: Projects 2D detections into 3D world coordinates using ARKit raycasting, depth maps, and fallback estimation.
-- **Kabsch Calibration**: Advanced affine transformation solver using SVD for precise mapping between ARKit space and Hue Bridge Room Space.
+- **Kabsch Calibration**: Advanced affine transformation solver using Newton-Raphson polar decomposition for precise mapping between ARKit space and Hue Bridge Room Space.
 - **Material Recognition**: Leverages ARKit 2026 Neural Surface Synthesis to classify fixture materials (Glass, Metal, Wood, etc.).
 - **Hue Bridge Integration**: Full CLIP v2 API support, mTLS with Trust-On-First-Use (TOFU) certificate pinning, and real-time state updates via Server-Sent Events (SSE).
 - **Adaptive Thermal Management**: Dynamic inference throttling based on device thermal state to prevent LiDAR/Camera shutdown.
@@ -47,7 +47,7 @@ Built with Swift concurrency, strict type safety, and modern Apple frameworks, V
 Vision-Link Hue
 ├── 🧠 Engines/
 │   ├── DetectionEngine.swift        # Vision + Heuristic classification
-│   ├── SpatialCalibrationEngine.swift # Kabsch algorithm (SVD)
+│   ├── SpatialCalibrationEngine.swift # Kabsch algorithm (Newton-Raphson polar decomposition)
 │   ├── HueClient.swift              # CLIP v2 + SSE + mTLS
 │   ├── SpatialProjector.swift       # ARKit raycast & depth unprojection
 │   └── ThermalMonitor.swift         # Adaptive throttling

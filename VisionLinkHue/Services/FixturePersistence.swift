@@ -7,10 +7,10 @@ import os
 /// and spatial coordinates. Provides atomic transactions for all
 /// persistence operations with background isolation to prevent
 /// main-thread blocking as the fixture count grows.
+@ModelActor
 actor FixturePersistence {
     
     let modelContainer: ModelContainer
-    let modelContext: ModelContext
     private let logger = Logger(
         subsystem: "com.tomwolfe.visionlinkhue",
         category: "FixturePersistence"
@@ -31,19 +31,16 @@ actor FixturePersistence {
         
         do {
             modelContainer = try ModelContainer(for: schema, configurations: [ModelConfiguration()])
-            modelContext = ModelContext(modelContainer)
             logger.info("FixturePersistence initialized with SwiftData")
         } catch {
             logger.warning("Failed to create persistent SwiftData container, falling back to in-memory: \(error.localizedDescription)")
             isUsingInMemoryStorage = true
             do {
                 modelContainer = try ModelContainer(for: schema, configurations: [ModelConfiguration(isStoredInMemoryOnly: true)])
-                modelContext = ModelContext(modelContainer)
                 logger.info("Fallback to in-memory SwiftData succeeded")
             } catch {
                 logger.error("In-memory fallback also failed: \(error.localizedDescription)")
                 modelContainer = try! ModelContainer(for: schema, configurations: [ModelConfiguration(isStoredInMemoryOnly: true)])
-                modelContext = ModelContext(modelContainer)
             }
         }
     }
@@ -51,7 +48,6 @@ actor FixturePersistence {
     /// Initialize with a custom ModelContainer (for testing).
     init(container: ModelContainer) {
         self.modelContainer = container
-        self.modelContext = ModelContext(container)
     }
     
     /// Load all persisted fixture mappings from SwiftData.
