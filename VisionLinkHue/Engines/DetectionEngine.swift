@@ -226,8 +226,8 @@ final class DetectionEngine {
     /// Enables OTA updates to detection logic without recompiling.
     /// - Parameter url: URL pointing to the JSON config file.
     /// - Throws: `ClassificationConfigError` if the config is invalid.
-    func reloadRules(from url: URL) throws {
-        try classifier.loadRules(from: url)
+    func reloadRules(from url: URL) async throws {
+        try await classifier.loadRules(from: url)
         logger.info("Classification rules reloaded from \(url.path)")
     }
     

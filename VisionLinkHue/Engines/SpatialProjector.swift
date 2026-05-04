@@ -30,6 +30,9 @@ final class SpatialProjector {
     private let provider: CameraConfigurationProvider
     private weak var session: ARSession?
     
+    /// Last known average depth from successful raycasts for dynamic fallback.
+    private var lastKnownAverageDepth: Float?
+    
     init(session: ARSession? = nil, configuration: Configuration = .init(), provider: CameraConfigurationProvider? = nil) {
         self.configuration = configuration
         self.provider = provider ?? DefaultCameraConfigurationProvider()
@@ -76,10 +79,11 @@ final class SpatialProjector {
             return .anchored(fixture)
         }
         
+        let fallbackDistance: Float = lastKnownAverageDepth ?? DetectionConstants.fallbackDistanceMeters
         let fallbackPosition = SpatialMath.fallbackPosition(
             normalized: normalizedPoint,
             cameraTransform: frame.camera.transform,
-            distance: DetectionConstants.fallbackDistanceMeters
+            distance: fallbackDistance
         )
         
         let rotationMatrix = SpatialMath.rotationMatrix(from: frame.camera.transform)
@@ -98,7 +102,7 @@ final class SpatialProjector {
                 ),
                 position: fallbackPosition,
                 orientation: fallbackOrientation,
-                distanceMeters: DetectionConstants.fallbackDistanceMeters,
+                distanceMeters: fallbackDistance,
                 material: nil
             )
         )
@@ -215,6 +219,7 @@ final class SpatialProjector {
         
         let orientation = simd_quatf(hit.worldTransform)
         let distance = length(position)
+        lastKnownAverageDepth = distance
         
         let adjustedPosition = position + configuration.hudOffset
         
@@ -282,6 +287,8 @@ final class SpatialProjector {
         
         let rotationMatrix = SpatialMath.rotationMatrix(from: frame.camera.transform)
         let orientation = simd_quatf(rotationMatrix)
+        
+        lastKnownAverageDepth = depthMeters
         
         let adjustedPosition = position + configuration.hudOffset
         

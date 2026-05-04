@@ -181,7 +181,7 @@ actor HueEventStreamActor {
                 
                 // Accumulate data lines for multi-line SSE events
                 if line.hasPrefix("data: ") {
-                    sseDataBuffer += String(line.dropFirst(6))
+                    sseDataBuffer += String(line.dropFirst(6)) + "\n"
                 }
             }
         } catch {
@@ -206,7 +206,8 @@ actor HueEventStreamActor {
         }
         
         let decoder = JSONDecoder()
-        let update = try decoder.decode(ResourceUpdate.self, from: trimmed.data(using: .utf8)!)
+        guard let data = trimmed.data(using: .utf8) else { throw HueError.invalidResponse }
+        let update = try decoder.decode(ResourceUpdate.self, from: data)
         
         parseFailures = 0
         
