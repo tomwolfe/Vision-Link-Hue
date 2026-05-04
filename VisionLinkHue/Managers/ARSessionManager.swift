@@ -151,6 +151,7 @@ final class ARSessionManager {
             }
             
             await MainActor.run { [newFixtures] in
+                guard self.isSessionActive else { return }
                 for fixture in newFixtures {
                     if !self.trackedFixtures.contains(where: { $0.id == fixture.id }) {
                         self.trackedFixtures.append(fixture)
@@ -267,6 +268,14 @@ final class ARSessionManager {
     func resolveHueGroup(for fixture: TrackedFixture) -> String? {
         guard let groupId = stateStream.selectedGroupId else { return nil }
         return groupId
+    }
+    
+    /// Adjust the depth offset for a tracked fixture.
+    /// Used on non-LiDAR devices to manually push/pull the Z-depth
+    /// of a fixture reticle when automatic depth estimation is unavailable.
+    func adjustDepthOffset(for fixtureId: UUID, offset: Float) {
+        guard let idx = trackedFixtures.firstIndex(where: { $0.id == fixtureId }) else { return }
+        trackedFixtures[idx].depthOffsetMeters = offset
     }
     
 }

@@ -47,6 +47,10 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
     /// Ensures all REST calls use TOFU pinning, not just SSE.
     private var pinningDelegate: CertificatePinningDelegate?
     
+    /// Callback for pin mismatch events, allowing the UI to prompt
+    /// the user to accept a new certificate (e.g., after bridge reset).
+    var onCertificatePinMismatch: @Sendable (Data, Data) async -> Void
+    
     /// Dedicated actor for SSE event stream management.
     /// Isolates high-frequency network events from the MainActor.
     private let eventStream = HueEventStreamActor()
@@ -369,6 +373,10 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
                 Task { @MainActor [weak self] in
                     await self?.handleTOFUPin(for: trustedHash)
                 }
+            } onPinMismatch: { [weak self] newHash, oldHash in
+                Task { @MainActor [weak self] in
+                    await self?.onCertificatePinMismatch(newHash, oldHash)
+                }
             }
         }
         
@@ -396,19 +404,37 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
     }
     
     /// Reconnect to the bridge (re-authenticate and restart SSE).
+    /// If the bridge IP is lost, reports a critical error to prompt the
+    /// user to manually select a bridge rather than auto-connecting to
+    /// the first mDNS result in multi-bridge environments.
     func reconnect() async {
         disconnect()
         
         if bridgeIP == nil {
             let bridges = await discoverBridges()
-            if let first = bridges.first {
-                await connect(to: first)
-            } else {
+            
+            if bridges.isEmpty {
                 Task { [stateStream] in
                     await stateStream?.reportError(HueError.noBridgeConfigured, severity: .error, source: "HueClient.reconnect")
                 }
                 return
             }
+            
+            if bridges.count > 1 {
+                let noBridgeError = NSError(
+                    domain: "HueClient",
+                    code: 2,
+                    userInfo: [
+                        NSLocalizedDescriptionKey: "Bridge connection lost. Multiple bridges detected (\(bridges.count)). Please select a bridge to reconnect."
+                    ]
+                )
+                Task { [stateStream] in
+                    await stateStream?.reportError(noBridgeError, severity: .critical, source: "HueClient.reconnect")
+                }
+                return
+            }
+            
+            await connect(to: bridges.first!)
         }
         
         startEventStream()
@@ -438,6 +464,12 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
         ) { [weak self] trustedHash in
             Task { @MainActor [weak self] in
                 await self?.handleTOFUPin(for: trustedHash)
+            }
+        } onPinMismatch: { [weak self] newHash, oldHash in
+            if let self {
+                Task { @MainActor [weak self] in
+                    await self?.onCertificatePinMismatch(newHash, oldHash)
+                }
             }
         }
         

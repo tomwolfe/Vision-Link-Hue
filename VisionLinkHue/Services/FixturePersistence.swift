@@ -3,11 +3,12 @@ import SwiftData
 import simd
 import os
 
-/// Service that manages SwiftData persistence for fixture-light mappings
+/// Background actor that manages SwiftData persistence for fixture-light mappings
 /// and spatial coordinates. Provides atomic transactions for all
-/// persistence operations.
-@MainActor
-final class FixturePersistence: Sendable {
+/// persistence operations with background isolation to prevent
+/// main-thread blocking as the fixture count grows.
+@ModelActor
+final class FixturePersistence {
     
     let modelContainer: ModelContainer
     let modelContext: ModelContext
@@ -55,7 +56,7 @@ final class FixturePersistence: Sendable {
     }
     
     /// Load all persisted fixture mappings from SwiftData.
-    func loadMappings() -> [FixtureMapping] {
+    func loadMappings() async -> [FixtureMapping] {
         let descriptor = FetchDescriptor<FixtureMapping>()
         
         do {
@@ -69,7 +70,7 @@ final class FixturePersistence: Sendable {
     
     /// Load persisted fixture mappings that have bridge-space coordinates.
     /// These can be projected back into ARKit space using a calibration transform.
-    func loadMappingsWithBridgeSpace() -> [FixtureMapping] {
+    func loadMappingsWithBridgeSpace() async -> [FixtureMapping] {
         let descriptor = FetchDescriptor<FixtureMapping>(
             predicate: #Predicate<FixtureMapping> {
                 $0.bridgePositionX != nil && $0.bridgePositionY != nil && $0.bridgePositionZ != nil
@@ -86,7 +87,7 @@ final class FixturePersistence: Sendable {
     }
     
     /// Check if any persisted mappings have bridge-space coordinates.
-    func hasBridgeSpaceMappings() -> Bool {
+    func hasBridgeSpaceMappings() async -> Bool {
         let descriptor = FetchDescriptor<FixtureMapping>(
             predicate: #Predicate<FixtureMapping> {
                 $0.bridgePositionX != nil

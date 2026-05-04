@@ -107,7 +107,7 @@ final class SSEStressTests: XCTestCase {
         let elapsed = Double(end.uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000_000.0
         let rate = Double(eventCount) / max(elapsed, 0.001)
         
-        XCTAssertEqual(stateStream.lights.count, eventCount, "All lights should be merged")
+        XCTAssertEqual(self.stateStream.lights.count, eventCount, "All lights should be merged")
         
         // Verify rate is reasonable (should handle 100+ events/sec easily)
         XCTAssertGreaterThan(rate, 50.0, "Should process at least 50 events/sec")

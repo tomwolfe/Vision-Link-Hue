@@ -39,20 +39,65 @@ extension Date {
 // MARK: - JSON Utilities
 
 extension JSONDecoder {
-    /// Create a decoder with ISO 8601 date decoding strategy.
+    /// Create a decoder with ISO 8601 date decoding strategy that handles
+    /// Hue's specific ISO 8601 flavor, including fractional seconds.
+    /// Hue's SSE stream occasionally sends timestamps like
+    /// "2026-01-15T10:30:00.123Z" which the standard `.iso8601` strategy rejects.
     static var hueDecoder: JSONDecoder {
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let dateString = try container.decode(String.self)
+            
+            // Try standard ISO8601DateFormatter first
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let date = formatter.date(from: dateString) {
+                return date
+            }
+            
+            // Fallback: try parsing with various fractional second formats
+            let parsers: [ISO8601DateFormatter] = [
+                {
+                    let f = ISO8601DateFormatter()
+                    f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                    return f
+                }(),
+                {
+                    let f = ISO8601DateFormatter()
+                    f.formatOptions = [.withInternetDateTime]
+                    return f
+                }(),
+            ]
+            
+            for formatter in parsers {
+                if let date = formatter.date(from: dateString) {
+                    return date
+                }
+            }
+            
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Unable to decode date string: \(dateString)"
+            )
+        }
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return decoder
     }
 }
 
 extension JSONEncoder {
-    /// Create an encoder with ISO 8601 date encoding strategy.
+    /// Create an encoder with ISO 8601 date encoding strategy that includes
+    /// fractional seconds for compatibility with Hue Bridge API.
     static var hueEncoder: JSONEncoder {
         let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        encoder.dateEncodingStrategy = .custom { date, encoder in
+            var container = encoder.singleValueContainer()
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            let dateString = formatter.string(from: date)
+            try container.encode(dateString)
+        }
         encoder.keyEncodingStrategy = .convertToSnakeCase
         return encoder
     }

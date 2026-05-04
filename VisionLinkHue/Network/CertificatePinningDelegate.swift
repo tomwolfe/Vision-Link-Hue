@@ -2,6 +2,18 @@ import Foundation
 import Security
 import os
 
+/// Result of evaluating a certificate challenge against pinned state.
+enum CertificateEvaluationResult: Sendable {
+    /// Certificate matches the pinned hash - trust it.
+    case accepted
+    /// Certificate does not match - reject it.
+    case rejected
+    /// No hash pinned yet - trust on first use.
+    case trustOnFirstUse
+    /// Hash mismatch detected - requires user confirmation to accept.
+    case pinMismatch(newHash: Data, oldHash: Data)
+}
+
 /// Actor that manages certificate pin state with proper Swift concurrency isolation.
 /// All mutable state (`pinnedHash`) is confined to the actor, eliminating the need
 /// for `@unchecked Sendable` suppression.
@@ -41,6 +53,21 @@ actor CertificatePinStore {
         }
     }
     
+    /// Evaluate a certificate challenge and return a detailed result
+    /// that can be used to present a user prompt for pin mismatches.
+    func evaluateChallengeDetailed(publicKeyHash: Data) async -> CertificateEvaluationResult {
+        if let pinnedHash {
+            if publicKeyHash == pinnedHash {
+                return .accepted
+            } else {
+                logger.warning("Certificate pin mismatch detected - bridge may have been reset")
+                return .pinMismatch(newHash: publicKeyHash, oldHash: pinnedHash)
+            }
+        } else {
+            return .trustOnFirstUse
+        }
+    }
+    
     /// Save a newly trusted certificate hash via TOFU.
     func savePinnedHash(_ hash: Data) async {
         guard let keychainKey else { return }
@@ -54,6 +81,22 @@ actor CertificatePinStore {
         }
         
         await tofuCallback(hash)
+    }
+    
+    /// Accept a certificate after user confirmation (e.g., bridge reset).
+    /// Overwrites the existing TOFU hash in the Keychain.
+    func acceptPinChange(to newHash: Data) async {
+        guard let keychainKey else { return }
+        
+        do {
+            try await KeychainManager.shared.saveCertPin(to: keychainKey, hash: newHash)
+            self.pinnedHash = newHash
+            logger.info("Certificate pin updated after bridge reset for key \(keychainKey)")
+        } catch {
+            logger.error("Failed to update certificate pin in Keychain: \(error.localizedDescription)")
+        }
+        
+        await tofuCallback(newHash)
     }
 }
 
@@ -72,12 +115,17 @@ final class CertificatePinningDelegate: NSObject, URLSessionDelegate {
     
     private let pinStore: CertificatePinStore
     
-    init(pinnedHash: Data?, keychainKey: String? = nil, tofuCallback: @escaping @Sendable (Data) async -> Void) {
+    /// Optional callback when a pin mismatch is detected, allowing the UI
+    /// to present a prompt for the user to accept a new certificate.
+    var onPinMismatch: @Sendable (Data, Data) async -> Void
+    
+    init(pinnedHash: Data?, keychainKey: String? = nil, tofuCallback: @escaping @Sendable (Data) async -> Void, onPinMismatch: @escaping @Sendable (Data, Data) async -> Void = { _, _ in }) {
         self.pinStore = CertificatePinStore(
             pinnedHash: pinnedHash,
             keychainKey: keychainKey,
             tofuCallback: tofuCallback
         )
+        self.onPinMismatch = onPinMismatch
         super.init()
     }
     
@@ -119,6 +167,14 @@ final class CertificatePinningDelegate: NSObject, URLSessionDelegate {
     func updatePinnedHash(_ hash: Data) {
         Task { [weak self] in
             await self?.pinStore.pinnedHash = hash
+        }
+    }
+    
+    /// Handle a pin mismatch by attempting to accept the new certificate
+    /// after the user has confirmed.
+    func handlePinMismatch(newHash: Data) {
+        Task { [weak self] in
+            await self?.pinStore.acceptPinChange(to: newHash)
         }
     }
 }

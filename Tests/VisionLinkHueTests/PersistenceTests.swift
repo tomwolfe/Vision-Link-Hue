@@ -31,7 +31,7 @@ final class PersistenceTests: XCTestCase {
     
     // MARK: - Spatial Data Validation Tests
     
-    func testRejectsNaNPositionX() {
+    func testRejectsNaNPositionX() async {
         let fixtureId = UUID()
         let position = SIMD3<Float>(.nan, 1.0, 2.0)
         let orientation = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: Float.pi / 4)
@@ -47,11 +47,11 @@ final class PersistenceTests: XCTestCase {
             confidence: 0.9
         )
         
-        let mappings = persistence.loadMappings()
+        let mappings = await persistence.loadMappings()
         XCTAssertTrue(mappings.isEmpty, "NaN position X should be rejected")
     }
     
-    func testRejectsNaNPositionY() {
+    func testRejectsNaNPositionY() async {
         let fixtureId = UUID()
         let position = SIMD3<Float>(1.0, .nan, 2.0)
         let orientation = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: Float.pi / 4)
@@ -66,11 +66,11 @@ final class PersistenceTests: XCTestCase {
             confidence: 0.9
         )
         
-        let mappings = persistence.loadMappings()
+        let mappings = await persistence.loadMappings()
         XCTAssertTrue(mappings.isEmpty, "NaN position Y should be rejected")
     }
     
-    func testRejectsNaNPositionZ() {
+    func testRejectsNaNPositionZ() async {
         let fixtureId = UUID()
         let position = SIMD3<Float>(1.0, 2.0, .nan)
         let orientation = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: Float.pi / 4)
@@ -85,11 +85,11 @@ final class PersistenceTests: XCTestCase {
             confidence: 0.9
         )
         
-        let mappings = persistence.loadMappings()
+        let mappings = await persistence.loadMappings()
         XCTAssertTrue(mappings.isEmpty, "NaN position Z should be rejected")
     }
     
-    func testRejectsInfinitePositionX() {
+    func testRejectsInfinitePositionX() async {
         let fixtureId = UUID()
         let position = SIMD3<Float>(.infinity, 1.0, 2.0)
         let orientation = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: Float.pi / 4)
@@ -104,11 +104,11 @@ final class PersistenceTests: XCTestCase {
             confidence: 0.9
         )
         
-        let mappings = persistence.loadMappings()
+        let mappings = await persistence.loadMappings()
         XCTAssertTrue(mappings.isEmpty, "Infinite position X should be rejected")
     }
     
-    func testRejectsInfinitePositionY() {
+    func testRejectsInfinitePositionY() async {
         let fixtureId = UUID()
         let position = SIMD3<Float>(1.0, -.infinity, 2.0)
         let orientation = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: Float.pi / 4)
@@ -123,11 +123,11 @@ final class PersistenceTests: XCTestCase {
             confidence: 0.9
         )
         
-        let mappings = persistence.loadMappings()
+        let mappings = await persistence.loadMappings()
         XCTAssertTrue(mappings.isEmpty, "Negative infinite position Y should be rejected")
     }
     
-    func testRejectsInfinitePositionZ() {
+    func testRejectsInfinitePositionZ() async {
         let fixtureId = UUID()
         let position = SIMD3<Float>(1.0, 2.0, .infinity)
         let orientation = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: Float.pi / 4)
@@ -142,11 +142,11 @@ final class PersistenceTests: XCTestCase {
             confidence: 0.9
         )
         
-        let mappings = persistence.loadMappings()
+        let mappings = await persistence.loadMappings()
         XCTAssertTrue(mappings.isEmpty, "Infinite position Z should be rejected")
     }
     
-    func testRejectsNonUnitQuaternion() {
+    func testRejectsNonUnitQuaternion() async {
         let fixtureId = UUID()
         let position = SIMD3<Float>(1.0, 2.0, 3.0)
         // Quaternion with norm far from 1.0
@@ -162,11 +162,11 @@ final class PersistenceTests: XCTestCase {
             confidence: 0.9
         )
         
-        let mappings = persistence.loadMappings()
+        let mappings = await persistence.loadMappings()
         XCTAssertTrue(mappings.isEmpty, "Non-unit quaternion should be rejected")
     }
     
-    func testRejectsQuaternionWithNaNComponents() {
+    func testRejectsQuaternionWithNaNComponents() async {
         let fixtureId = UUID()
         let position = SIMD3<Float>(1.0, 2.0, 3.0)
         let orientation = simd_quatf(real: .nan, imag: SIMD3<Float>(0, 0, 0))
@@ -181,11 +181,11 @@ final class PersistenceTests: XCTestCase {
             confidence: 0.9
         )
         
-        let mappings = persistence.loadMappings()
+        let mappings = await persistence.loadMappings()
         XCTAssertTrue(mappings.isEmpty, "Quaternion with NaN components should be rejected")
     }
     
-    func testRejectsUnreasonableDistanceZero() {
+    func testRejectsUnreasonableDistanceZero() async {
         let fixtureId = UUID()
         let position = SIMD3<Float>(1.0, 2.0, 3.0)
         let orientation = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: Float.pi / 4)
@@ -200,11 +200,11 @@ final class PersistenceTests: XCTestCase {
             confidence: 0.9
         )
         
-        let mappings = persistence.loadMappings()
+        let mappings = await persistence.loadMappings()
         XCTAssertTrue(mappings.isEmpty, "Zero distance should be rejected")
     }
     
-    func testRejectsUnreasonableDistanceNegative() {
+    func testRejectsUnreasonableDistanceNegative() async {
         let fixtureId = UUID()
         let position = SIMD3<Float>(1.0, 2.0, 3.0)
         let orientation = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: Float.pi / 4)
@@ -219,11 +219,11 @@ final class PersistenceTests: XCTestCase {
             confidence: 0.9
         )
         
-        let mappings = persistence.loadMappings()
+        let mappings = await persistence.loadMappings()
         XCTAssertTrue(mappings.isEmpty, "Negative distance should be rejected")
     }
     
-    func testRejectsUnreasonableDistanceOver100Meters() {
+    func testRejectsUnreasonableDistanceOver100Meters() async {
         let fixtureId = UUID()
         let position = SIMD3<Float>(1.0, 2.0, 3.0)
         let orientation = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: Float.pi / 4)
@@ -238,11 +238,11 @@ final class PersistenceTests: XCTestCase {
             confidence: 0.9
         )
         
-        let mappings = persistence.loadMappings()
+        let mappings = await persistence.loadMappings()
         XCTAssertTrue(mappings.isEmpty, "Distance over 100 meters should be rejected")
     }
     
-    func testRejectsExtremePositionOver1km() {
+    func testRejectsExtremePositionOver1km() async {
         let fixtureId = UUID()
         let position = SIMD3<Float>(5000.0, 5000.0, 5000.0)
         let orientation = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: Float.pi / 4)
@@ -257,13 +257,13 @@ final class PersistenceTests: XCTestCase {
             confidence: 0.9
         )
         
-        let mappings = persistence.loadMappings()
+        let mappings = await persistence.loadMappings()
         XCTAssertTrue(mappings.isEmpty, "Position over 1km from origin should be rejected")
     }
     
     // MARK: - Valid Data Acceptance Tests
     
-    func testAcceptsValidSpatialData() {
+    func testAcceptsValidSpatialData() async {
         let fixtureId = UUID()
         let position = SIMD3<Float>(1.0, 2.0, 3.0)
         let orientation = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: Float.pi / 4)
@@ -278,14 +278,14 @@ final class PersistenceTests: XCTestCase {
             confidence: 0.9
         )
         
-        let mappings = persistence.loadMappings()
+        let mappings = await persistence.loadMappings()
         XCTAssertEqual(mappings.count, 1, "Valid spatial data should be accepted")
         XCTAssertEqual(mappings.first?.lightId, "test-light")
         XCTAssertEqual(mappings.first?.fixtureType, "ceiling")
         XCTAssertEqual(mappings.first?.distanceMeters, 2.5)
     }
     
-    func testAcceptsBoundaryDistanceExactly100Meters() {
+    func testAcceptsBoundaryDistanceExactly100Meters() async {
         let fixtureId = UUID()
         let position = SIMD3<Float>(0.1, 0.1, 0.1)
         let orientation = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: Float.pi / 4)
@@ -300,11 +300,11 @@ final class PersistenceTests: XCTestCase {
             confidence: 0.9
         )
         
-        let mappings = persistence.loadMappings()
+        let mappings = await persistence.loadMappings()
         XCTAssertEqual(mappings.count, 1, "Distance exactly 100 meters should be accepted")
     }
     
-    func testAcceptsUnitQuaternion() {
+    func testAcceptsUnitQuaternion() async {
         let fixtureId = UUID()
         let position = SIMD3<Float>(1.0, 2.0, 3.0)
         // Properly normalized quaternion
@@ -320,13 +320,13 @@ final class PersistenceTests: XCTestCase {
             confidence: 0.85
         )
         
-        let mappings = persistence.loadMappings()
+        let mappings = await persistence.loadMappings()
         XCTAssertEqual(mappings.count, 1, "Unit quaternion should be accepted")
     }
     
     // MARK: - Atomic Transaction Tests
     
-    func testUpdateExistingMappingIsAtomic() {
+    func testUpdateExistingMappingIsAtomic() async {
         let fixtureId = UUID()
         let position1 = SIMD3<Float>(1.0, 2.0, 3.0)
         let orientation1 = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: Float.pi / 4)
@@ -342,7 +342,7 @@ final class PersistenceTests: XCTestCase {
             confidence: 0.9
         )
         
-        var mappings = persistence.loadMappings()
+        var mappings = await persistence.loadMappings()
         XCTAssertEqual(mappings.count, 1)
         XCTAssertEqual(mappings.first?.lightId, "light-1")
         
@@ -360,14 +360,14 @@ final class PersistenceTests: XCTestCase {
             confidence: 0.95
         )
         
-        mappings = persistence.loadMappings()
+        mappings = await persistence.loadMappings()
         XCTAssertEqual(mappings.count, 1, "Should still have exactly one mapping after update")
         XCTAssertEqual(mappings.first?.lightId, "light-2", "Light ID should be updated")
         XCTAssertEqual(mappings.first?.positionX, 4.0, "Position X should be updated")
         XCTAssertEqual(mappings.first?.fixtureType, "pendant", "Fixture type should be updated")
     }
     
-    func testLinkFixtureIsAtomic() {
+    func testLinkFixtureIsAtomic() async {
         let fixtureId = UUID()
         let position = SIMD3<Float>(1.0, 2.0, 3.0)
         let orientation = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: Float.pi / 4)
@@ -383,19 +383,19 @@ final class PersistenceTests: XCTestCase {
             confidence: 0.9
         )
         
-        var mappings = persistence.loadMappings()
+        var mappings = await persistence.loadMappings()
         XCTAssertEqual(mappings.count, 1)
         XCTAssertNil(mappings.first?.lightId)
         
         // Link to a light
         persistence.linkFixture(fixtureId, toLight: "linked-light-id")
         
-        mappings = persistence.loadMappings()
+        mappings = await persistence.loadMappings()
         XCTAssertEqual(mappings.count, 1)
         XCTAssertEqual(mappings.first?.lightId, "linked-light-id", "Light ID should be linked")
     }
     
-    func testUnlinkFixtureIsAtomic() {
+    func testUnlinkFixtureIsAtomic() async {
         let fixtureId = UUID()
         let position = SIMD3<Float>(1.0, 2.0, 3.0)
         let orientation = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: Float.pi / 4)
@@ -414,12 +414,12 @@ final class PersistenceTests: XCTestCase {
         // Unlink
         persistence.unlinkFixture(fixtureId)
         
-        let mappings = persistence.loadMappings()
+        let mappings = await persistence.loadMappings()
         XCTAssertEqual(mappings.count, 1)
         XCTAssertNil(mappings.first?.lightId, "Light ID should be nil after unlink")
     }
     
-    func testMarkSyncedUpdatesIsSyncedToBridge() {
+    func testMarkSyncedUpdatesIsSyncedToBridge() async {
         let fixtureId = UUID()
         let position = SIMD3<Float>(1.0, 2.0, 3.0)
         let orientation = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: Float.pi / 4)
@@ -434,17 +434,17 @@ final class PersistenceTests: XCTestCase {
             confidence: 0.9
         )
         
-        var mappings = persistence.loadMappings()
+        var mappings = await persistence.loadMappings()
         XCTAssertFalse(mappings.first?.isSyncedToBridge ?? true, "Should start as not synced")
         
         // Mark as synced
         persistence.markSynced(fixtureId)
         
-        mappings = persistence.loadMappings()
+        mappings = await persistence.loadMappings()
         XCTAssertTrue(mappings.first?.isSyncedToBridge ?? false, "Should be marked as synced after calling markSynced")
     }
     
-    func testRemoveMappingRemovesEntirely() {
+    func testRemoveMappingRemovesEntirely() async {
         let fixtureId = UUID()
         let position = SIMD3<Float>(1.0, 2.0, 3.0)
         let orientation = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: Float.pi / 4)
@@ -459,16 +459,16 @@ final class PersistenceTests: XCTestCase {
             confidence: 0.9
         )
         
-        XCTAssertEqual(persistence.loadMappings().count, 1)
+        XCTAssertEqual(await persistence.loadMappings().count, 1)
         
         // Remove the mapping
         persistence.removeMapping(for: fixtureId)
         
-        let mappings = persistence.loadMappings()
+        let mappings = await persistence.loadMappings()
         XCTAssertTrue(mappings.isEmpty, "Mapping should be removed entirely")
     }
     
-    func testClearAllMappingsRemovesEverything() {
+    func testClearAllMappingsRemovesEverything() async {
         let fixtureId1 = UUID()
         let fixtureId2 = UUID()
         let fixtureId3 = UUID()
@@ -503,16 +503,16 @@ final class PersistenceTests: XCTestCase {
             confidence: 0.8
         )
         
-        XCTAssertEqual(persistence.loadMappings().count, 3)
+        XCTAssertEqual(await persistence.loadMappings().count, 3)
         
         // Clear all
         persistence.clearAllMappings()
         
-        let mappings = persistence.loadMappings()
+        let mappings = await persistence.loadMappings()
         XCTAssertTrue(mappings.isEmpty, "All mappings should be cleared")
     }
     
-    func testMultipleMappingsPersistedCorrectly() {
+    func testMultipleMappingsPersistedCorrectly() async {
         let fixtureId1 = UUID()
         let fixtureId2 = UUID()
         let position1 = SIMD3<Float>(1.0, 2.0, 3.0)
@@ -538,7 +538,7 @@ final class PersistenceTests: XCTestCase {
             confidence: 0.85
         )
         
-        let mappings = persistence.loadMappings()
+        let mappings = await persistence.loadMappings()
         XCTAssertEqual(mappings.count, 2, "Should have exactly two mappings")
         
         let lightIds = Set(mappings.map { $0.lightId })
@@ -547,7 +547,7 @@ final class PersistenceTests: XCTestCase {
     
     // MARK: - Edge Cases
     
-    func testRejectsMixedNaNAndValidPosition() {
+    func testRejectsMixedNaNAndValidPosition() async {
         let fixtureId = UUID()
         let position = SIMD3<Float>(.nan, 2.0, 3.0)
         let orientation = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: Float.pi / 4)
@@ -562,11 +562,11 @@ final class PersistenceTests: XCTestCase {
             confidence: 0.9
         )
         
-        let mappings = persistence.loadMappings()
+        let mappings = await persistence.loadMappings()
         XCTAssertTrue(mappings.isEmpty, "Position with any NaN component should be rejected")
     }
     
-    func testRejectsZeroDistance() {
+    func testRejectsZeroDistance() async {
         let fixtureId = UUID()
         let position = SIMD3<Float>(1.0, 2.0, 3.0)
         let orientation = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: Float.pi / 4)
@@ -581,11 +581,11 @@ final class PersistenceTests: XCTestCase {
             confidence: 0.9
         )
         
-        let mappings = persistence.loadMappings()
+        let mappings = await persistence.loadMappings()
         XCTAssertTrue(mappings.isEmpty, "Zero distance should be rejected")
     }
     
-    func testAcceptsMinimalValidPosition() {
+    func testAcceptsMinimalValidPosition() async {
         let fixtureId = UUID()
         let position = SIMD3<Float>(0.001, 0.001, 0.001)
         let orientation = simd_quatf(real: 1.0, imag: SIMD3<Float>(0, 0, 0))
@@ -600,13 +600,13 @@ final class PersistenceTests: XCTestCase {
             confidence: 0.5
         )
         
-        let mappings = persistence.loadMappings()
+        let mappings = await persistence.loadMappings()
         XCTAssertEqual(mappings.count, 1, "Minimal valid position should be accepted")
     }
     
     // MARK: - Bridge Space Coordinate Tests
     
-    func testSaveMappingWithBridgeSpaceCoordinates() {
+    func testSaveMappingWithBridgeSpaceCoordinates() async {
         let fixtureId = UUID()
         let position = SIMD3<Float>(1.0, 2.0, 3.0)
         let orientation = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: Float.pi / 4)
@@ -623,14 +623,14 @@ final class PersistenceTests: XCTestCase {
             bridgePosition: bridgePosition
         )
         
-        let mappings = persistence.loadMappings()
+        let mappings = await persistence.loadMappings()
         XCTAssertEqual(mappings.count, 1, "Mapping with bridge space should be accepted")
         XCTAssertEqual(mappings.first?.bridgePositionX, 5.0)
         XCTAssertEqual(mappings.first?.bridgePositionY, 1.5)
         XCTAssertEqual(mappings.first?.bridgePositionZ, 2.0)
     }
     
-    func testLoadMappingsWithBridgeSpace() {
+    func testLoadMappingsWithBridgeSpace() async {
         let fixtureId1 = UUID()
         let fixtureId2 = UUID()
         let position = SIMD3<Float>(1.0, 2.0, 3.0)
@@ -657,20 +657,20 @@ final class PersistenceTests: XCTestCase {
             confidence: 0.85
         )
         
-        let bridgeMappings = persistence.loadMappingsWithBridgeSpace()
+        let bridgeMappings = await persistence.loadMappingsWithBridgeSpace()
         XCTAssertEqual(bridgeMappings.count, 1, "Should only return mappings with bridge space")
         XCTAssertEqual(bridgeMappings.first?.lightId, "light-1")
         
-        let allMappings = persistence.loadMappings()
+        let allMappings = await persistence.loadMappings()
         XCTAssertEqual(allMappings.count, 2, "Should return all mappings")
     }
     
-    func testHasBridgeSpaceMappingsReturnsTrue() {
+    func testHasBridgeSpaceMappingsReturnsTrue() async {
         let fixtureId = UUID()
         let position = SIMD3<Float>(1.0, 2.0, 3.0)
         let orientation = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: Float.pi / 4)
         
-        XCTAssertFalse(persistence.hasBridgeSpaceMappings(), "Should be false with no mappings")
+        XCTAssertFalse(await persistence.hasBridgeSpaceMappings(), "Should be false with no mappings")
         
         persistence.saveMapping(
             fixtureId: fixtureId,
@@ -683,10 +683,10 @@ final class PersistenceTests: XCTestCase {
             bridgePosition: SIMD3<Float>(5.0, 1.0, 2.0)
         )
         
-        XCTAssertTrue(persistence.hasBridgeSpaceMappings(), "Should be true after saving bridge space")
+        XCTAssertTrue(await persistence.hasBridgeSpaceMappings(), "Should be true after saving bridge space")
     }
     
-    func testHasBridgeSpaceMappingsReturnsFalseWithoutBridgeSpace() {
+    func testHasBridgeSpaceMappingsReturnsFalseWithoutBridgeSpace() async {
         let fixtureId = UUID()
         let position = SIMD3<Float>(1.0, 2.0, 3.0)
         let orientation = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: Float.pi / 4)
@@ -701,10 +701,10 @@ final class PersistenceTests: XCTestCase {
             confidence: 0.9
         )
         
-        XCTAssertFalse(persistence.hasBridgeSpaceMappings(), "Should be false without bridge space")
+        XCTAssertFalse(await persistence.hasBridgeSpaceMappings(), "Should be false without bridge space")
     }
     
-    func testUpdateMappingPreservesBridgeSpace() {
+    func testUpdateMappingPreservesBridgeSpace() async {
         let fixtureId = UUID()
         let position1 = SIMD3<Float>(1.0, 2.0, 3.0)
         let position2 = SIMD3<Float>(4.0, 5.0, 6.0)
@@ -722,7 +722,7 @@ final class PersistenceTests: XCTestCase {
             bridgePosition: bridgePosition
         )
         
-        var mappings = persistence.loadMappings()
+        var mappings = await persistence.loadMappings()
         XCTAssertEqual(mappings.first?.bridgePositionX, 5.0)
         
         // Update with new ARKit position but no bridge space (should preserve existing)
@@ -736,7 +736,7 @@ final class PersistenceTests: XCTestCase {
             confidence: 0.95
         )
         
-        mappings = persistence.loadMappings()
+        mappings = await persistence.loadMappings()
         XCTAssertEqual(mappings.first?.bridgePositionX, 5.0, "Bridge space should be preserved after update")
         XCTAssertEqual(mappings.first?.positionX, 4.0, "ARKit position should be updated")
     }

@@ -117,9 +117,19 @@ struct TrackedFixture: Identifiable, Sendable {
     /// locally-generated UUID for the detection tracking.
     var mappedHueLightId: String?
     
+    /// Manual depth offset applied to the fixture position (meters).
+    /// Used on non-LiDAR devices where depth estimation falls back to
+    /// a static distance. The user can adjust this via a HUD slider.
+    var depthOffsetMeters: Float = 0.0
+    
     /// Convenience accessor for fixture type.
     var type: FixtureType { detection.type }
     
     /// Convenience accessor for detection confidence.
     var confidence: Double { detection.confidence }
+    
+    /// Effective distance including manual depth offset.
+    var effectiveDistanceMeters: Float {
+        distanceMeters + depthOffsetMeters
+    }
 }

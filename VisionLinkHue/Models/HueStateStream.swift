@@ -387,6 +387,19 @@ final class HueStateStream {
         }
         fixtureLightMapping.removeAll()
     }
+    
+    /// Report a certificate pin mismatch to the user.
+    /// This occurs when the bridge has been factory-reset and presents a new TLS certificate.
+    func reportCertificatePinMismatch(newHash: Data, oldHash: Data) {
+        let mismatchError = NSError(
+            domain: "CertificatePinning",
+            code: 1,
+            userInfo: [
+                NSLocalizedDescriptionKey: "Certificate pin mismatch detected. The bridge may have been factory-reset. Tap settings to re-verify the connection."
+            ]
+        )
+        reportError(mismatchError, severity: .critical, source: "CertificatePinning.mismatch")
+    }
 }
 
 

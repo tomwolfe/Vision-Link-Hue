@@ -61,6 +61,9 @@ actor HueEventStreamActor {
     /// TOFU callback for certificate pinning.
     private var tofuCallback: @Sendable (Data) async -> Void = { _ in }
     
+    /// Callback for pin mismatch events during SSE connection.
+    private var onPinMismatch: @Sendable (Data, Data) async -> Void = { _, _ in }
+    
     /// Saved connection parameters for reconnection.
     private var pendingReconnection: (url: URL, pinnedHash: Data?, keychainKey: String?, tofuCallback: @Sendable (Data) async -> Void)?
     
@@ -71,7 +74,8 @@ actor HueEventStreamActor {
         url: URL,
         pinnedHash: Data?,
         keychainKey: String?,
-        tofuCallback: @escaping @Sendable (Data) async -> Void
+        tofuCallback: @escaping @Sendable (Data) async -> Void,
+        onPinMismatch: @escaping @Sendable (Data, Data) async -> Void = { _, _ in }
     ) {
         guard state != .connected else {
             logger.debug("SSE stream already connected, ignoring start request")
@@ -81,6 +85,7 @@ actor HueEventStreamActor {
         disconnect()
         
         self.tofuCallback = tofuCallback
+        self.onPinMismatch = onPinMismatch
         self.pendingReconnection = (url: url, pinnedHash: pinnedHash, keychainKey: keychainKey, tofuCallback: tofuCallback)
         
         let sessionDelegate = CertificatePinningDelegate(
@@ -89,6 +94,10 @@ actor HueEventStreamActor {
         ) { [weak self] trustedHash in
             Task { [weak self] in
                 await self?.tofuCallback(trustedHash)
+            }
+        } onPinMismatch: { [weak self] newHash, oldHash in
+            Task { [weak self] in
+                await self?.onPinMismatch(newHash, oldHash)
             }
         }
         

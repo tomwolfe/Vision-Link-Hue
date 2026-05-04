@@ -14,6 +14,11 @@ struct HUDOverlay: View {
     @State private var showBridgeSetup: Bool = false
     @State private var showScenes: Bool = false
     @State private var selectedFixtureId: UUID?
+    @State private var depthOffsetMeters: Float = 0.0
+    
+    /// Minimum and maximum depth offset range in meters.
+    private let minDepthOffset: Float = -3.0
+    private let maxDepthOffset: Float = 3.0
     
     var body: some View {
         VStack {
@@ -97,6 +102,36 @@ struct HUDOverlay: View {
                         Text("Scanning...")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                    }
+                    
+                    // Depth offset slider for non-LiDAR devices
+                    if let fixtureId = selectedFixtureId,
+                       let fixture = sessionManager.trackedFixtures.first(where: { $0.id == fixtureId }) {
+                        VStack(spacing: 4) {
+                            HStack {
+                                Text("Depth Adjust")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Text(String(format: "%.1fm", fixture.depthOffsetMeters))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            
+                            Slider(
+                                value: Binding(
+                                    get: { fixture.depthOffsetMeters },
+                                    set: { newValue in
+                                        sessionManager.adjustDepthOffset(
+                                            for: fixtureId,
+                                            offset: newValue
+                                        )
+                                    }
+                                ),
+                                in: minDepthOffset...maxDepthOffset
+                            )
+                            .labelsHidden()
+                        }
                     }
                     
                     // Detection latency indicator

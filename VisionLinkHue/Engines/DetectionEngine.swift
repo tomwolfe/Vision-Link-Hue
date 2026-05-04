@@ -53,8 +53,8 @@ final class DetectionEngine {
         )
     }
     
-    /// Timestamp of the last inference pass.
-    private var lastInferenceTime: CFAbsoluteTime = 0
+    /// Timestamp of the last inference pass (monotonic clock).
+    private var lastInferenceInstant: ContinuousClock.Instant = .now
     
     /// Adaptive inference interval that adjusts based on thermal state.
     private var currentInferenceInterval: TimeInterval {
@@ -78,7 +78,7 @@ final class DetectionEngine {
         guard !isRunning else { return }
         isRunning = true
         frameCount = 0
-        lastInferenceTime = 0
+        lastInferenceInstant = .now
         logger.info("DetectionEngine started")
         thermalMonitor.start()
     }
@@ -98,11 +98,11 @@ final class DetectionEngine {
     func processFrame(_ pixelBuffer: CVPixelBuffer, timestamp: TimeInterval) async throws -> [FixtureDetection] {
         guard isRunning else { return [] }
         
-        let now = CFAbsoluteTimeGetCurrent()
-        guard now - lastInferenceTime >= currentInferenceInterval else {
+        let now = ContinuousClock.now
+        guard now - lastInferenceInstant >= currentInferenceInterval else {
             return []
         }
-        lastInferenceTime = now
+        lastInferenceInstant = now
         
         let start = now
         frameCount += 1
@@ -121,8 +121,8 @@ final class DetectionEngine {
         
         let detections = try await runVisionDetection(pixelBuffer, lowPower: useLowPower)
         
-        let elapsed = (CFAbsoluteTimeGetCurrent() - start) * 1000
-        inferenceLatencyMs = elapsed
+        let elapsed = ContinuousClock.now.duration(from: start).milliseconds
+        inferenceLatencyMs = Double(elapsed)
         
         let filtered = detections.filter { $0.confidence >= minConfidence }
         

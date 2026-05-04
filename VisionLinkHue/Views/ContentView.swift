@@ -13,6 +13,7 @@ struct ContentView: View {
     @Environment(SpatialProjector.self) private var spatialProjector
     
     @State private var showSettings: Bool = false
+    @State private var showBridgeDiscovery: Bool = false
     @State private var dismissedErrorId: UUID?
     
     var body: some View {
@@ -55,17 +56,35 @@ struct ContentView: View {
                 stateStream: stateStream
             )
         }
+        .sheet(isPresented: $showBridgeDiscovery) {
+            BridgeDiscoveryView(
+                hueClient: hueClient,
+                stateStream: stateStream
+            )
+        }
         .overlay(alignment: .top) {
             if let error = stateStream.activeErrors.first(where: { $0.id != dismissedErrorId }) {
                 errorToast(error)
                     .padding(.top, 60)
+                    .onAppear {
+                        if error.severity == .critical && error.source == "HueClient.reconnect" {
+                            showBridgeDiscovery = true
+                        }
+                    }
             }
         }
         .task {
             // Auto-discover bridge on launch
             let bridges = await hueClient.discoverBridges()
-            if let first = bridges.first {
-                await hueClient.connect(to: first)
+            if bridges.count == 1 {
+                await hueClient.connect(to: bridges.first!)
+            } else if bridges.count > 1 {
+                showBridgeDiscovery = true
+            }
+            
+            // Handle certificate pin mismatch events
+            hueClient.onCertificatePinMismatch = { [weak stateStream] newHash, oldHash in
+                await stateStream?.reportCertificatePinMismatch(newHash: newHash, oldHash: oldHash)
             }
         }
     }

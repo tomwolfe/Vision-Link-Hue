@@ -11,6 +11,8 @@ final class FixtureHUDFactory {
     /// Create a HUD entity for a tracked fixture with a visible billboard quad.
     /// The entity uses a BillboardComponent to always face the camera and
     /// displays a semi-transparent rounded-rect quad at the fixture's position.
+    /// Includes a CollisionComponent with a bounding sphere for raycast
+    /// disambiguation when multiple fixtures overlap in the camera view.
     ///
     /// - Parameters:
     ///   - fixture: The tracked fixture to create a HUD for.
@@ -25,6 +27,9 @@ final class FixtureHUDFactory {
         
         entity.components.set(BillboardComponent())
         entity.components.set(ViewAttachmentComponent(rootView: FixtureHUDView(fixture: fixture)))
+        entity.components.set(CollisionComponent(
+            shapes: [.boundingSphere(radius: 0.15)]
+        ))
         
         anchor.addChild(entity)
         
