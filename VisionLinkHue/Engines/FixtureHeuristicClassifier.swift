@@ -102,6 +102,15 @@ struct ClassificationConfigFile: Codable {
         let specificity: [String: Int]?
         let materialFixtureMapping: [String: [String]]?
         let materialIndexMapping: [String: String]?
+        let spatial: SpatialConfig?
+    }
+    
+    struct SpatialConfig: Codable {
+        let raycastProjectionConfidence: Double?
+        let depthProjectionConfidence: Double?
+        let meshResultConfidence: Double?
+        let fallbackDistanceMeters: Float?
+        let fallbackConfidence: Double?
     }
 }
 
@@ -280,6 +289,18 @@ struct FixtureHeuristicClassifier {
                 }
             }
             self.specificity = loadedSpecificity
+        }
+        
+        // Apply spatial/projection thresholds from config if available
+        if let spatial = configFile.config?.spatial {
+            let configData = DetectionConstants.SpatialConfigData(
+                raycastProjectionConfidence: spatial.raycastProjectionConfidence ?? DetectionConstants.defaultRaycastProjectionConfidence,
+                depthProjectionConfidence: spatial.depthProjectionConfidence ?? DetectionConstants.defaultDepthProjectionConfidence,
+                meshResultConfidence: spatial.meshResultConfidence ?? DetectionConstants.defaultMeshResultConfidence,
+                fallbackDistanceMeters: spatial.fallbackDistanceMeters ?? DetectionConstants.defaultFallbackDistanceMeters,
+                fallbackConfidence: spatial.fallbackConfidence ?? DetectionConstants.defaultFallbackConfidence
+            )
+            DetectionConstants.setSpatialConfig(configData)
         }
         
         self.rules = loadedRules

@@ -662,9 +662,9 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
                 if Self.retryableStatusCodes.contains(httpResponse.statusCode) {
                     lastError = HueError.apiError(statusCode: httpResponse.statusCode, message: "Transient server error on attempt \(attempt + 1)")
                     if attempt < Self.maxRetries {
-                        let delay = Self.retryBaseDelay * pow(2.0, Double(attempt))
-                        logger.debug("Retryable status \(httpResponse.statusCode) on attempt \(attempt + 1), retrying in \(String(format: "%.2f", delay))s")
-                        try? await Task.sleep(for: .seconds(delay))
+                        let jitterDelay = Self.retryBaseDelay * pow(2.0, Double(attempt)) + Double.random(in: 0...0.2)
+                        logger.debug("Retryable status \(httpResponse.statusCode) on attempt \(attempt + 1), retrying in \(String(format: "%.2f", jitterDelay))s")
+                        try? await Task.sleep(for: .seconds(jitterDelay))
                     } else {
                         let errorMsg = String(data: data, encoding: .utf8) ?? "Unknown error (\(httpResponse.statusCode))"
                         throw HueError.apiError(statusCode: httpResponse.statusCode, message: errorMsg)
@@ -681,9 +681,9 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
                 let isURLErrorCancelled = nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
                 
                 if isURLErrorTimeout && attempt < Self.maxRetries {
-                    let delay = Self.retryBaseDelay * pow(2.0, Double(attempt))
-                    logger.debug("Timeout on attempt \(attempt + 1), retrying in \(String(format: "%.2f", delay))s")
-                    try? await Task.sleep(for: .seconds(delay))
+                    let jitterDelay = Self.retryBaseDelay * pow(2.0, Double(attempt)) + Double.random(in: 0...0.2)
+                    logger.debug("Timeout on attempt \(attempt + 1), retrying in \(String(format: "%.2f", jitterDelay))s")
+                    try? await Task.sleep(for: .seconds(jitterDelay))
                 } else if isURLErrorCancelled {
                     throw error
                 } else {

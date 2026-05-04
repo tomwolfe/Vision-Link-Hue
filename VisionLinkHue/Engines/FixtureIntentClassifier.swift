@@ -2,6 +2,7 @@ import Vision
 @preconcurrency import CoreML
 import Foundation
 import os
+import CoreVideo
 
 /// Protocol for intent-based fixture classification using on-device ML models.
 /// Complements heuristic classification by providing semantic understanding
@@ -31,6 +32,9 @@ protocol FixtureIntentClassifier: Sendable {
 ///
 /// Uses `VNCoreMLRequest` for Vision framework integration and handles
 /// async inference via `Task.detached` to avoid blocking the main thread.
+///
+/// Reuses a `CVPixelBufferPool` across classification calls to minimize memory
+/// churn and CPU overhead during rapid frame analysis.
 struct CoreMLIntentClassifier: FixtureIntentClassifier {
     /// Mapping from CoreML model labels to `FixtureType` enum cases.
     static let labelToFixtureType: [String: FixtureType] = [
@@ -53,6 +57,9 @@ struct CoreMLIntentClassifier: FixtureIntentClassifier {
     /// Whether the model has been loaded successfully.
     var isReady: Bool { model != nil }
 
+    /// Pixel buffer pool for reusing CVPixelBuffer allocations across classification calls.
+    private var pixelBufferPool: CVPixelBufferPool?
+
     /// Initialize the classifier without loading the model.
     /// Call `loadModel()` before using.
     init() {}
@@ -74,6 +81,36 @@ struct CoreMLIntentClassifier: FixtureIntentClassifier {
         model = try await Task.detached {
             try MLModel(contentsOf: compiledModelURL)
         }.value
+
+        createPixelBufferPool()
+    }
+
+    /// Create a pixel buffer pool for reuse across classification calls.
+    private func createPixelBufferPool() {
+        let width = 224
+        let height = 224
+        let pixelFormatType = kCVPixelFormatType_32ARGB
+
+        let attributes: [String: Any] = [
+            kCVPixelBufferPoolAllocationThresholdKey as String: 8
+        ]
+
+        var pool: CVPixelBufferPool?
+        let status = CVPixelBufferPoolCreate(
+            nil,
+            nil,
+            [
+                kCVPixelBufferPoolMinimumWidthKey as String: width,
+                kCVPixelBufferPoolMinimumHeightKey as String: height,
+                kCVPixelBufferPoolMinimumPixelFormatTypeKey as String: pixelFormatType
+            ] as CFDictionary,
+            attributes as CFDictionary,
+            &pool
+        )
+
+        if status == kCVReturnSuccess, let createdPool = pool {
+            pixelBufferPool = createdPool
+        }
     }
 
     /// Classify an observation using the CoreML model and Vision framework.
@@ -130,11 +167,31 @@ struct CoreMLIntentClassifier: FixtureIntentClassifier {
     /// Get the override threshold value for external consumers.
     static let overrideThreshold: Double = overrideConfidenceThreshold
 
-    /// Create a minimal pixel buffer for Vision framework processing.
-    /// In production, this would use the actual camera frame buffer.
+    /// Create a pixel buffer for Vision framework processing.
+    /// Reuses a `CVPixelBufferPool` when available to reduce memory churn.
     private func createPixelBuffer(from box: CGRect) throws -> CVPixelBuffer {
         let width = 224
         let height = 224
+
+        if let pool = pixelBufferPool {
+            var pixelBuffer: CVPixelBuffer?
+            let status = CVPixelBufferPoolCreatePixelBuffer(nil, pool, &pixelBuffer)
+            guard status == kCVReturnSuccess, let buffer = pixelBuffer else {
+                fallback:
+                do {
+                    return try createPixelBufferDirect(width: width, height: height)
+                } catch {
+                    throw error
+                }
+            }
+            return buffer
+        }
+
+        return try createPixelBufferDirect(width: width, height: height)
+    }
+
+    /// Create a pixel buffer directly without pool reuse.
+    private func createPixelBufferDirect(width: Int, height: Int) throws -> CVPixelBuffer {
         let attributes: [String: Any] = [
             kCVPixelBufferCGImageCompatibilityKey as String: true,
             kCVPixelBufferCGBitmapContextCompatibilityKey as String: true,

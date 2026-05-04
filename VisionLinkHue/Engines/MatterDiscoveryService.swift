@@ -1,12 +1,16 @@
 import Foundation
 import MultipeerConnectivity
 import os
+import UIKit
 
 /// Service for discovering Matter-compatible Thread border routers and accessories
 /// using MultipeerConnectivity as a local network discovery fallback.
 ///
 /// Works alongside HomeKit's native accessory discovery to provide additional
 /// discovery surface for Matter devices on the Thread network.
+///
+/// Automatically suspends discovery when the app backgrounds or when a stable
+/// Hue Bridge connection is established to minimize battery drain.
 @MainActor
 final class MatterDiscoveryService {
     
@@ -14,6 +18,23 @@ final class MatterDiscoveryService {
     
     /// Whether the service is currently active and discovering.
     var isDiscovering: Bool { session?.state != .notConnected }
+    
+    /// Controls whether discovery should be suspended due to external factors
+    /// (app backgrounding or stable bridge connection).
+    private var isSuspended: Bool = false
+    
+    /// Whether a stable Hue Bridge connection is established.
+    /// When true, aggressively suspends Multipeer discovery to conserve battery.
+    var isBridgeConnected: Bool {
+        get { _isBridgeConnected }
+        set {
+            _isBridgeConnected = newValue
+            if newValue {
+                suspendDiscovery()
+            }
+        }
+    }
+    private var _isBridgeConnected: Bool = false
     
     /// Discovered Matter border routers.
     var discoveredBorderRouters: [MatterBorderRouter] {
@@ -89,7 +110,61 @@ final class MatterDiscoveryService {
         session?.disconnect()
         self.session = nil
         _discoveredRouters.removeAll()
+        isSuspended = false
         logger.info("Stopped Matter border router discovery")
+    }
+    
+    /// Suspend discovery due to app backgrounding or stable bridge connection.
+    /// This aggressively conserves battery by stopping the advertiser without
+    /// fully disconnecting the session.
+    func suspendDiscovery() {
+        guard isDiscovering && !isSuspended else { return }
+        isSuspended = true
+        advertiser?.stop()
+        self.advertiser = nil
+        logger.debug("Matter discovery suspended for battery conservation")
+    }
+    
+    /// Resume discovery after suspension (app foregrounded or bridge disconnected).
+    func resumeDiscovery() {
+        guard isSuspended else { return }
+        isSuspended = false
+        if !isBridgeConnected {
+            startDiscovery()
+        }
+        logger.debug("Matter discovery resumed")
+    }
+    
+    /// Register for lifecycle notifications to auto-suspend on background.
+    func registerForLifecycleNotifications() {
+        let nc = NotificationCenter.default
+        nc.addObserver(
+            self,
+            selector: #selector(handleApplicationDidEnterBackground),
+            name: UIApplication.didEnterBackgroundNotification,
+            object: nil
+        )
+        nc.addObserver(
+            self,
+            selector: #selector(handleApplicationWillEnterForeground),
+            name: UIApplication.willEnterForegroundNotification,
+            object: nil
+        )
+    }
+    
+    /// Unregister from lifecycle notifications.
+    func unregisterForLifecycleNotifications() {
+        NotificationCenter.default.removeObserver(self)
+    }
+    
+    @objc private func handleApplicationDidEnterBackground() {
+        suspendDiscovery()
+    }
+    
+    @objc private func handleApplicationWillEnterForeground() {
+        if !isBridgeConnected {
+            resumeDiscovery()
+        }
     }
     
     /// Discover Matter devices and return the results.

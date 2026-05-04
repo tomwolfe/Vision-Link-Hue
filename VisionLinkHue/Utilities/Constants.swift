@@ -73,18 +73,62 @@ enum DetectionConstants {
     
     // MARK: - Projection
     
+    public static let defaultRaycastProjectionConfidence: Double = 0.95
+    public static let defaultDepthProjectionConfidence: Double = 0.75
+    public static let defaultMeshResultConfidence: Double = 0.9
+    public static let defaultFallbackDistanceMeters: Float = 2.0
+    public static let defaultFallbackConfidence: Double = 0.5
+    
+    private static var _spatialConfig: SpatialConfigData?
+    
+    public struct SpatialConfigData: Sendable {
+        public let raycastProjectionConfidence: Double
+        public let depthProjectionConfidence: Double
+        public let meshResultConfidence: Double
+        public let fallbackDistanceMeters: Float
+        public let fallbackConfidence: Double
+    }
+    
+    public static func setSpatialConfig(_ config: SpatialConfigData) {
+        _spatialConfig = config
+    }
+    
+    public static func clearSpatialConfig() {
+        _spatialConfig = nil
+    }
+    
+    public static func projectedSpatialConfig() -> SpatialConfigData {
+        _spatialConfig ?? SpatialConfigData(
+            raycastProjectionConfidence: defaultRaycastProjectionConfidence,
+            depthProjectionConfidence: defaultDepthProjectionConfidence,
+            meshResultConfidence: defaultMeshResultConfidence,
+            fallbackDistanceMeters: defaultFallbackDistanceMeters,
+            fallbackConfidence: defaultFallbackConfidence
+        )
+    }
+    
     /// Confidence score for raycast-on-mesh projections.
-    public static let raycastProjectionConfidence: Double = 0.95
+    public static var raycastProjectionConfidence: Double {
+        projectedSpatialConfig().raycastProjectionConfidence
+    }
     
     /// Confidence score for depth map unprojection.
-    public static let depthProjectionConfidence: Double = 0.75
+    public static var depthProjectionConfidence: Double {
+        projectedSpatialConfig().depthProjectionConfidence
+    }
     
     /// Confidence score for mesh result projections.
-    public static let meshResultConfidence: Double = 0.9
+    public static var meshResultConfidence: Double {
+        projectedSpatialConfig().meshResultConfidence
+    }
     
     /// Default fallback distance in meters when raycast and depth fail.
-    public static let fallbackDistanceMeters: Float = 2.0
+    public static var fallbackDistanceMeters: Float {
+        projectedSpatialConfig().fallbackDistanceMeters
+    }
     
     /// Confidence score for fallback projections.
-    public static let fallbackConfidence: Double = 0.5
+    public static var fallbackConfidence: Double {
+        projectedSpatialConfig().fallbackConfidence
+    }
 }

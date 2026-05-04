@@ -42,6 +42,13 @@
             "3": "Fabric",
             "4": "Plaster",
             "5": "Concrete"
+        },
+        "spatial": {
+            "raycastProjectionConfidence": 0.95,
+            "depthProjectionConfidence": 0.75,
+            "meshResultConfidence": 0.9,
+            "fallbackDistanceMeters": 2.0,
+            "fallbackConfidence": 0.5
         }
     },
     "rules": [
