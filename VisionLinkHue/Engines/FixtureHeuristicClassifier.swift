@@ -199,8 +199,14 @@ struct FixtureHeuristicClassifier {
     /// - Parameter url: URL pointing to the JSON config file.
     /// - Returns: The loaded rules array.
     /// - Throws: `ClassificationConfigError` if the config is invalid or cannot be loaded.
-    mutating func loadRules(from url: URL) throws {
-        let data = try Data(contentsOf: url)
+    mutating func loadRules(from url: URL) async throws {
+        let (data, response): (Data, URLResponse)
+        
+        if url.scheme == "http" || url.scheme == "https" {
+            (data, response) = try await URLSession.shared.data(from: url)
+        } else {
+            data = try Data(contentsOf: url)
+        }
         
         let decoder = JSONDecoder()
         

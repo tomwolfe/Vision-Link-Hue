@@ -140,7 +140,8 @@ struct NeuralSurfaceMaterialClassifier: Sendable {
     ) -> String? {
         guard let baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer) else { return nil }
         
-        let byteOffset = pixelY * width + pixelX
+        let bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
+        let byteOffset = pixelY * bytesPerRow + pixelX
         let materialIndex = baseAddress.load(fromByteOffset: byteOffset, as: UInt8.self)
         
         return materialIndexToLabel(materialIndex)

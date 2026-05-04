@@ -75,6 +75,9 @@ actor AppNotificationSystem {
     /// Last notification time per source for rate limiting.
     private var lastNotificationTimeBySource: [String: Date] = [:]
     
+    /// Active auto-dismiss tasks keyed by notification ID.
+    private var autoDismissTasks: [UUID: Task<Void, Never>] = [:]
+    
     /// Notification event publisher for UI consumption.
     var onNotification: (@Sendable ([AppError]) -> Void)?
     
@@ -114,6 +117,10 @@ actor AppNotificationSystem {
         // Remove duplicate errors from the same source
         activeNotifications.removeAll { $0.source == source && $0.error._domain == (error as NSError).domain }
         
+        // Cancel any existing auto-dismiss task for this notification ID
+        autoDismissTasks[appError.id]?.cancel()
+        autoDismissTasks.removeValue(forKey: appError.id)
+        
         activeNotifications.append(appError)
         lastNotificationTimeBySource[source] = Date()
         
@@ -122,22 +129,32 @@ actor AppNotificationSystem {
         
         // Auto-dismiss informational errors after 3 seconds
         if severity == .informational {
-            Task { [weak self] in
-                try? await Task.sleep(for: .seconds(3))
-                await self?.dismissNotification(withId: appError.id)
+            let task = Task { [weak self] in
+                do {
+                    try await Task.sleep(for: .seconds(3))
+                    await self?.dismissNotification(withId: appError.id)
+                } catch {
+                    // Task was cancelled, silently ignore
+                }
             }
+            autoDismissTasks[appError.id] = task
         }
     }
     
     /// Dismiss a specific notification by ID.
     func dismissNotification(withId id: UUID) {
         activeNotifications.removeAll { $0.id == id }
+        autoDismissTasks.removeValue(forKey: id)?.cancel()
         onNotification?(activeNotifications)
     }
     
     /// Clear all active notifications.
     func clearAllNotifications() {
         activeNotifications.removeAll()
+        for task in autoDismissTasks.values {
+            task.cancel()
+        }
+        autoDismissTasks.removeAll()
         onNotification?(activeNotifications)
     }
     

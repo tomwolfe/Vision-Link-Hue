@@ -186,7 +186,10 @@ final class SpatialCalibrationEngine {
         )
         
         // Newton-Raphson iterations: X_{n+1} = 0.5 * X_n * (3I - M * X_n^2)
-        for _ in 0..<5 {
+        // Converge when change falls below epsilon, capped by max iterations
+        let maxIterations = 20
+        let epsilon: Float = 1e-5
+        for _ in 0..<maxIterations {
             let MX = M * X
             let MX2 = MX * MX
             let threeI_minus_MX2 = simd_float3x3(
@@ -194,7 +197,17 @@ final class SpatialCalibrationEngine {
                 SIMD3<Float>(-MX2.columns.1.x, 3 - MX2.columns.1.y, -MX2.columns.1.z),
                 SIMD3<Float>(-MX2.columns.2.x, -MX2.columns.2.y, 3 - MX2.columns.2.z)
             )
-            X = 0.5 * (X * threeI_minus_MX2)
+            let XNew = 0.5 * (X * threeI_minus_MX2)
+            
+            let diff = simd_length(XNew.columns.0 - X.columns.0)
+                + simd_length(XNew.columns.1 - X.columns.1)
+                + simd_length(XNew.columns.2 - X.columns.2)
+            
+            X = XNew
+            
+            if diff <= epsilon {
+                break
+            }
         }
         
         return X
