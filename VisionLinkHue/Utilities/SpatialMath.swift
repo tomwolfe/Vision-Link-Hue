@@ -51,7 +51,7 @@ enum SpatialMath {
         let dirX = (pixelX - cx) / fx
         let dirY = (pixelY - cy) / fy
         
-        var direction = SIMD3<Float>(dirX, dirY, 1.0)
+        var direction = SIMD3<Float>(dirX, dirY, -1.0)
         direction = normalize(direction)
         
         let rotationMatrix = rotationMatrix(from: cameraTransform)
@@ -78,7 +78,7 @@ enum SpatialMath {
         let dirX = (normalized.x - cx)
         let dirY = (normalized.y - cy)
         
-        var direction = SIMD3<Float>(dirX, dirY, 1.0)
+        var direction = SIMD3<Float>(dirX, dirY, -1.0)
         direction = normalize(direction)
         
         let rotationMatrix = rotationMatrix(from: cameraTransform)
@@ -109,7 +109,7 @@ enum SpatialMath {
         let dirX = (pixelXf - cx) / fx
         let dirY = (pixelYf - cy) / fy
         
-        let direction = SIMD3<Float>(dirX, dirY, 1.0)
+        let direction = SIMD3<Float>(dirX, dirY, -1.0)
         let rotationMatrix = rotationMatrix(from: cameraTransform)
         let rotatedDirection = rotationMatrix * direction
         

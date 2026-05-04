@@ -82,7 +82,7 @@ final class HueSpatialService {
             bridgePosition = calibrationEngine.mapToBridgeSpace(arKitPosition)
         } else if let origin = referencePoint {
             // Fallback: single-point origin offset
-            bridgePosition = origin + (arKitPosition - origin)
+            bridgePosition = arKitPosition - origin
         } else {
             // Default: identity mapping
             bridgePosition = arKitPosition

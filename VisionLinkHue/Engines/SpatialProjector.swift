@@ -222,7 +222,7 @@ final class SpatialProjector {
         )
         
         let orientation = simd_quatf(hit.worldTransform)
-        let distance = length(position)
+        let distance = length(position - ray.origin)
         emaDepth = updateEMA(depth: distance, currentEma: emaDepth, alpha: emaSmoothingFactor)
         
         let adjustedPosition = position + configuration.hudOffset

@@ -99,9 +99,8 @@ final class DetectionEngine {
         guard isRunning else { return [] }
         
         let now = ContinuousClock.now
-        let intervalSeconds = Int64(currentInferenceInterval)
-        let intervalNanoseconds = Int64((currentInferenceInterval - Double(intervalSeconds)) * 1_000_000_000)
-        guard now - lastInferenceInstant >= Duration(secondsComponent: intervalSeconds, attosecondsComponent: intervalNanoseconds * 1_000_000) else {
+        let intervalMilliseconds = Int(currentInferenceInterval * 1000)
+        guard now - lastInferenceInstant >= Duration.milliseconds(intervalMilliseconds) else {
             return []
         }
         lastInferenceInstant = now
@@ -221,7 +220,7 @@ final class DetectionEngine {
             
             keep.append(detection)
             
-            for (j, other) in sorted.enumerated() where i != j {
+            for (j, other) in sorted.enumerated() where j > i {
                 guard !suppressed.contains(other.id) else { continue }
                 
                 let iou = detection.region.intersectionOverUnion(with: other.region)

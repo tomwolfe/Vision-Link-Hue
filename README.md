@@ -125,7 +125,7 @@ See [`.github/workflows/ci.yml`](.github/workflows/ci.yml) for pipeline configur
 
 - **Certificate Pinning**: Trust-On-First-Use (TOFU) with SHA-256 public key hashing stored securely in Keychain.
 - **mTLS**: All Hue Bridge communication uses mutual TLS.
-- **Strict Concurrency**: Full Swift 6.1+ strict concurrency compliance with zero `@unchecked Sendable` suppressions.
+- **Strict Concurrency**: Full Swift 6.1+ strict concurrency compliance with minimal `@unchecked Sendable` suppressions only where required by `URLSessionDelegate` protocol constraints.
 
 ---
 

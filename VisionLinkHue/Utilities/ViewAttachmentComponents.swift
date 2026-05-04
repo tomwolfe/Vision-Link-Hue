@@ -27,6 +27,8 @@ final class FixtureHUDFactory {
         
         entity.components.set(BillboardComponent())
         
+        entity.components.set(ViewAttachmentComponent(FixtureHUDView(fixture: fixture)))
+        
         anchor.addChild(entity)
         
         return entity

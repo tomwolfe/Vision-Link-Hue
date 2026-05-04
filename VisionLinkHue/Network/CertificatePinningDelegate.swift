@@ -115,8 +115,8 @@ actor CertificatePinStore {
 /// thread-safe certificate pinning and TOFU management.
 ///
 /// The delegate itself is stateless and only holds a reference to the actor.
-/// All mutable state is isolated within the actor, satisfying Swift 6.1
-/// strict concurrency without `@unchecked Sendable`.
+/// All mutable state is isolated within the actor. `@unchecked Sendable` is
+/// required here because `URLSessionDelegate` is not a `Sendable` protocol.
 final class CertificatePinningDelegate: NSObject, URLSessionDelegate, @unchecked Sendable {
     
     private let logger = Logger(
