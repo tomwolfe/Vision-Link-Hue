@@ -32,7 +32,8 @@ final class AppContainer {
             detectionEngine: detector,
             spatialProjector: projector,
             hueClient: client,
-            stateStream: stream
+            stateStream: stream,
+            fixturePersistence: persistence
         )
         
         // Wire up calibration persistence to the spatial service's engine

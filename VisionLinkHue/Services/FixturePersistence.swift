@@ -1,6 +1,7 @@
 import Foundation
 import SwiftData
 import simd
+import ARKit
 import os
 
 /// Background actor that manages SwiftData persistence for fixture-light mappings
@@ -334,5 +335,65 @@ actor FixturePersistence {
     /// Get the model container for external access (e.g., SwiftUI modelContainer).
     var container: ModelContainer {
         modelContainer
+    }
+    
+    // MARK: - ARWorldMap Persistence
+    
+    /// The file URL where the ARWorldMap is persisted.
+    private var worldMapURL: URL {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        return docs.appendingPathComponent("spatial_anchor.worldmap")
+    }
+    
+    /// Save an ARWorldMap to the Documents directory for session relabeling.
+    func saveWorldMap(_ worldMap: ARWorldMap) {
+        do {
+            let data = try NSKeyedArchiver.archivedData(
+                withRootObject: worldMap,
+                requiringSecureCoding: true
+            )
+            try data.write(to: worldMapURL)
+            logger.info("ARWorldMap saved to \(worldMapURL.path)")
+        } catch {
+            logger.error("Failed to save ARWorldMap: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Load a previously saved ARWorldMap from the Documents directory.
+    /// Returns nil if no map exists or deserialization fails.
+    func loadWorldMap() -> ARWorldMap? {
+        guard FileManager.default.fileExists(atPath: worldMapURL.path) else {
+            return nil
+        }
+        
+        do {
+            let data = try Data(contentsOf: worldMapURL)
+            let worldMap = try NSKeyedUnarchiver.unarchivedObject(
+                ofClass: ARWorldMap.self,
+                from: data
+            )
+            logger.info("ARWorldMap loaded from \(worldMapURL.path)")
+            return worldMap
+        } catch {
+            logger.error("Failed to load ARWorldMap: \(error.localizedDescription)")
+            return nil
+        }
+    }
+    
+    /// Check whether a persisted ARWorldMap exists.
+    func hasWorldMap() -> Bool {
+        FileManager.default.fileExists(atPath: worldMapURL.path)
+    }
+    
+    /// Delete the persisted ARWorldMap.
+    func deleteWorldMap() {
+        do {
+            if FileManager.default.fileExists(atPath: worldMapURL.path) {
+                try FileManager.default.removeItem(at: worldMapURL)
+                logger.info("ARWorldMap deleted")
+            }
+        } catch {
+            logger.error("Failed to delete ARWorldMap: \(error.localizedDescription)")
+        }
     }
 }

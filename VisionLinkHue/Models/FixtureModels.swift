@@ -3,12 +3,18 @@ import simd
 import RealityKit
 
 /// Categories of lighting fixtures the on-device model can detect.
+/// Includes architectural archetypes recognized by the CoreML object
+/// detection model (Chandelier, Sconce, Desk Lamp) alongside traditional
+/// geometric classification categories.
 enum FixtureType: String, Codable, CaseIterable, Sendable {
     case lamp
     case recessed
     case pendant
     case ceiling
     case strip
+    case chandelier
+    case sconce
+    case deskLamp
     
     var displayName: String {
         switch self {
@@ -17,6 +23,9 @@ enum FixtureType: String, Codable, CaseIterable, Sendable {
         case .pendant: return "Pendant"
         case .ceiling: return "Ceiling"
         case .strip: return "Strip Light"
+        case .chandelier: return "Chandelier"
+        case .sconce: return "Wall Sconce"
+        case .deskLamp: return "Desk Lamp"
         }
     }
 }

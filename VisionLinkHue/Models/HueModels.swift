@@ -42,6 +42,9 @@ struct HueLightResource: Codable, Sendable, Identifiable {
             case ambiance = "ambiance"
             case candle = "candle"
             case nightlight = "nightlight"
+            case chandelier = "chandelier"
+            case wallSconce = "wall_sconce"
+            case deskLamp = "desk_lamp"
             case generic = "generic"
         }
     }

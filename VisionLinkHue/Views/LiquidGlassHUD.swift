@@ -33,6 +33,23 @@ enum LiquidGlassHUD {
         }
     }
     
+    /// Gradient for the "Connecting" / relocalization state indicator.
+    static let connectingGradient = LinearGradient(
+        colors: [.blue.opacity(0.8), .blue.opacity(0.3), .clear],
+        startPoint: .leading,
+        endPoint: .trailing
+    )
+    
+    /// Solid color for the relocalization progress bar.
+    static let connectingProgressColor: Color = .blue
+    
+    /// Gradient for the pinch gesture brightness indicator.
+    static let pinchGradient = LinearGradient(
+        colors: [.orange.opacity(0.8), .yellow.opacity(0.5)],
+        startPoint: .bottom,
+        endPoint: .top
+    )
+    
     /// Standard padding configuration for HUD panels.
     static let panelPadding = EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16)
     

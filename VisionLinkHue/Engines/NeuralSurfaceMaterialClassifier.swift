@@ -27,11 +27,11 @@ struct NeuralSurfaceMaterialClassifier: Sendable {
     
     /// Default material-to-fixture-type mapping (used when config is unavailable).
     private static let defaultMaterialFixtureMapping: [String: [FixtureType]] = [
-        "Glass": [.recessed, .ceiling],
-        "Metal": [.pendant, .lamp],
-        "Wood": [.ceiling, .recessed],
+        "Glass": [.recessed, .ceiling, .chandelier],
+        "Metal": [.pendant, .lamp, .sconce, .chandelier],
+        "Wood": [.ceiling, .recessed, .deskLamp, .sconce],
         "Fabric": [.lamp, .pendant],
-        "Plaster": [.ceiling, .recessed],
+        "Plaster": [.ceiling, .recessed, .sconce],
         "Concrete": [.ceiling, .recessed]
     ]
     

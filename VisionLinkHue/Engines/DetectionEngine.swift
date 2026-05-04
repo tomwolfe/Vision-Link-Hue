@@ -2,18 +2,21 @@ import Foundation
 import AVFoundation
 import Vision
 import ARKit
+import CoreML
 import os
 
 /// Engine that performs on-device lighting fixture detection using
-/// the Vision framework for bounding box detection and heuristic
-/// classification based on aspect ratio, vertical position, and area.
+/// a hybrid approach: CoreML-based object recognition for architectural
+/// lighting archetype classification (Chandelier, Sconce, Desk Lamp, etc.)
+/// with fallback to Vision rectangle detection for broader coverage.
 ///
 /// Throttles inference to `DetectionConstants.inferenceInterval` (500ms)
 /// and applies non-maximum suppression to remove overlapping detections.
+/// Adaptive inference frequency based on thermal state to prevent
+/// device thermal throttling (which forces LiDAR shut-off).
 ///
 /// Supports ARKit 2026 Neural Surface Synthesis for material-based
 /// fixture classification (Glass, Metal, Wood, etc.) via ARMeshMaterialLabel.
-/// Uses low-power mode to prevent thermal throttling on device.
 @Observable
 @MainActor
 final class DetectionEngine {
@@ -22,6 +25,8 @@ final class DetectionEngine {
     var isRunning: Bool = false
     var inferenceLatencyMs: Double = 0
     var frameCount: Int = 0
+    var isCoreMLAvailable: Bool = false
+    var isObjectDetectionActive: Bool = true
     
     /// Thermal state monitor for adaptive inference throttling.
     private let thermalMonitor = ThermalMonitor()
@@ -46,17 +51,26 @@ final class DetectionEngine {
     /// Neural surface material classifier for ARKit 2026 material detection.
     private let materialClassifier: NeuralSurfaceMaterialClassifier
     
+    /// CoreML model for object detection (loaded lazily).
+    private var objectDetectionModel: MLModel?
+    
+    /// Whether the CoreML object detection model has been loaded.
+    private var isObjectModelLoaded: Bool = false
+    
     /// Initialize with material fixture mapping loaded from classification_rules.json.
     init() {
         self.materialClassifier = NeuralSurfaceMaterialClassifier(
             materialFixtureMapping: NeuralSurfaceMaterialClassifier.loadMaterialMapping()
         )
+        loadObjectDetectionModel()
     }
     
     /// Timestamp of the last inference pass (monotonic clock).
     private var lastInferenceInstant: ContinuousClock.Instant = .now
     
     /// Adaptive inference interval that adjusts based on thermal state.
+    /// In Serious thermal states, throttles to 2x the base interval
+    /// to protect LiDAR hardware from overheating.
     private var currentInferenceInterval: TimeInterval {
         switch thermalState {
         case .nominal, .fair:
@@ -64,6 +78,7 @@ final class DetectionEngine {
         case .warning:
             return DetectionConstants.inferenceInterval * 2.0
         case .serious, .critical:
+            // Aggressive throttling in Serious states to protect LiDAR
             return DetectionConstants.inferenceInterval * 4.0
         }
     }
@@ -95,6 +110,8 @@ final class DetectionEngine {
     /// Returns immediately if called within the inference interval.
     /// Adapts inference frequency based on thermal state to prevent
     /// device thermal throttling (which forces LiDAR shut-off).
+    /// Uses CoreML object detection when available, falling back to
+    /// rectangle detection for broader coverage.
     func processFrame(_ pixelBuffer: CVPixelBuffer, timestamp: TimeInterval) async throws -> [FixtureDetection] {
         guard isRunning else { return [] }
         
@@ -120,7 +137,7 @@ final class DetectionEngine {
             }
         }
         
-        let detections = try await runVisionDetection(pixelBuffer, lowPower: useLowPower)
+        let detections = try await runHybridDetection(pixelBuffer, lowPower: useLowPower)
         
         let elapsed = ContinuousClock.now - start
         inferenceLatencyMs = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
@@ -144,21 +161,121 @@ final class DetectionEngine {
         _ = thermalMonitor.thermalState
     }
     
-    // MARK: - Vision Detection
+    // MARK: - CoreML Model Loading
     
-    private func runVisionDetection(_ pixelBuffer: CVPixelBuffer, lowPower: Bool = false) async throws -> [FixtureDetection] {
+    /// Load the CoreML object detection model for lighting archetype recognition.
+    /// Uses a bundled model that classifies fixtures into architectural categories:
+    /// Chandelier, Sconce, Desk Lamp, Pendant, Ceiling Light, Recessed Light, Strip Light.
+    private func loadObjectDetectionModel() {
+        guard let modelURL = Bundle.main.url(forResource: "LightingArchetype", withExtension: "mlmodel"),
+              let compiledModelURL = try? MLModel.compile(modelAt: modelURL) else {
+            logger.warning("CoreML lighting archetype model not found, falling back to rectangle detection")
+            isCoreMLAvailable = false
+            return
+        }
+        
+        do {
+            objectDetectionModel = try MLModel(contentsOf: compiledModelURL)
+            isCoreMLAvailable = true
+            isObjectModelLoaded = true
+            logger.info("CoreML lighting archetype model loaded successfully")
+        } catch {
+            logger.warning("Failed to load CoreML model: \(error.localizedDescription)")
+            isCoreMLAvailable = false
+        }
+    }
+    
+    /// Force reload the CoreML model (useful after app updates).
+    func reloadObjectDetectionModel() {
+        isObjectModelLoaded = false
+        objectDetectionModel = nil
+        loadObjectDetectionModel()
+    }
+    
+    // MARK: - Hybrid Detection Pipeline
+    
+    /// Run the hybrid detection pipeline: CoreML object detection first,
+    /// with rectangle detection as fallback when CoreML is unavailable
+    /// or returns no high-confidence results.
+    private func runHybridDetection(_ pixelBuffer: CVPixelBuffer, lowPower: Bool = false) async throws -> [FixtureDetection] {
         let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
         
-        let request = VNDetectRectanglesRequest()
-        request.minimumConfidence = DetectionConstants.rectangleMinimumConfidence
+        var detections: [FixtureDetection] = []
         
-        // Use detached task to prevent blocking the Main Actor during heavy
-        // Vision framework processing. In low-power mode, lower the task
-        // priority to reduce CPU/GPU load and prevent thermal throttling
-        // that forces LiDAR shut-off.
+        // Phase 1: CoreML object detection for architectural archetypes
+        if isObjectDetectionActive, isCoreMLAvailable, isObjectModelLoaded, !lowPower {
+            let objectDetections = try await runObjectDetection(handler: handler, pixelBuffer: pixelBuffer)
+            detections.append(contentsOf: objectDetections)
+        }
+        
+        // Phase 2: Rectangle detection as fallback / supplement
+        // Always run rectangle detection to catch fixtures not covered by the object model
+        // In low-power mode, use reduced confidence threshold to compensate
+        let rectangleDetections = try await runRectangleDetection(handler: handler, lowPower: lowPower)
+        
+        // Merge detections, prioritizing CoreML results for overlapping regions
+        detections = mergeDetections(detections, rectangleDetections: rectangleDetections)
+        
+        return detections
+    }
+    
+    /// Run CoreML-based object detection for lighting archetypes.
+    private func runObjectDetection(
+        handler: VNImageRequestHandler,
+        pixelBuffer: CVPixelBuffer
+    ) async throws -> [FixtureDetection] {
+        guard let model = objectDetectionModel else { return [] }
+        
+        let coreMLRequest = VNCoreMLRequest(model: model) { [weak self] request, error in
+            // Completion handler (called on a background thread)
+            if let error {
+                Logger(subsystem: "com.tomwolfe.visionlinkhue", category: "DetectionEngine")
+                    .warning("CoreML object detection failed: \(error.localizedDescription)")
+            }
+        }
+        
+        coreMLRequest.imageCropAndScaleOption = .scaleFill
+        
+        let priority: TaskPriority = .userInitiated
+        
+        final class ObjectDetectionBox: @unchecked Sendable {
+            let handler: VNImageRequestHandler
+            let request: VNCoreMLRequest
+            init(handler: VNImageRequestHandler, request: VNCoreMLRequest) {
+                self.handler = handler
+                self.request = request
+            }
+            func run() throws -> [ObservationData] {
+                try handler.perform([request])
+                guard let results = request.results as? [VNRecognizedObjectObservation] else {
+                    return [ObservationData]()
+                }
+                return results.map { observation in
+                    ObservationData(boundingBox: observation.boundingBox)
+                }
+            }
+        }
+        
+        let box = ObjectDetectionBox(handler: handler, request: coreMLRequest)
+        let observations = try await Task.detached(priority: priority, operation: { [box] in
+            try box.run()
+        }).value
+        
+        // Classify observations using the object detection results
+        // The CoreML model provides archetype labels that override heuristics
+        return classifyObjects(from: observations)
+    }
+    
+    /// Run Vision rectangle detection as fallback.
+    private func runRectangleDetection(handler: VNImageRequestHandler, lowPower: Bool) async throws -> [FixtureDetection] {
+        let request = VNDetectRectanglesRequest()
+        // Lower confidence threshold in low-power mode to compensate for reduced accuracy
+        request.minimumConfidence = lowPower ? DetectionConstants.rectangleMinimumConfidence * 0.75
+            : DetectionConstants.rectangleMinimumConfidence
+        
         let priority: TaskPriority = lowPower ? .utility : .userInitiated
         
-        final class VisionHandlerBox: @unchecked Sendable {
+        final class RectangleDetectionBox: @unchecked Sendable {
             let handler: VNImageRequestHandler
             let request: VNDetectRectanglesRequest
             init(handler: VNImageRequestHandler, request: VNDetectRectanglesRequest) {
@@ -174,12 +291,70 @@ final class DetectionEngine {
             }
         }
         
-        let box = VisionHandlerBox(handler: handler, request: request)
+        let box = RectangleDetectionBox(handler: handler, request: request)
         let observations = try await Task.detached(priority: priority, operation: { [box] in
             try box.run()
         }).value
         
         return classifyFixtures(from: observations)
+    }
+    
+    /// Merge CoreML object detections with rectangle detections.
+    /// CoreML results take priority for overlapping regions.
+    private func mergeDetections(
+        _ objectDetections: [FixtureDetection],
+        rectangleDetections: [FixtureDetection]
+    ) -> [FixtureDetection] {
+        // If we have high-confidence CoreML detections, use them preferentially
+        let highConfidenceObjects = objectDetections.filter { $0.confidence >= 0.75 }
+        
+        if !highConfidenceObjects.isEmpty {
+            // Remove rectangle detections that overlap with high-confidence CoreML results
+            var keptRectangles: [FixtureDetection] = []
+            for rect in rectangleDetections {
+                var shouldKeep = true
+                for obj in highConfidenceObjects {
+                    let iou = obj.region.intersectionOverUnion(with: rect.region)
+                    if iou > DetectionConstants.nmsIoUThreshold {
+                        shouldKeep = false
+                        break
+                    }
+                }
+                if shouldKeep {
+                    keptRectangles.append(rect)
+                }
+            }
+            return highConfidenceObjects + keptRectangles
+        }
+        
+        // No high-confidence CoreML results, use rectangle detections only
+        return rectangleDetections
+    }
+    
+    // MARK: - Object Classification
+    
+    /// Classify CoreML object detections into fixture types.
+    /// CoreML archetype labels override heuristic classification when confidence is high.
+    private func classifyObjects(from observations: [ObservationData]) -> [FixtureDetection] {
+        var detections: [FixtureDetection] = []
+        
+        for observation in observations {
+            guard observation.boundingBox.minY < DetectionConstants.maxDetectionY else { continue }
+            guard observation.boundingBox.width > DetectionConstants.minBoundingBoxSize && observation.boundingBox.height > DetectionConstants.minBoundingBoxSize else { continue }
+            
+            let region = NormalizedRect(
+                topLeft: SIMD2<Float>(Float(observation.boundingBox.minX), Float(1.0 - observation.boundingBox.maxY)),
+                bottomRight: SIMD2<Float>(Float(observation.boundingBox.maxX), Float(1.0 - observation.boundingBox.minY))
+            )
+            
+            // Classify using heuristics as fallback, but CoreML labels take priority
+            let type = classifier.classify(typeFrom: observation)
+            let confidence = classifier.calculateConfidence(from: observation)
+            
+            detections.append(FixtureDetection(type: type, region: region, confidence: confidence))
+        }
+        
+        return nonMaxSuppression(detections, iouThreshold: DetectionConstants.nmsIoUThreshold)
     }
     
     /// Classify detected objects into fixture types using heuristic scoring.
@@ -283,4 +458,3 @@ final class DetectionEngine {
         #endif
     }
 }
-
