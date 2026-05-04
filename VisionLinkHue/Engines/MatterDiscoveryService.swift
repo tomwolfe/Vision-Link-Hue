@@ -45,7 +45,9 @@ final class MatterDiscoveryService {
                 manufacturer: routerInfo.manufacturer,
                 model: routerInfo.model,
                 isOnline: routerInfo.isConnected,
-                threadNetworkName: routerInfo.threadNetworkName
+                threadNetworkName: routerInfo.threadNetworkName,
+                rssi: nil,
+                areaMetadata: routerInfo.areaMetadata
             )
         }
     }
@@ -189,7 +191,9 @@ final class MatterDiscoveryService {
             manufacturer: info.manufacturer,
             model: info.model,
             isOnline: info.isConnected,
-            threadNetworkName: info.threadNetworkName
+            threadNetworkName: info.threadNetworkName,
+            rssi: nil,
+            areaMetadata: info.areaMetadata
         )
         
         onBorderRouterDiscovered?(router)
@@ -204,6 +208,7 @@ final class MatterDiscoveryService {
 // MARK: - Router Info
 
 /// Internal representation of a discovered router's advertising data.
+/// Includes area metadata for Matter 1.5.1+ Thread Border Routers.
 struct RouterInfo: Sendable {
     let advertiserName: String
     let displayName: String
@@ -211,6 +216,7 @@ struct RouterInfo: Sendable {
     let model: String
     let isConnected: Bool
     let threadNetworkName: String?
+    let areaMetadata: MatterAreaMetadata?
 }
 
 // MARK: - MCSessionDelegate Conformance
@@ -247,7 +253,8 @@ extension MatterDiscoveryService: MCSessionDelegate {
                     manufacturer: "Unknown",
                     model: "Unknown",
                     isConnected: true,
-                    threadNetworkName: nil
+                    threadNetworkName: nil,
+                    areaMetadata: nil
                 )
                 await self.addOrUpdateRouter(info)
             case .notConnected:

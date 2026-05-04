@@ -211,6 +211,23 @@ struct SettingsView: View {
                     }
                 }
                 
+                // Spatial
+                Section("Spatial") {
+                    if hueClient.spatialService?.isSpatialAwareSupported == true {
+                        Text("SpatialAware: Available")
+                            .foregroundStyle(.green)
+                    } else {
+                        Text("SpatialAware: Not available (older bridge)")
+                            .foregroundStyle(.secondary)
+                        
+                        NavigationLink {
+                            ManualPlacementView()
+                        } label: {
+                            Text("Manual Placement")
+                        }
+                    }
+                }
+                
                 // Actions
                 Section {
                     Button("Reconnect") {

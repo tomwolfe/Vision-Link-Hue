@@ -32,6 +32,64 @@ final class HueSpatialService {
         return true // Checked at sync time via API response
     }
     
+    // MARK: - Manual Placement Mode
+    
+    /// Whether Manual Placement mode is active (for older Bridge hardware).
+    var isManualPlacementActive: Bool {
+        _manualPlacementMode != .inactive
+    }
+    
+    /// The current manual placement mode state.
+    enum ManualPlacementMode: Sendable {
+        /// Spatial features are available and functioning normally.
+        case inactive
+        /// User is manually assigning room/zone to a fixture.
+        case placing(fixtureId: UUID, lightId: String?)
+        /// User has completed manual placement for a fixture.
+        case placed(fixtureId: UUID, roomId: String, areaId: String?)
+    }
+    
+    private var _manualPlacementMode: ManualPlacementMode = .inactive
+    
+    /// The user-defined room mapping for manual placement mode.
+    /// Maps fixture UUIDs to their manually assigned room and area.
+    private var manualRoomAssignments: [UUID: (roomId: String, areaId: String?)] = [:]
+    
+    /// Get the manual room assignment for a fixture.
+    func manualRoomAssignment(for fixtureId: UUID) -> (roomId: String, areaId: String?)? {
+        manualRoomAssignments[fixtureId]
+    }
+    
+    /// Set the manual room assignment for a fixture.
+    func setManualRoomAssignment(fixtureId: UUID, roomId: String, areaId: String?) {
+        manualRoomAssignments[fixtureId] = (roomId: roomId, areaId: areaId)
+        _manualPlacementMode = .placed(fixtureId: fixtureId, roomId: roomId, areaId: areaId)
+        logger.info("Manual placement set for fixture \(fixtureId): room=\(roomId), area=\(areaId ?? "none")")
+    }
+    
+    /// Enter manual placement mode for a specific fixture.
+    func enterManualPlacementMode(fixtureId: UUID, lightId: String?) {
+        _manualPlacementMode = .placing(fixtureId: fixtureId, lightId: lightId)
+        logger.info("Entered manual placement mode for fixture \(fixtureId)")
+    }
+    
+    /// Exit manual placement mode and return to normal operation.
+    func exitManualPlacementMode() {
+        _manualPlacementMode = .inactive
+        logger.info("Exited manual placement mode")
+    }
+    
+    /// Get all manual room assignments for persistence.
+    func getAllManualAssignments() -> [UUID: (roomId: String, areaId: String?)] {
+        manualRoomAssignments
+    }
+    
+    /// Restore manual room assignments from persistence.
+    func restoreManualAssignments(_ assignments: [UUID: (roomId: String, areaId: String?)]) {
+        manualRoomAssignments = assignments
+        logger.info("Restored \(assignments.count) manual room assignments")
+    }
+    
     /// Initialize the spatial service with its dependencies.
     /// - Parameters:
     ///   - hueClient: The authenticated Hue client for REST API calls.
@@ -108,6 +166,8 @@ final class HueSpatialService {
     
     /// Create a full SpatialAwarePosition from ARKit detection data with
     /// room-relative coordinate mapping.
+    /// When in manual placement mode, uses user-assigned room/area instead
+    /// of bridge-derived values for older hardware compatibility.
     func createSpatialAwarePosition(context: DetectionContext) -> SpatialAwarePosition {
         let (position, roomOffset) = mapARKitToBridgeSpace(
             arKitPosition: context.arKitPosition,
@@ -115,13 +175,25 @@ final class HueSpatialService {
             referencePoint: context.origin
         )
         
+        // In manual placement mode, use user-assigned room/area
+        let roomId: String?
+        let areaId: String?
+        if isManualPlacementActive {
+            let manual = manualRoomAssignments[context.lightId.map { UUID(uuidString: $0) } ?? UUID()]
+            roomId = manual?.roomId
+            areaId = manual?.areaId
+        } else {
+            roomId = context.roomId
+            areaId = context.areaId
+        }
+        
         return SpatialAwarePosition(
             id: context.lightId,
             position: position,
             confidence: context.confidence,
             fixtureType: context.fixtureType,
-            roomId: context.roomId,
-            areaId: context.areaId,
+            roomId: roomId,
+            areaId: areaId,
             timestamp: Date(),
             orientation: SpatialAwarePosition.Orientation(simd: context.arKitOrientation),
             materialLabel: context.materialLabel,

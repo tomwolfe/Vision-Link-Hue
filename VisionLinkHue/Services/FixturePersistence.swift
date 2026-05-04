@@ -11,6 +11,7 @@ import os
 enum SchemaVersion: Int {
     case v1 = 1
     case v2 = 2
+    case v3 = 3
 }
 
 /// Migration configuration for SwiftData schema evolution.
@@ -18,7 +19,7 @@ enum SchemaVersion: Int {
 enum SchemaMigration {
     
     /// The current schema version.
-    static let currentVersion: SchemaVersion = .v2
+    static let currentVersion: SchemaVersion = .v3
     
     /// Migrate data from an older schema version to the current version.
     /// Note: This custom migration block is only invoked when using a custom
@@ -443,6 +444,9 @@ actor FixturePersistence {
     }
     
     /// Save an ARWorldMap to the Documents directory for session relabeling.
+    /// The file is marked with `.isExcludedFromBackup = true` to comply with
+    /// iOS 26 privacy guidelines that require spatial data persistence to be
+    /// excluded from iCloud backups.
     func saveWorldMap(_ worldMap: ARWorldMap) {
         do {
             let data = try NSKeyedArchiver.archivedData(
@@ -450,6 +454,7 @@ actor FixturePersistence {
                 requiringSecureCoding: true
             )
             try data.write(to: worldMapURL)
+            try setExcludeFromICloudBackup(url: worldMapURL)
             logger.info("ARWorldMap saved to \(worldMapURL.path)")
         } catch {
             logger.error("Failed to save ARWorldMap: \(error.localizedDescription)")
@@ -458,6 +463,8 @@ actor FixturePersistence {
     
     /// Load a previously saved ARWorldMap from the Documents directory.
     /// Returns nil if no map exists or deserialization fails.
+    /// Ensures the file is marked for iCloud backup exclusion on load
+    /// to handle files saved before this privacy compliance was added.
     func loadWorldMap() -> ARWorldMap? {
         guard FileManager.default.fileExists(atPath: worldMapURL.path) else {
             return nil
@@ -469,6 +476,7 @@ actor FixturePersistence {
                 ofClass: ARWorldMap.self,
                 from: data
             )
+            try setExcludeFromICloudBackup(url: worldMapURL)
             logger.info("ARWorldMap loaded from \(worldMapURL.path)")
             return worldMap
         } catch {
@@ -505,11 +513,13 @@ actor FixturePersistence {
     /// Save fixture object anchors for faster relocalization.
     /// Object anchors provide quicker relocalization than world maps
     /// for known fixture archetypes (Chandelier, Sconce, Desk Lamp, Pendant).
+    /// The file is marked with `.isExcludedFromBackup = true` for privacy compliance.
     func saveObjectAnchors(_ anchors: [Data]) {
         do {
             try anchors.forEach { data in
                 try data.write(to: objectAnchorURL, options: .atomic)
             }
+            try setExcludeFromICloudBackup(url: objectAnchorURL)
             logger.info("Saved \(anchors.count) fixture object anchor(s)")
         } catch {
             logger.error("Failed to save object anchors: \(error.localizedDescription)")
@@ -517,6 +527,7 @@ actor FixturePersistence {
     }
     
     /// Load persisted object anchors for relocalization.
+    /// Ensures the file is marked for iCloud backup exclusion on load.
     func loadObjectAnchors() -> [Data] {
         guard FileManager.default.fileExists(atPath: objectAnchorURL.path) else {
             return []
@@ -524,6 +535,7 @@ actor FixturePersistence {
         
         do {
             let data = try Data(contentsOf: objectAnchorURL)
+            try setExcludeFromICloudBackup(url: objectAnchorURL)
             logger.info("Loaded fixture object anchor data")
             return [data]
         } catch {
@@ -561,5 +573,74 @@ actor FixturePersistence {
     /// Check if CloudKit spatial sync is available.
     func checkSpatialSyncAvailability() async -> Bool {
         await SpatialSyncService().checkCloudKitAvailability()
+    }
+    
+    // MARK: - Manual Placement Persistence
+    
+    /// Save a manual room assignment for a fixture (for older Bridge hardware).
+    func saveManualAssignment(fixtureId: UUID, roomId: String, areaId: String?) async {
+        do {
+            let descriptor = FetchDescriptor<FixtureMapping>(
+                predicate: #Predicate<FixtureMapping> { $0.fixtureId == fixtureId.uuidString }
+            )
+            let results = try modelContext.fetch(descriptor)
+            if let mapping = results.first {
+                mapping.roomId = roomId
+                mapping.areaId = areaId
+                mapping.updatedAt = Date()
+                try modelContext.save()
+            } else {
+                // Create a new mapping entry just for manual placement data
+                let mapping = FixtureMapping(
+                    fixtureId: fixtureId,
+                    lightId: nil,
+                    position: SIMD3<Float>(0, 0, 0),
+                    orientation: simd_quatf(),
+                    distanceMeters: 0,
+                    fixtureType: "manual_placement",
+                    confidence: 0
+                )
+                mapping.roomId = roomId
+                mapping.areaId = areaId
+                modelContext.insert(mapping)
+                try modelContext.save()
+            }
+            logger.debug("Saved manual assignment for fixture \(fixtureId): room=\(roomId)")
+        } catch {
+            logger.error("Failed to save manual assignment: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Clear all manual room assignments from persistence.
+    func clearManualAssignments() async {
+        do {
+            let descriptor = FetchDescriptor<FixtureMapping>()
+            let mappings = try modelContext.fetch(descriptor)
+            for mapping in mappings {
+                mapping.roomId = nil
+                mapping.areaId = nil
+                mapping.updatedAt = Date()
+            }
+            try modelContext.save()
+            logger.info("Cleared all manual room assignments")
+        } catch {
+            logger.error("Failed to clear manual assignments: \(error.localizedDescription)")
+        }
+    }
+    
+    // MARK: - iCloud Backup Exclusion
+    
+    /// Mark a file to exclude it from iCloud backup.
+    /// Complies with iOS 26 App Store Privacy guidelines for spatial data persistence.
+    /// - Parameter url: The file URL to mark for exclusion.
+    private func setExcludeFromICloudBackup(url: URL) throws {
+        try (url as NSURL).setResourceValue(NSNumber(value: true), forKey: .isExcludedFromBackupKey)
+    }
+    
+    /// Ensure all persisted spatial data files are excluded from iCloud backup.
+    private func ensureBackupExclusion(forURLs urls: [URL]) {
+        for url in urls {
+            try? setExcludeFromICloudBackup(url: url)
+        }
     }
 }

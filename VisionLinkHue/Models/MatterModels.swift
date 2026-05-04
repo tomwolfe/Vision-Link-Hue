@@ -149,6 +149,7 @@ struct MatterLightDevice: Identifiable, Sendable {
 // MARK: - Matter Bridge/Controller Models
 
 /// Represents a Matter Thread border router or controller that can serve as a fallback lighting gateway.
+/// Includes area metadata imported from the Thread network (Matter 1.5.1+).
 struct MatterBorderRouter: Identifiable, Sendable {
     let id: String
     let name: String
@@ -158,6 +159,11 @@ struct MatterBorderRouter: Identifiable, Sendable {
     let threadNetworkName: String?
     let rssi: Int?
     
+    /// Area metadata from the Thread Border Router (Matter 1.5.1+).
+    /// Contains room/area definitions that can pre-populate light groups
+    /// when the Hue Bridge is offline.
+    let areaMetadata: MatterAreaMetadata?
+    
     init(
         id: String,
         name: String,
@@ -165,7 +171,8 @@ struct MatterBorderRouter: Identifiable, Sendable {
         model: String,
         isOnline: Bool,
         threadNetworkName: String? = nil,
-        rssi: Int? = nil
+        rssi: Int? = nil,
+        areaMetadata: MatterAreaMetadata? = nil
     ) {
         self.id = id
         self.name = name
@@ -174,6 +181,35 @@ struct MatterBorderRouter: Identifiable, Sendable {
         self.isOnline = isOnline
         self.threadNetworkName = threadNetworkName
         self.rssi = rssi
+        self.areaMetadata = areaMetadata
+    }
+}
+
+/// Area metadata imported from a Matter Thread Border Router (Matter 1.5.1+).
+/// Provides room and area definitions for pre-populating light groups offline.
+struct MatterAreaMetadata: Sendable, Codable {
+    /// The area ID assigned by the Thread Border Router.
+    let areaId: String
+    
+    /// The area name (e.g., "Living Room", "Kitchen").
+    let areaName: String
+    
+    /// Child areas within this area (hierarchical room structure).
+    let childAreaIds: [String]
+    
+    /// Lights assigned to this area by the Matter network.
+    let assignedLightIds: [String]
+    
+    init(
+        areaId: String,
+        areaName: String,
+        childAreaIds: [String] = [],
+        assignedLightIds: [String] = []
+    ) {
+        self.areaId = areaId
+        self.areaName = areaName
+        self.childAreaIds = childAreaIds
+        self.assignedLightIds = assignedLightIds
     }
 }
 

@@ -37,13 +37,16 @@ final class MatterBridgeService {
         let borderRouters = homes.flatMap { home in
             home.accessories.compactMap { accessory in
                 if accessory.isConnected {
+                    let areaMetadata = MatterBridgeService.extractAreaMetadata(from: accessory)
                     return MatterBorderRouter(
                         id: accessory.accessoryIdentifier.uuidString,
                         name: accessory.name,
                         manufacturer: accessory.manufacturer,
                         model: accessory.model,
                         isOnline: true,
-                        threadNetworkName: accessory.threadNetworkName
+                        threadNetworkName: accessory.threadNetworkName,
+                        rssi: nil,
+                        areaMetadata: areaMetadata
                     )
                 }
                 return nil
@@ -176,7 +179,121 @@ final class MatterBridgeService {
         }
     }
     
+    // MARK: - Matter Area Metadata (Matter 1.5.1+)
+    
+    /// Import area metadata from all connected Thread Border Routers.
+    /// This provides room/area definitions that can pre-populate light groups
+    /// when the Hue Bridge is offline, per Matter 1.5.1 specification.
+    func importAreaMetadata() async -> [MatterAreaMetadata] {
+        var areas: [MatterAreaMetadata] = []
+        
+        for router in state.borderRouters {
+            if let metadata = router.areaMetadata {
+                areas.append(metadata)
+            }
+        }
+        
+        if !areas.isEmpty {
+            logger.info("Imported \(areas.count) area(s) from \(state.borderRouters.count) Thread Border Router(s)")
+        }
+        
+        return areas
+    }
+    
+    /// Get area metadata for a specific light device from the Matter network.
+    /// Returns the area assignment if the light is part of a Matter-defined area.
+    func areaForLight(_ lightId: String) -> MatterAreaMetadata? {
+        for router in state.borderRouters {
+            if let metadata = router.areaMetadata {
+                if metadata.assignedLightIds.contains(lightId) {
+                    return metadata
+                }
+                // Check child areas
+                for childAreaId in metadata.childAreaIds {
+                    if let child = areaById(childAreaId) {
+                        if child.assignedLightIds.contains(lightId) {
+                            return child
+                        }
+                    }
+                }
+            }
+        }
+        return nil
+    }
+    
+    /// Get all area metadata indexed by area ID for quick lookup.
+    func allAreaMetadata() -> [String: MatterAreaMetadata] {
+        var result: [String: MatterAreaMetadata] = [:]
+        
+        for router in state.borderRouters {
+            if let metadata = router.areaMetadata {
+                result[metadata.areaId] = metadata
+            }
+        }
+        
+        return result
+    }
+    
+    /// Pre-populate light group assignments from Matter area metadata.
+    /// This is called when the Hue Bridge is offline to provide room-aware
+    /// light grouping based on Matter network topology.
+    func prePopulateLightGroups() async -> [String: [String]] {
+        // Returns a mapping of areaId -> [lightIds]
+        var groups: [String: [String]] = [:]
+        
+        for router in state.borderRouters {
+            if let metadata = router.areaMetadata {
+                groups[metadata.areaId] = metadata.assignedLightIds
+            }
+        }
+        
+        return groups
+    }
+    
+    private func areaById(_ areaId: String) -> MatterAreaMetadata? {
+        for router in state.borderRouters {
+            if let metadata = router.areaMetadata {
+                if metadata.areaId == areaId {
+                    return metadata
+                }
+                for childAreaId in metadata.childAreaIds {
+                    if childAreaId == areaId {
+                        return MatterAreaMetadata(
+                            areaId: childAreaId,
+                            areaName: "\(metadata.areaName) (sub-area)",
+                            childAreaIds: [],
+                            assignedLightIds: []
+                        )
+                    }
+                }
+            }
+        }
+        return nil
+    }
+    
     // MARK: - Private Helpers
+    
+    /// Extract area metadata from a HomeKit accessory (Matter 1.5.1+).
+    /// Looks for Matter Area and Zone information in the accessory's services.
+    private static func extractAreaMetadata(from accessory: HMAccessory) -> MatterAreaMetadata? {
+        // Matter 1.5.1 adds Area and Zone information as accessory metadata
+        // This is exposed through HMAccessory's extended properties
+        guard let areaData = accessory.userData as? [String: Any],
+              let areaId = areaData["matterAreaId"] as? String,
+              let areaName = areaData["matterAreaName"] as? String else {
+            return nil
+        }
+        
+        let childAreaIds = (areaData["matterChildAreaIds"] as? [String]) ?? []
+        let assignedLightIds = (areaData["matterAssignedLightIds"] as? [String]) ?? []
+        
+        return MatterAreaMetadata(
+            areaId: areaId,
+            areaName: areaName,
+            childAreaIds: childAreaIds,
+            assignedLightIds: assignedLightIds
+        )
+    }
     
     private func controller(for deviceId: String) -> (any MatterLightController)? {
         if let existing = controllers[deviceId] {

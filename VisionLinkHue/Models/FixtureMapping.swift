@@ -48,6 +48,12 @@ final class FixtureMapping {
     /// Bridge room-space Z coordinate (source of truth for persistence).
     var bridgePositionZ: Float?
     
+    /// Room ID assigned via manual placement mode (older Bridge hardware).
+    var roomId: String?
+    
+    /// Area/zone ID assigned via manual placement mode (older Bridge hardware).
+    var areaId: String?
+    
     init(
         fixtureId: UUID,
         lightId: String? = nil,
