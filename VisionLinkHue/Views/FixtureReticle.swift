@@ -85,27 +85,133 @@ struct FixtureReticle: View {
         ZStack {
             // Connecting ring animation for relocalization state
             if isConnecting {
-                connectingRing
+                ConnectingRingView(progress: connectingProgress)
             }
             
             // Gaze dwell ring animation for Vision Pro
             if isGazeTargeted {
-                gazeDwellRing
+                GazeDwellRingView(progress: gazeDwellProgress, isActive: isGazeTargeted)
             }
             
             // Outer ring - glass effect
-            Circle()
-                .strokeBorder(
-                    LinearGradient(
-                        colors: pinchRingColors,
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ),
-                    lineWidth: pinchLineWidth
-                )
-                .frame(width: pinchRingSize, height: pinchRingSize)
+            ReticleRingView(visualState: visualState)
             
-            // Inner crosshair
+            // Center dot
+            ReticleDotView(visualState: visualState)
+            
+            // Crosshair
+            CrosshairView()
+            
+            // Confidence indicator (arc at top)
+            if fixture.detection.confidence > 0 {
+                ConfidenceArcView(confidence: fixture.detection.confidence)
+            }
+            
+            // Brightness indicator for pinch gesture
+            if isPinching {
+                brightnessIndicator
+            }
+        }
+        .phaseAnimator([1.0, 1.15]) { content, phase in
+            if isLowCertainty || isPinching {
+                content
+                    .scaleEffect(phase)
+                    .opacity(isLowCertainty ? 0.5 + phase * 0.5 : 1.0)
+            } else {
+                content
+            }
+        } animation: { phase in
+            if isLowCertainty {
+                .easeInOut(duration: 1.5)
+            } else if isPinching {
+                .easeInOut(duration: 0.3)
+            } else {
+                .easeInOut(duration: 0.5)
+            }
+        }
+        .onTapGesture(count: 1) {
+            onSelect()
+        }
+        .rotation3DEffect(
+            .degrees(0),
+            axis: (x: 0, y: 1, z: 0)
+        )
+        .accessibilityLabel(Text(fixture.type.displayName))
+        .accessibilityHint(Text("Detection confidence \(Int(fixture.detection.confidence * 100)) percent. Tap to select."))
+        .accessibilityValue(Text("\(Int(fixture.detection.confidence * 100))% confidence"))
+        #if !targetEnvironment(simulator)
+        .glassEffect(.liquid, alignment: .center)
+        #endif
+    }
+    
+    // MARK: - Connecting Ring
+    
+    private var connectingProgress: Float {
+        switch visualState {
+        case .connecting(let progress):
+            return progress
+        default:
+            return 0
+        }
+    }
+    
+    // MARK: - Pinch Gesture Visuals
+    
+    private var brightnessIndicator: some View {
+        BrightnessIndicatorView(brightness: currentBrightness)
+    }
+}
+
+// MARK: - Sub-Views
+
+/// Extracted sub-view for the connecting ring animation during relocalization.
+private struct ConnectingRingView: View {
+    let progress: Float
+    
+    var body: some View {
+        Circle()
+            .trim(from: 0, to: 0.6)
+            .stroke(
+                LinearGradient(
+                    colors: [.blue.opacity(0.8), .blue.opacity(0.2)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ),
+                style: StrokeStyle(lineWidth: 3, lineCap: .round)
+            )
+            .frame(width: 80, height: 80)
+            .rotationEffect(.degrees(progress * 360.0))
+            .opacity(0.8)
+    }
+}
+
+/// Extracted sub-view for the gaze dwell ring animation on Vision Pro.
+private struct GazeDwellRingView: View {
+    let progress: Float
+    let isActive: Bool
+    
+    var body: some View {
+        Circle()
+            .trim(from: 0, to: progress)
+            .stroke(
+                LinearGradient(
+                    colors: [.purple.opacity(0.8), .purple.opacity(0.3)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ),
+                style: StrokeStyle(lineWidth: 3, lineCap: .round)
+            )
+            .frame(width: 80, height: 80)
+            .rotationEffect(.degrees(progress * 360.0))
+            .opacity(isActive ? 0.8 : 0.0)
+    }
+}
+
+/// Extracted sub-view for the crosshair overlay at the reticle center.
+private struct CrosshairView: View {
+    var body: some View {
+        ZStack {
+            // Vertical crosshair
             VStack(spacing: 0) {
                 Rectangle()
                     .fill(
@@ -117,10 +223,6 @@ struct FixtureReticle: View {
                     )
                     .frame(width: 1.5, height: 12)
                     .offset(y: -8)
-                
-                Circle()
-                    .fill(pinchingDotColor)
-                    .frame(width: pinchingDotSize, height: pinchingDotSize)
                 
                 Rectangle()
                     .fill(
@@ -158,167 +260,38 @@ struct FixtureReticle: View {
                     .frame(width: 12, height: 1.5)
                     .offset(x: 8)
             }
-            
-            // Confidence indicator (arc at top)
-            if fixture.detection.confidence > 0 {
-                Circle()
-                    .trim(from: 0, to: 1.0)
-                    .stroke(
-                        LinearGradient(
-                            colors: LiquidGlassHUD.confidenceGradient(for: fixture.detection.confidence),
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ),
-                        style: StrokeStyle(lineWidth: 3, lineCap: .round)
-                    )
-                    .rotation3DEffect(.degrees(-90), axis: (x: 0, y: 1, z: 0))
-                    .frame(width: 70, height: 70)
-                    .opacity(0.7)
-            }
-            
-            // Brightness indicator for pinch gesture
-            if isPinching {
-                brightnessIndicator
-            }
         }
-        .phaseAnimator([1.0, 1.15]) { content, phase in
-            if isLowCertainty || isPinching {
-                content
-                    .scaleEffect(phase)
-                    .opacity(isLowCertainty ? 0.5 + phase * 0.5 : 1.0)
-            } else {
-                content
-            }
-        } animation: { phase in
-            if isLowCertainty {
-                .easeInOut(duration: 1.5)
-            } else if isPinching {
-                .easeInOut(duration: 0.3)
-            } else {
-                .easeInOut(duration: 0.5)
-            }
-        }
-        .onTapGesture(count: 1) {
-            onSelect()
-        }
-        .rotation3DEffect(
-            .degrees(0),
-            axis: (x: 0, y: 1, z: 0)
-        )
-        #if !targetEnvironment(simulator)
-        .glassEffect(.liquid, alignment: .center)
-        #endif
     }
+}
+
+/// Extracted sub-view for the confidence arc indicator.
+private struct ConfidenceArcView: View {
+    let confidence: Double
     
-    // MARK: - Connecting Ring
-    
-    private var connectingRing: some View {
+    var body: some View {
         Circle()
-            .trim(from: 0, to: 0.6)
+            .trim(from: 0, to: 1.0)
             .stroke(
                 LinearGradient(
-                    colors: [.blue.opacity(0.8), .blue.opacity(0.2)],
+                    colors: LiquidGlassHUD.confidenceGradient(for: confidence),
                     startPoint: .leading,
                     endPoint: .trailing
                 ),
                 style: StrokeStyle(lineWidth: 3, lineCap: .round)
             )
-            .frame(width: 80, height: 80)
-            .rotationEffect(.degrees(connectingRotation))
-            .opacity(connectingOpacity)
+            .rotation3DEffect(.degrees(-90), axis: (x: 0, y: 1, z: 0))
+            .frame(width: 70, height: 70)
+            .opacity(0.7)
     }
+}
+
+/// Extracted sub-view for the brightness indicator during pinch gesture.
+private struct BrightnessIndicatorView: View {
+    let brightness: Int
     
-    // MARK: - Gaze Dwell Ring
-    
-    private var gazeDwellRing: some View {
-        Circle()
-            .trim(from: 0, to: gazeDwellProgress)
-            .stroke(
-                LinearGradient(
-                    colors: [.purple.opacity(0.8), .purple.opacity(0.3)],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                ),
-                style: StrokeStyle(lineWidth: 3, lineCap: .round)
-            )
-            .frame(width: 80, height: 80)
-            .rotationEffect(.degrees(gazeDwellProgress * 360.0))
-            .opacity(isGazeTargeted ? 0.8 : 0.0)
-    }
-    
-    private var connectingRotation: Double {
-        switch visualState {
-        case .connecting(let progress):
-            return progress * 360.0
-        default:
-            return 0
-        }
-    }
-    
-    private var connectingOpacity: Double {
-        switch visualState {
-        case .connecting: return 0.8
-        default: return 0
-        }
-    }
-    
-    // MARK: - Pinch Gesture Visuals
-    
-    private var pinchRingColors: [Color] {
-        switch visualState {
-        case .pinchActive:
-            return [.orange.opacity(0.7), .yellow.opacity(0.4), .orange.opacity(0.2)]
-        case .gazeSelecting:
-            return [.purple.opacity(0.7), .indigo.opacity(0.4), .purple.opacity(0.2)]
-        case .gazeTargeted, .gazeDwell:
-            return [.purple.opacity(0.6), .indigo.opacity(0.3), .purple.opacity(0.1)]
-        case .handNearby:
-            return [.white.opacity(0.7), .blue.opacity(0.4), .white.opacity(0.2)]
-        default:
-            return [.white.opacity(0.6), .blue.opacity(0.3), .white.opacity(0.1)]
-        }
-    }
-    
-    private var pinchLineWidth: CGFloat {
-        switch visualState {
-        case .pinchActive, .gazeSelecting: return 3
-        case .handNearby, .gazeTargeted, .gazeDwell: return 2.5
-        default: return 2
-        }
-    }
-    
-    private var pinchRingSize: CGFloat {
-        switch visualState {
-        case .pinchActive: return 68
-        case .gazeSelecting: return 72
-        case .handNearby, .gazeTargeted, .gazeDwell: return 64
-        default: return 60
-        }
-    }
-    
-    private var pinchingDotColor: Color {
-        switch visualState {
-        case .pinchActive: return .orange.opacity(0.9)
-        case .gazeSelecting, .gazeTargeted, .gazeDwell: return .purple.opacity(0.9)
-        case .handNearby: return .blue.opacity(0.7)
-        default: return .white.opacity(0.9)
-        }
-    }
-    
-    private var pinchingDotSize: CGFloat {
-        switch visualState {
-        case .pinchActive: return 6
-        case .gazeSelecting: return 7
-        case .handNearby, .gazeTargeted, .gazeDwell: return 5
-        default: return 4
-        }
-    }
-    
-    // MARK: - Brightness Indicator
-    
-    private var brightnessIndicator: some View {
+    var body: some View {
         VStack(spacing: 2) {
-            Text("\(currentBrightness)")
+            Text("\(brightness)")
                 .font(.system(size: 10, weight: .medium, design: .rounded))
                 .foregroundStyle(.white.opacity(0.9))
                 .lineLimit(1)
@@ -339,12 +312,91 @@ struct FixtureReticle: View {
                         )
                         .frame(
                             width: geo.size.width,
-                            height: geo.size.height * (Double(currentBrightness) / 254.0)
+                            height: geo.size.height * (Double(brightness) / 254.0)
                         )
                 }
                 .cornerRadius(2)
             }
             .frame(width: 16, height: 30)
         }
+    }
+}
+
+/// Extracted sub-view for the outer ring with state-dependent styling.
+private struct ReticleRingView: View {
+    let visualState: ReticleVisualState
+    
+    private var ringColors: [Color] {
+        switch visualState {
+        case .pinchActive:
+            return [.orange.opacity(0.7), .yellow.opacity(0.4), .orange.opacity(0.2)]
+        case .gazeSelecting:
+            return [.purple.opacity(0.7), .indigo.opacity(0.4), .purple.opacity(0.2)]
+        case .gazeTargeted, .gazeDwell:
+            return [.purple.opacity(0.6), .indigo.opacity(0.3), .purple.opacity(0.1)]
+        case .handNearby:
+            return [.white.opacity(0.7), .blue.opacity(0.4), .white.opacity(0.2)]
+        default:
+            return [.white.opacity(0.6), .blue.opacity(0.3), .white.opacity(0.1)]
+        }
+    }
+    
+    private var lineWidth: CGFloat {
+        switch visualState {
+        case .pinchActive, .gazeSelecting: return 3
+        case .handNearby, .gazeTargeted, .gazeDwell: return 2.5
+        default: return 2
+        }
+    }
+    
+    private var ringSize: CGFloat {
+        switch visualState {
+        case .pinchActive: return 68
+        case .gazeSelecting: return 72
+        case .handNearby, .gazeTargeted, .gazeDwell: return 64
+        default: return 60
+        }
+    }
+    
+    var body: some View {
+        Circle()
+            .strokeBorder(
+                LinearGradient(
+                    colors: ringColors,
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ),
+                lineWidth: lineWidth
+            )
+            .frame(width: ringSize, height: ringSize)
+    }
+}
+
+/// Extracted sub-view for the center dot with state-dependent styling.
+private struct ReticleDotView: View {
+    let visualState: ReticleVisualState
+    
+    private var dotColor: Color {
+        switch visualState {
+        case .pinchActive: return .orange.opacity(0.9)
+        case .gazeSelecting, .gazeTargeted, .gazeDwell: return .purple.opacity(0.9)
+        case .handNearby: return .blue.opacity(0.7)
+        default: return .white.opacity(0.9)
+        }
+    }
+    
+    private var dotSize: CGFloat {
+        switch visualState {
+        case .pinchActive: return 6
+        case .gazeSelecting: return 7
+        case .handNearby, .gazeTargeted, .gazeDwell: return 5
+        default: return 4
+        }
+    }
+    
+    var body: some View {
+        Circle()
+            .fill(dotColor)
+            .frame(width: dotSize, height: dotSize)
     }
 }

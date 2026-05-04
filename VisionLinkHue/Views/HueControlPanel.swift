@@ -59,6 +59,9 @@ struct HueControlPanel: View {
                 Toggle("", isOn: $isOn)
                     .labelsHidden()
                     .tint(.blue)
+                    .accessibilityLabel(Text("Power toggle"))
+                    .accessibilityValue(isOn ? Text("On") : Text("Off"))
+                    .accessibilityHint(Text("Toggle the light on or off"))
                     .onChange(of: isOn) { _, newValue in
                         controlLight { lightId in
                             try await hueClient.togglePower(resourceId: lightId, on: newValue)
@@ -91,6 +94,9 @@ struct HueControlPanel: View {
                         }
                     }
                 )
+                .accessibilityLabel(Text("Brightness"))
+                .accessibilityValue(Text("\(Int(brightnessValue)) percent"))
+                .accessibilityHint(Text("Drag to adjust brightness from 0 to 100 percent"))
                 .tint(.yellow)
             }
             
@@ -120,6 +126,9 @@ struct HueControlPanel: View {
                         }
                     }
                 )
+                .accessibilityLabel(Text("Color temperature"))
+                .accessibilityValue(Text("\(Int(colorTempValue)) Kelvin"))
+                .accessibilityHint(Text("Drag to adjust color temperature from warm to cool"))
                 .tint(.orange)
             }
         }

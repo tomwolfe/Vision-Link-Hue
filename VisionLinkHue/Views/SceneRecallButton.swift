@@ -37,5 +37,7 @@ struct SceneRecallButton: View {
             Label("Scenes", systemImage: "light.beacon.min")
                 .font(.caption)
         }
+        .accessibilityLabel(Text("Scene recall"))
+        .accessibilityHint(Text("Open menu to recall lighting scenes"))
     }
 }

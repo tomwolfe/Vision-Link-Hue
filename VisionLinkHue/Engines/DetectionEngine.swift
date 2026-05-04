@@ -57,12 +57,22 @@ final class DetectionEngine {
     /// Whether the CoreML object detection model has been loaded.
     private var isObjectModelLoaded: Bool = false
     
+    /// Progress of model loading (0.0 to 1.0).
+    var modelLoadingProgress: Double = 0.0
+    
+    /// Whether the model is currently being loaded.
+    var isModelLoading: Bool = false
+    
+    /// Callback for model loading progress updates.
+    private var onModelLoadingProgress: (@Sendable (Double) -> Void)?
+    
     /// Initialize with material fixture mapping loaded from classification_rules.json.
-    init() {
+    init(onModelLoadingProgress: (@Sendable (Double) -> Void)? = nil) {
         self.materialClassifier = NeuralSurfaceMaterialClassifier(
             materialFixtureMapping: NeuralSurfaceMaterialClassifier.loadMaterialMapping()
         )
-        loadObjectDetectionModel()
+        self.onModelLoadingProgress = onModelLoadingProgress
+        Task { await loadObjectDetectionModel() }
     }
     
     /// Timestamp of the last inference pass (monotonic clock).
@@ -166,16 +176,35 @@ final class DetectionEngine {
     /// Load the CoreML object detection model for lighting archetype recognition.
     /// Uses a bundled model that classifies fixtures into architectural categories:
     /// Chandelier, Sconce, Desk Lamp, Pendant, Ceiling Light, Recessed Light, Strip Light.
-    private func loadObjectDetectionModel() {
+    /// Asynchronously loads the model with progress reporting to avoid blocking the main thread.
+    private func loadObjectDetectionModel() async {
+        guard !isModelLoading else {
+            logger.warning("Model loading already in progress")
+            return
+        }
+        
+        isModelLoading = true
+        modelLoadingProgress = 0.0
+        onModelLoadingProgress?(0.0)
+        
         guard let modelURL = Bundle.main.url(forResource: "LightingArchetype", withExtension: "mlmodel"),
               let compiledModelURL = try? MLModel.compile(modelAt: modelURL) else {
             logger.warning("CoreML lighting archetype model not found, falling back to rectangle detection")
             isCoreMLAvailable = false
+            isObjectModelLoaded = false
+            isModelLoading = false
+            modelLoadingProgress = 1.0
+            onModelLoadingProgress?(1.0)
             return
         }
         
+        modelLoadingProgress = 0.5
+        onModelLoadingProgress?(0.5)
+        
         do {
-            objectDetectionModel = try MLModel(contentsOf: compiledModelURL)
+            objectDetectionModel = try await Task.detached(priority: .userInitiated) {
+                try MLModel(contentsOf: compiledModelURL)
+            }.value
             isCoreMLAvailable = true
             isObjectModelLoaded = true
             logger.info("CoreML lighting archetype model loaded successfully")
@@ -183,13 +212,20 @@ final class DetectionEngine {
             logger.warning("Failed to load CoreML model: \(error.localizedDescription)")
             isCoreMLAvailable = false
         }
+        
+        isModelLoading = false
+        modelLoadingProgress = 1.0
+        onModelLoadingProgress?(1.0)
     }
     
     /// Force reload the CoreML model (useful after app updates).
     func reloadObjectDetectionModel() {
+        isModelLoading = true
+        modelLoadingProgress = 0.0
+        onModelLoadingProgress?(0.0)
         isObjectModelLoaded = false
         objectDetectionModel = nil
-        loadObjectDetectionModel()
+        Task { await loadObjectDetectionModel() }
     }
     
     // MARK: - Hybrid Detection Pipeline

@@ -114,9 +114,47 @@ actor CertificatePinStore {
 /// `URLSessionDelegate` that bridges to `CertificatePinStore` actor for
 /// thread-safe certificate pinning and TOFU management.
 ///
-/// The delegate itself is stateless and only holds a reference to the actor.
-/// All mutable state is isolated within the actor. `@unchecked Sendable` is
-/// required here because `URLSessionDelegate` is not a `Sendable` protocol.
+/// ## Thread Safety Architecture
+///
+/// This delegate is designed to be completely stateless. All mutable state
+/// (certificate pin hashes, TOFU callbacks) is isolated within the
+/// `CertificatePinStore` actor, which provides Swift concurrency guarantees
+/// for safe access.
+///
+/// The delegate's only role is to:
+/// 1. Receive authentication challenges from URLSession (called on arbitrary threads)
+/// 2. Extract the server's public key and compute its SHA-256 hash
+/// 3. Forward the evaluation to the actor-isolated `CertificatePinStore`
+/// 4. Dispatch the result back to the calling thread via the completionHandler
+///
+/// ## @unchecked Sendable Rationale
+///
+/// `CertificatePinningDelegate` conforms to `@unchecked Sendable` because
+/// `URLSessionDelegate` is not a `Sendable` protocol. The `URLSessionDelegate`
+/// protocol requires nonisolated method signatures, which conflicts with
+/// Swift 6's strict concurrency model that would otherwise require all
+/// conforming types to be `Sendable`.
+///
+/// This is safe because:
+/// - The delegate holds no mutable state itself (all state is in the actor)
+/// - All state mutations go through the actor, which serializes access
+/// - The `ChallengeHandlerBox` wrapper prevents data races on the completionHandler closure
+/// - The delegate is created once per session and never modified after creation
+///
+/// This pattern follows Apple's recommended approach for bridging
+/// delegate-based APIs with Swift concurrency (see SE-0306, SE-0309).
+///
+/// ## Certificate Rotation Strategy
+///
+/// For production deployments, implement certificate rotation by:
+/// 1. Adding multiple pinned hashes to `CertificatePinStore` (e.g., `pinnedHashes: [Data]`)
+/// 2. Supporting both old and new pins during a transition period
+/// 3. Using the `onPinMismatch` callback to trigger a rotation workflow
+/// 4. Updating pins via `updatePinnedHash(_:)` after user confirmation
+///
+/// Per iOS security best practices, certificates should be rotated before
+/// expiration and old pins should be retained for at least one rotation
+/// cycle to avoid service disruption.
 final class CertificatePinningDelegate: NSObject, URLSessionDelegate, @unchecked Sendable {
     
     private let logger = Logger(

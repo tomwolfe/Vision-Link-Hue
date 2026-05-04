@@ -38,6 +38,8 @@ struct BridgeDiscoveryView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(.blue)
+                        .accessibilityLabel(Text("Try bridge discovery again"))
+                        .accessibilityHint(Text("Search for Hue bridges on the network again"))
                     }
                     .padding()
                 } else {
@@ -64,6 +66,8 @@ struct BridgeDiscoveryView: View {
                                     .foregroundStyle(.secondary)
                             }
                         }
+                        .accessibilityLabel(Text(bridge.name))
+                        .accessibilityHint(Text("Connect to \(bridge.name) at \(bridge.ip)"))
                     }
                 }
                 

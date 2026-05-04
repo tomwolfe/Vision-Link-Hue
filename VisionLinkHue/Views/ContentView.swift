@@ -98,13 +98,23 @@ struct ContentView: View {
             
             Spacer()
             
-            Button {
-                dismissedErrorId = error.id
-                stateStream.dismissError(error)
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(.secondary)
+                    Button {
+                        dismissedErrorId = error.id
+                        stateStream.dismissError(error)
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .accessibilityLabel(Text("Dismiss error"))
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(.ultraThinMaterial, in: Rectangle())
+                .shadow(radius: 5)
             }
+        }
+    }
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 16)
@@ -157,6 +167,8 @@ struct SettingsView: View {
                             }
                         }
                     }
+                    .accessibilityLabel(Text("Create new API key"))
+                    .accessibilityHint(Text("Generate a new API key for bridge authentication"))
                     .foregroundStyle(.blue)
                 }
                 
@@ -179,6 +191,8 @@ struct SettingsView: View {
                                     }
                                 }
                             }
+                            .accessibilityLabel(Text(group.name))
+                            .accessibilityHint(Text("Select light group"))
                         }
                     }
                 }
@@ -211,11 +225,15 @@ struct SettingsView: View {
                     Button("Reconnect") {
                         Task { await hueClient.reconnect() }
                     }
+                    .accessibilityLabel(Text("Reconnect to bridge"))
+                    .accessibilityHint(Text("Attempt to reconnect to the Hue bridge"))
                     .foregroundStyle(.blue)
                     
                     Button("Disconnect") {
                         hueClient.disconnect()
                     }
+                    .accessibilityLabel(Text("Disconnect from bridge"))
+                    .accessibilityHint(Text("Disconnect from the Hue bridge"))
                     .foregroundStyle(.red)
                 }
             }

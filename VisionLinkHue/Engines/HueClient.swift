@@ -55,6 +55,16 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
     /// Isolates high-frequency network events from the MainActor.
     private let eventStream = HueEventStreamActor()
     
+    /// Configure the SSE event stream behavior.
+    func configureEventStream(_ configuration: HueEventStreamActor.Configuration) {
+        Task { await self.eventStream.configure(configuration) }
+    }
+    
+    /// Get the current SSE connection health metrics.
+    func eventStreamHealthMetrics() async -> HueEventStreamActor.SSEConnectionHealthMetrics {
+        await self.eventStream.healthMetrics()
+    }
+    
     /// State stream publisher.
     weak var stateStream: HueStateStream?
     

@@ -57,6 +57,8 @@ struct HUDOverlay: View {
                     Image(systemName: "light.beacon.min")
                         .foregroundStyle(.secondary)
                 }
+                .accessibilityLabel(Text("Scene recall"))
+                .accessibilityHint(Text("Open scene picker to recall lighting scenes"))
                 .sheet(isPresented: $showScenes) {
                     ScenePickerView(
                         scenes: stateStream.scenes,
@@ -83,6 +85,8 @@ struct HUDOverlay: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(.blue)
+                    .accessibilityLabel(Text("Discover Hue bridge"))
+                    .accessibilityHint(Text("Search for available Hue bridges on the network"))
                     
                     Text("Press the link button on your Hue bridge first")
                         .font(.caption2)
@@ -130,6 +134,9 @@ struct HUDOverlay: View {
                                 ),
                                 in: minDepthOffset...maxDepthOffset
                             )
+                            .accessibilityLabel(Text("Depth adjustment for \(fixture.type.displayName)"))
+                            .accessibilityValue(Text(String(format: "%.1f meters", fixture.depthOffsetMeters)))
+                            .accessibilityHint(Text("Drag to adjust the depth position of the fixture"))
                             .labelsHidden()
                         }
                     }

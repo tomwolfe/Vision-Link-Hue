@@ -44,6 +44,8 @@ struct ScenePickerView: View {
                                 Text(scene.metadata.name ?? scene.id)
                             }
                         }
+                        .accessibilityLabel(Text(scene.metadata.name ?? scene.id))
+                        .accessibilityHint(Text("Recall lighting scene"))
                     }
                 }
             }

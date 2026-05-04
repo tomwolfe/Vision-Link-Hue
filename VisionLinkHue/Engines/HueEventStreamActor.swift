@@ -52,11 +52,60 @@ actor HueEventStreamActor {
     /// Minimum reconnect delay.
     private let minReconnectDelay: TimeInterval = 1.0
     
+    /// Base reconnect delay for exponential backoff.
+    private var baseReconnectDelay: TimeInterval = 1.0
+    
     /// Maximum consecutive parse failures before entering degraded mode.
-    private let maxParseFailures = 10
+    /// Configurable to adapt to different network conditions.
+    private var maxParseFailures: Int = 10
     
     /// Track parse failures for degradation detection.
     private var parseFailures = 0
+    
+    /// Connection health metrics for adaptive reconnection tuning.
+    private(set) var connectionHealthMetrics = SSEConnectionHealthMetrics()
+    
+    /// Configuration for SSE connection behavior.
+    struct Configuration: Sendable {
+        /// Maximum consecutive parse failures before entering degraded mode.
+        var maxParseFailures: Int = 10
+        
+        /// Base reconnect delay in seconds.
+        var baseReconnectDelay: TimeInterval = 1.0
+        
+        /// Maximum reconnect delay in seconds.
+        var maxReconnectDelay: TimeInterval = 30.0
+        
+        /// Minimum reconnect delay in seconds.
+        var minReconnectDelay: TimeInterval = 1.0
+        
+        /// Whether to enable connection health metrics tracking.
+        var trackHealthMetrics: Bool = true
+        
+        static let `default` = Configuration()
+    }
+    
+    /// Connection health metrics for adaptive reconnection tuning.
+    struct SSEConnectionHealthMetrics: Sendable {
+        /// Average time between successful event parses (in seconds).
+        var averageEventInterval: TimeInterval = 0.0
+        
+        /// Number of events successfully parsed.
+        var eventsParsed: Int = 0
+        
+        /// Number of consecutive parse failures.
+        var consecutiveParseFailures: Int = 0
+        
+        /// Timestamp of the last successful event parse.
+        var lastEventTimestamp: Date?
+        
+        /// Whether the connection appears healthy based on event frequency.
+        var isHealthy: Bool {
+            if eventsParsed == 0 { return true }
+            guard let lastEventTimestamp else { return false }
+            return Date().timeIntervalSince(lastEventTimestamp) < 60.0
+        }
+    }
     
     /// TOFU callback for certificate pinning.
     private var tofuCallback: @Sendable (Data) async -> Void = { _ in }
@@ -152,11 +201,29 @@ actor HueEventStreamActor {
         onError = handler
     }
     
+    /// Configure the SSE connection behavior with custom thresholds.
+    func configure(_ configuration: Configuration) {
+        self.maxParseFailures = configuration.maxParseFailures
+        self.baseReconnectDelay = configuration.baseReconnectDelay
+        self.maxReconnectDelay = configuration.maxReconnectDelay
+        self.minReconnectDelay = configuration.minReconnectDelay
+        logger.info("SSE configuration updated: maxParseFailures=\(configuration.maxParseFailures), baseDelay=\(String(format: "%.1f", configuration.baseReconnectDelay))s")
+    }
+    
+    /// Get the current connection health metrics for monitoring.
+    func healthMetrics() -> SSEConnectionHealthMetrics {
+        connectionHealthMetrics
+    }
+    
     /// Stream SSE events incrementally from a line-by-line byte stream.
     /// Processes events in real-time without buffering the entire response.
     private func streamEventsIncrementally(from lines: any AsyncSequence<String, any Error>) async {
         sseDataBuffer = ""
         parseFailures = 0
+        
+        if connectionHealthMetrics.eventsParsed == 0 {
+            connectionHealthMetrics.lastEventTimestamp = Date()
+        }
         
         do {
             for try await line in lines {
@@ -179,6 +246,7 @@ actor HueEventStreamActor {
                             try await parseAndDispatchEvent(eventText)
                         } catch {
                             parseFailures += 1
+                            connectionHealthMetrics.consecutiveParseFailures += 1
                             if parseFailures >= maxParseFailures {
                                 state = .degraded
                                 logger.warning("Entered degraded mode after \(self.parseFailures) parse failures")
@@ -219,6 +287,18 @@ actor HueEventStreamActor {
         let update = try decoder.decode(ResourceUpdate.self, from: data)
         
         parseFailures = 0
+        connectionHealthMetrics.consecutiveParseFailures = 0
+        connectionHealthMetrics.eventsParsed += 1
+        connectionHealthMetrics.lastEventTimestamp = Date()
+        
+        let now = Date()
+        if let lastTimestamp = connectionHealthMetrics.lastEventTimestamp,
+           connectionHealthMetrics.eventsParsed > 1 {
+            let interval = now.timeIntervalSince(lastTimestamp)
+            let currentAvg = connectionHealthMetrics.averageEventInterval
+            let weight = 1.0 / Double(connectionHealthMetrics.eventsParsed)
+            connectionHealthMetrics.averageEventInterval = currentAvg + (interval - currentAvg) * weight
+        }
         
         onEvent?(update)
     }
@@ -241,7 +321,7 @@ actor HueEventStreamActor {
         let delay = reconnectDelay
         let params = pendingReconnection
         
-        reconnectTask = Task { [weak self] in
+        reconnectTask = Task.detached(priority: .utility) { [weak self] in
             guard let self else { return }
             
             try? await Task.sleep(for: .seconds(delay))
@@ -280,6 +360,7 @@ actor HueEventStreamActor {
         sseDataBuffer = ""
         reconnectDelay = minReconnectDelay
         parseFailures = 0
+        connectionHealthMetrics.consecutiveParseFailures = 0
         state = .idle
         logger.info("SSE stream disconnected")
     }

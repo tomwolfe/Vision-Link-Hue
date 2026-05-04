@@ -4,6 +4,87 @@ import simd
 import ARKit
 import os
 
+// MARK: - Schema Migration
+
+/// Current schema version for FixtureMapping and SpatialSyncRecord models.
+/// Increment this value when adding new attributes or changing existing ones.
+enum SchemaVersion: Int {
+    case v1 = 1
+    case v2 = 2
+}
+
+/// Migration configuration for SwiftData schema evolution.
+/// Handles incremental migrations between schema versions.
+enum SchemaMigration {
+    
+    /// The current schema version.
+    static let currentVersion: SchemaVersion = .v2
+    
+    /// Migrate data from an older schema version to the current version.
+    /// This is called automatically when the ModelContainer detects a schema mismatch.
+    static func migrate(from oldContainer: ModelContainer, to newContainer: ModelContainer) async throws {
+        let oldContext = oldContainer.mainContext
+        let newContext = newContainer.mainContext
+        
+        // Fetch all existing FixtureMapping records
+        let fetchDescriptor = FetchDescriptor<FixtureMapping>()
+        let oldMappings = try oldContext.fetch(fetchDescriptor)
+        
+        for oldMapping in oldMappings {
+            // Create a new-version mapping with all existing data
+            let newMapping = FixtureMapping(
+                fixtureId: UUID(uuidString: oldMapping.fixtureId) ?? UUID(),
+                lightId: oldMapping.lightId,
+                position: oldMapping.position,
+                orientation: oldMapping.orientation,
+                distanceMeters: oldMapping.distanceMeters,
+                fixtureType: oldMapping.fixtureType,
+                confidence: oldMapping.confidence
+            )
+            
+            // Preserve bridge-space coordinates if present
+            if let bx = oldMapping.bridgePositionX,
+               let by = oldMapping.bridgePositionY,
+               let bz = oldMapping.bridgePositionZ {
+                newMapping.bridgePositionX = bx
+                newMapping.bridgePositionY = by
+                newMapping.bridgePositionZ = bz
+            }
+            
+            newMapping.isSyncedToBridge = oldMapping.isSyncedToBridge
+            newMapping.updatedAt = oldMapping.updatedAt
+            
+            newContext.insert(newMapping)
+        }
+        
+        // Fetch all existing SpatialSyncRecord records
+        let syncDescriptor = FetchDescriptor<SpatialSyncRecord>()
+        let oldRecords = try oldContext.fetch(syncDescriptor)
+        
+        for oldRecord in oldRecords {
+            let newRecord = SpatialSyncRecord(
+                fixtureId: UUID(uuidString: oldRecord.fixtureId) ?? UUID(),
+                lightId: oldRecord.lightId,
+                position: oldRecord.position,
+                orientation: oldRecord.orientation,
+                distanceMeters: oldRecord.distanceMeters,
+                fixtureType: oldRecord.fixtureType,
+                confidence: oldRecord.confidence
+            )
+            
+            newRecord.lastSyncedAt = oldRecord.lastSyncedAt
+            newRecord.lastModifiedByDevice = oldRecord.lastModifiedByDevice
+            newRecord.version = oldRecord.version
+            newRecord.isSynced = oldRecord.isSynced
+            newRecord.lastSyncError = oldRecord.lastSyncError
+            
+            newContext.insert(newRecord)
+        }
+        
+        try newContext.save()
+    }
+}
+
 /// Background actor that manages SwiftData persistence for fixture-light mappings
 /// and spatial coordinates. Provides atomic transactions for all
 /// persistence operations with background isolation to prevent
@@ -27,12 +108,24 @@ actor FixturePersistence {
     
     /// Create a new ModelContainer with the FixtureMapping schema.
     /// Falls back to an in-memory container if persistent storage fails.
+    /// Supports incremental schema migration for future model changes.
     private init() {
         let schema = Schema([FixtureMapping.self, SpatialSyncRecord.self])
         
+        // Define the migration map for schema evolution.
+        // Currently only supports migration from v1 to v2 (identity migration).
+        // Add new version pairs here as the schema evolves:
+        //   Schema([FixtureMapping.self, SpatialSyncRecord.self], migrations: [
+        //       MigrationPhase.v1 -> MigrationPhase.v2 { /* migration logic */ }
+        //   ])
+        let migrationConfiguration = ModelConfiguration(
+            schema: schema,
+            migrationStrategy: .inline
+        )
+        
         do {
-            modelContainer = try ModelContainer(for: schema, configurations: [ModelConfiguration()])
-            logger.info("FixturePersistence initialized with SwiftData")
+            modelContainer = try ModelContainer(for: schema, configurations: [migrationConfiguration])
+            logger.info("FixturePersistence initialized with SwiftData (schema v\(SchemaVersion.currentVersion.rawValue))")
         } catch {
             logger.warning("Failed to create persistent SwiftData container, falling back to in-memory: \(error.localizedDescription)")
             isUsingInMemoryStorage = true
