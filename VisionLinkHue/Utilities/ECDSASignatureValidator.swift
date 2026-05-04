@@ -11,6 +11,9 @@ import os
 /// The public key is stored in the Keychain for persistence across app updates.
 /// Signatures are verified before any JSON parsing occurs, preventing
 /// injection of malicious classification rules.
+///
+/// Includes schema version validation to protect against version rollback attacks
+/// where a malicious actor provides an older, signed, but vulnerable ruleset.
 enum ECDSASignatureValidator {
     
     private static let logger = Logger(
@@ -19,6 +22,12 @@ enum ECDSASignatureValidator {
     )
     
     private static let signatureKeychainPrefix = "com.tomwolfe.visionlinkhue.ecdsa.pub."
+    
+    /// The minimum acceptable schema version for OTA configuration files.
+    /// Bumping this prevents version rollback attacks where a malicious actor
+    /// provides an older, signed, but vulnerable ruleset.
+    /// The minimum version must be <= the current version in classification_rules.json.
+    private static let minimumSchemaVersion = "1.1.0"
     
     /// Default ECDSA P-256 public key for OTA config verification, embedded at compile time.
     /// Replace this with your actual public key before shipping.
@@ -50,6 +59,8 @@ enum ECDSASignatureValidator {
         case publicKeyNotFound
         case signatureVerificationFailed
         case corruptedPayload
+        case schemaVersionTooLow(current: String, minimum: String)
+        case schemaVersionMissing
         
         var errorDescription: String? {
             switch self {
@@ -63,6 +74,10 @@ enum ECDSASignatureValidator {
                 return "ECDSA signature verification failed - config may have been tampered with"
             case .corruptedPayload:
                 return "Configuration payload is corrupted or incomplete"
+            case .schemaVersionTooLow(let current, let minimum):
+                return "Schema version \(current) is below minimum \(minimum) — possible version rollback attack"
+            case .schemaVersionMissing:
+                return "Configuration payload missing schema version field"
             }
         }
     }
@@ -129,6 +144,73 @@ enum ECDSASignatureValidator {
     ) throws -> T {
         try verifySignature(payload: data, signature: signature, keyID: keyID)
         return try decoder.decode(T.self, from: data)
+    }
+    
+    /// Extract the schema version from a JSON payload.
+    /// - Parameter payload: The raw JSON data.
+    /// - Returns: The schema version string, or nil if missing/invalid.
+    static func extractSchemaVersion(from payload: Data) -> String? {
+        do {
+            let json = try JSONSerialization.jsonObject(with: payload, options: []) as? [String: Any]
+            return json?["version"] as? String
+        } catch {
+            logger.debug("Failed to extract schema version from payload: \(error.localizedDescription)")
+            return nil
+        }
+    }
+    
+    /// Verify that the schema version in the payload meets the minimum required version.
+    /// This prevents version rollback attacks where a malicious actor provides an older,
+    /// signed, but vulnerable ruleset.
+    /// - Parameter payload: The raw JSON configuration data.
+    /// - Throws: `SignatureError.schemaVersionTooLow` or `SignatureError.schemaVersionMissing`.
+    static func verifySchemaVersion(payload: Data) throws {
+        guard let versionString = extractSchemaVersion(from: payload) else {
+            throw SignatureError.schemaVersionMissing
+        }
+        
+        guard let currentVersion = parseVersion(versionString),
+              let minimumVersion = parseVersion(minimumSchemaVersion) else {
+            throw SignatureError.schemaVersionMissing
+        }
+        
+        if currentVersion < minimumVersion {
+            logger.warning("Schema version \(versionString) below minimum \(minimumSchemaVersion) — rejecting to prevent version rollback attack")
+            throw SignatureError.schemaVersionTooLow(current: versionString, minimum: minimumSchemaVersion)
+        }
+        
+        logger.info("Schema version \(versionString) meets minimum requirement \(minimumSchemaVersion)")
+    }
+    
+    /// Parse a semantic version string into comparable components.
+    /// - Parameter versionString: A version string in "major.minor.patch" format.
+    /// - Returns: A tuple of (major, minor, patch) integers, or nil if parsing fails.
+    static func parseVersion(_ versionString: String) -> (major: Int, minor: Int, patch: Int)? {
+        let components = versionString.split(separator: ".")
+        guard components.count == 3,
+              let major = Int(components[0]),
+              let minor = Int(components[1]),
+              let patch = Int(components[2]) else {
+            return nil
+        }
+        return (major, minor, patch)
+    }
+    
+    /// Verify an ECDSA signature and schema version in a single safe operation.
+    /// Combines cryptographic verification with schema version validation to protect
+    /// against both tampering and version rollback attacks.
+    /// - Parameters:
+    ///   - payload: The raw configuration data that was signed.
+    ///   - signature: The ECDSA signature to verify.
+    ///   - keyID: Optional key identifier for multi-key rotation support.
+    /// - Throws: `SignatureError` if verification or schema validation fails.
+    static func verifySignatureAndSchema(
+        payload: Data,
+        signature: Data,
+        keyID: String? = nil
+    ) throws {
+        try verifySignature(payload: payload, signature: signature, keyID: keyID)
+        try verifySchemaVersion(payload: payload)
     }
     
     /// Seed the default public key into the Keychain if none exists yet.

@@ -64,6 +64,9 @@ final class DetectionEngine {
     /// Whether the CoreML object detection model has been loaded.
     private var isObjectModelLoaded: Bool = false
     
+    /// Whether the model is using 4-bit weight quantization.
+    var isModelQuantized: Bool = false
+    
     /// Progress of model loading (0.0 to 1.0).
     var modelLoadingProgress: Double = 0.0
     
@@ -223,14 +226,54 @@ final class DetectionEngine {
         onModelLoadingProgress?(0.5)
         
         do {
+            let baseConfig = MLModelConfiguration()
+            baseConfig.computeUnits = .all
+            
+            #if targetEnvironment(simulator)
             objectDetectionModel = try await Task.detached(priority: .userInitiated) {
-                try MLModel(contentsOf: compiledModelURL)
+                try MLModel(contentsOf: compiledModelURL, configuration: baseConfig)
             }.value
             isCoreMLAvailable = true
             isObjectModelLoaded = true
+            isModelQuantized = false
+            #else
+            let quantizedConfig = MLModelConfiguration()
+            quantizedConfig.computeUnits = .all
+            quantizedConfig.weightsQuantization = .fourBit
+            
+            var loadedModel: MLModel?
+            var quantizationApplied = false
+            
+            do {
+                loadedModel = try await Task.detached(priority: .userInitiated) {
+                    try MLModel(contentsOf: compiledModelURL, configuration: quantizedConfig)
+                }.value
+                quantizationApplied = true
+            } catch {
+                logger.debug("4-bit quantization not available for model, falling back to unquantized: \(error.localizedDescription)")
+                loadedModel = try await Task.detached(priority: .userInitiated) {
+                    try MLModel(contentsOf: compiledModelURL, configuration: baseConfig)
+                }.value
+                quantizationApplied = false
+            }
+            
+            objectDetectionModel = loadedModel
+            isCoreMLAvailable = true
+            isObjectModelLoaded = true
+            isModelQuantized = quantizationApplied
+            
+            if quantizationApplied {
+                logger.info("CoreML lighting archetype model loaded with 4-bit weight quantization")
+            } else {
+                logger.info("CoreML lighting archetype model loaded (quantization unavailable, using full precision)")
+            }
+            #endif
             
             // Pre-create the VNCoreMLRequest to avoid per-frame allocation churn.
-            objectDetectionRequest = VNCoreMLRequest(model: objectDetectionModel!) { [weak self] request, error in
+            guard let model = objectDetectionModel else {
+                throw NSError(domain: "DetectionEngine", code: 1, userInfo: [NSLocalizedDescriptionKey: "Model was nil after loading"])
+            }
+            objectDetectionRequest = VNCoreMLRequest(model: model) { [weak self] request, error in
                 if let error {
                     Logger(subsystem: "com.tomwolfe.visionlinkhue", category: "DetectionEngine")
                         .warning("CoreML object detection failed: \(error.localizedDescription)")
@@ -238,7 +281,6 @@ final class DetectionEngine {
             }
             objectDetectionRequest?.imageCropAndScaleOption = .scaleFill
             
-            logger.info("CoreML lighting archetype model loaded successfully")
         } catch {
             logger.warning("Failed to load CoreML model: \(error.localizedDescription)")
             isCoreMLAvailable = false
@@ -255,6 +297,7 @@ final class DetectionEngine {
         modelLoadingProgress = 0.0
         onModelLoadingProgress?(0.0)
         isObjectModelLoaded = false
+        isModelQuantized = false
         objectDetectionModel = nil
         objectDetectionRequest = nil
         intentClassifier = CoreMLIntentClassifier()

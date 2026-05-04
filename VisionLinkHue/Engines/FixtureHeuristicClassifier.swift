@@ -89,7 +89,7 @@ struct JSONScoringRule: Sendable, Codable {
 /// Configuration version for classification rules.
 /// Bumping this forces apps to reload rules, preventing breaking changes
 /// from old config files being applied to new classifier logic.
-private let classificationConfigVersion = "1.0.0"
+private let classificationConfigVersion = "1.2.0"
 
 /// JSON-serializable configuration for heuristic classification.
 struct ClassificationConfigFile: Codable {

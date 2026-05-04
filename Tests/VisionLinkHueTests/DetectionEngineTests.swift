@@ -182,6 +182,22 @@ final class DetectionEngineTests: XCTestCase {
         XCTAssertEqual(rect.height, 0.6, accuracy: 0.001, "Height should be preserved after flip")
     }
     
+    // MARK: - Model Quantization Tests
+    
+    func testModelQuantizationFlagExists() {
+        let engine = DetectionEngine()
+        XCTAssertFalse(engine.isModelQuantized, "Model should not be quantized by default")
+    }
+    
+    func testReloadResetsQuantizationFlag() {
+        let engine = DetectionEngine()
+        let initialQuantized = engine.isModelQuantized
+        
+        engine.reloadObjectDetectionModel()
+        
+        XCTAssertFalse(engine.isModelQuantized, "Reload should reset quantization flag")
+    }
+    
     // MARK: - Helper Methods
     
     /// Create a minimal test pixel buffer (1x1 RGBA).

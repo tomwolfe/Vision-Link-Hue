@@ -139,6 +139,76 @@ final class RelocalizationGuideTests: XCTestCase {
         XCTAssertEqual(DepthQuadrant.bottomRight.opposite, .topLeft)
     }
     
+    // MARK: - MPS Fallback Tests
+    
+    func testQuadrantCountsInitialization() {
+        let counts = QuadrantCounts()
+        for quadrant in DepthQuadrant.allCases {
+            XCTAssertEqual(counts[quadrant], 0, "All quadrant counts should start at zero")
+        }
+    }
+    
+    func testQuadrantCountsIncrement() {
+        var counts = QuadrantCounts()
+        counts[.topLeft] += 1
+        counts[.topRight] += 5
+        counts[.bottomLeft] += 10
+        counts[.bottomRight] += 15
+        
+        XCTAssertEqual(counts[.topLeft], 1)
+        XCTAssertEqual(counts[.topRight], 5)
+        XCTAssertEqual(counts[.bottomLeft], 10)
+        XCTAssertEqual(counts[.bottomRight], 15)
+        XCTAssertEqual(counts.total(), 31)
+    }
+    
+    func testQuadrantDensitiesInitialization() {
+        let densities = QuadrantDensities()
+        for quadrant in DepthQuadrant.allCases {
+            XCTAssertEqual(densities[quadrant], 0.0, accuracy: 0.0001, "All densities should start at zero")
+        }
+    }
+    
+    func testQuadrantDensitiesEntropy() {
+        var densities = QuadrantDensities()
+        densities[.topLeft] = 1.0
+        densities[.topRight] = 1.0
+        densities[.bottomLeft] = 1.0
+        densities[.bottomRight] = 1.0
+        
+        let entropy = densities.entropy()
+        let maxEntropy = Float(log(4.0))
+        XCTAssertEqual(entropy, maxEntropy, accuracy: 0.0001, "Uniform distribution should have maximum entropy")
+    }
+    
+    func testQuadrantDensitiesZeroEntropy() {
+        var densities = QuadrantDensities()
+        densities[.topLeft] = 1.0
+        
+        let entropy = densities.entropy()
+        XCTAssertEqual(entropy, 0.0, accuracy: 0.0001, "Single-quadrant distribution should have zero entropy")
+    }
+    
+    func testQuadrantCountsSparsest() {
+        var counts = QuadrantCounts()
+        counts[.topLeft] = 10
+        counts[.topRight] = 5
+        counts[.bottomLeft] = 20
+        counts[.bottomRight] = 15
+        
+        XCTAssertEqual(counts.sparsest(), 1, "topRight (index 1) should be sparsest")
+    }
+    
+    func testQuadrantDensitiesRichest() {
+        var densities = QuadrantDensities()
+        densities[.topLeft] = 0.3
+        densities[.topRight] = 0.1
+        densities[.bottomLeft] = 0.4
+        densities[.bottomRight] = 0.2
+        
+        XCTAssertEqual(densities.richest(), 2, "bottomLeft (index 2) should be richest")
+    }
+    
     // MARK: - Helper Methods
     
     private func mockFrame() -> ARFrame {
