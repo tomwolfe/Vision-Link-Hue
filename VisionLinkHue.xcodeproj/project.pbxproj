@@ -11,6 +11,7 @@
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* AppContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E1D0C9B8A7F6E5D4C3B2A1 /* AppContainer.swift */; };
 		B2C3D4E5F6A7B8C9D0E1F2A3 /* NeuralSurfaceMaterialClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3F2E1D0C9B8A7F6E5D4C3B2 /* NeuralSurfaceMaterialClassifier.swift */; };
 		C3D4E5F6A7B8C9D0E1F2A3B4 /* ThermalMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4A3F2E1D0C9B8A7F6E5D4C3 /* ThermalMonitor.swift */; };
+		C4D5E6F7A8B9C0D1E2F3A4B5 /* ThermalPredictiveModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5A4F3E2D1C0B9A8F7E6D5C4 /* ThermalPredictiveModel.swift */; };
 		11B44BA2FD7378C702D08504 /* SpatialProjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27CF45B419A50697200CF344 /* SpatialProjector.swift */; };
 		17FE64294D6E1CF17EAC0579 /* HueStateStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BD4020BBE9F66E6C7A12BF4 /* HueStateStream.swift */; };
 		181096DD07FCC8886791A171 /* classification_rules.json in Resources */ = {isa = PBXBuildFile; fileRef = 3AFA647508BF564F9F9FA5F6 /* classification_rules.json */; };
@@ -100,6 +101,7 @@
 		A3F2E1D0C9B8A7F6E5D4C3B2 /* NeuralSurfaceMaterialClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NeuralSurfaceMaterialClassifier.swift; sourceTree = "<group>"; };
 		A58A999810DADAC4665355D9 /* CertificatePinningDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertificatePinningDelegate.swift; sourceTree = "<group>"; };
 		B4A3F2E1D0C9B8A7F6E5D4C3 /* ThermalMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThermalMonitor.swift; sourceTree = "<group>"; };
+		B5A4F3E2D1C0B9A8F7E6D5C4 /* ThermalPredictiveModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThermalPredictiveModel.swift; sourceTree = "<group>"; };
 		B1A3088B6BD175CE1AE5D13D /* HueEventStreamActor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueEventStreamActor.swift; sourceTree = "<group>"; };
 		B6CC7C6072CFA6D940C3DBA3 /* VisionLinkHueTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VisionLinkHueTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C3773D6FD40A1D0C05AB37AA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -175,6 +177,7 @@
 				E47BA61F9090C83D7B16D92D /* SpatialCalibrationEngine.swift */,
 				27CF45B419A50697200CF344 /* SpatialProjector.swift */,
 				B4A3F2E1D0C9B8A7F6E5D4C3 /* ThermalMonitor.swift */,
+				B5A4F3E2D1C0B9A8F7E6D5C4 /* ThermalPredictiveModel.swift */,
 			);
 			path = Engines;
 			sourceTree = "<group>";
@@ -402,6 +405,7 @@
 				4EBD8F5E9DC7711DC5B9505A /* SpatialMath.swift in Sources */,
 				11B44BA2FD7378C702D08504 /* SpatialProjector.swift in Sources */,
 				C3D4E5F6A7B8C9D0E1F2A3B4 /* ThermalMonitor.swift in Sources */,
+				C4D5E6F7A8B9C0D1E2F3A4B5 /* ThermalPredictiveModel.swift in Sources */,
 				E2BD477639C1EA188179A645 /* ViewAttachmentComponents.swift in Sources */,
 				641D1BC8A6308149CC1A7ACC /* VisionLinkHueApp.swift in Sources */,
 				A8413737CF974EAC832F59807427206B /* HueDiscoveryService.swift in Sources */,
