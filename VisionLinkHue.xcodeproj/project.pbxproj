@@ -48,6 +48,7 @@
 		E022D466C4C4BF2014F6D6D8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C3773D6FD40A1D0C05AB37AA /* Assets.xcassets */; };
 		E2BD477639C1EA188179A645 /* ViewAttachmentComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FBE4ED0D7F289735CA52155 /* ViewAttachmentComponents.swift */; };
 		E3A0D9831BB808C6CB4B3C52 /* QuaternionAttributeTransformer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D342A7DCA82DC0F175310AAD /* QuaternionAttributeTransformer.swift */; };
+		E4B5C6D7E8F9A0B1C2D3E4F5 /* ECDSASignatureValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6C7D8E9F0A1B2C3D4E5F6A7 /* ECDSASignatureValidator.swift */; };
 		F4CCEC981BB611E0E3D7812D /* HueEventStreamActor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A3088B6BD175CE1AE5D13D /* HueEventStreamActor.swift */; };
 		F897E4F964A89C76FB832BAD /* HUDOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08E7992EF63FE19E26EE84A9 /* HUDOverlay.swift */; };
 		FEA584A66F891C2B0F182DEE /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F9DCCC892C073529129A8F7 /* Extensions.swift */; };
@@ -108,6 +109,7 @@
 		CE3AF9C2519C92FD05483887 /* FixtureModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureModels.swift; sourceTree = "<group>"; };
 		D2EB75B6F6438D47B0DC3518 /* DetectionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectionEngine.swift; sourceTree = "<group>"; };
 		D342A7DCA82DC0F175310AAD /* QuaternionAttributeTransformer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuaternionAttributeTransformer.swift; sourceTree = "<group>"; };
+		B6C7D8E9F0A1B2C3D4E5F6A7 /* ECDSASignatureValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ECDSASignatureValidator.swift; sourceTree = "<group>"; };
 		D7A6864D4800313E5E637629 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		DA918F1B394BBC49BD3E7292 /* HueClientProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueClientProtocol.swift; sourceTree = "<group>"; };
 		E5NC1PROT01 /* HueNetworkClientProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueNetworkClientProtocol.swift; sourceTree = "<group>"; };
@@ -268,6 +270,7 @@
 				3F9DCCC892C073529129A8F7 /* Extensions.swift */,
 				8C7CFE88E1083C9D9ADC6DE6 /* KeychainManager.swift */,
 				D342A7DCA82DC0F175310AAD /* QuaternionAttributeTransformer.swift */,
+				B6C7D8E9F0A1B2C3D4E5F6A7 /* ECDSASignatureValidator.swift */,
 				9A04FE47AED193FE58A7AC30 /* SpatialMath.swift */,
 				6FBE4ED0D7F289735CA52155 /* ViewAttachmentComponents.swift */,
 			);
@@ -399,6 +402,7 @@
 				828E5F737EDCD2FA4D368DAE /* LiquidGlassHUD.swift in Sources */,
 				B2C3D4E5F6A7B8C9D0E1F2A3 /* NeuralSurfaceMaterialClassifier.swift in Sources */,
 				E3A0D9831BB808C6CB4B3C52 /* QuaternionAttributeTransformer.swift in Sources */,
+				E4B5C6D7E8F9A0B1C2D3E4F5 /* ECDSASignatureValidator.swift in Sources */,
 				B093D1DB4970EFA16ACA4B4F /* ScenePickerView.swift in Sources */,
 				DE8E12A879EC29E57D360BE2 /* SceneRecallButton.swift in Sources */,
 				532949754C9D06A1539ABF00 /* SpatialCalibrationEngine.swift in Sources */,

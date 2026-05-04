@@ -2,6 +2,17 @@ import RealityKit
 import SwiftUI
 import Foundation
 
+/// A RealityKit component that attaches a SwiftUI view to an entity,
+/// rendering the view as a texture on the entity's model component.
+@MainActor
+final class ViewAttachmentComponent: Component {
+    let rootView: AnyView
+    
+    init(_ view: some View) {
+        self.rootView = AnyView(view)
+    }
+}
+
 /// RealityKit 2026 fixture HUD entity factory.
 /// Creates a visible billboard entity with a semi-transparent quad
 /// that always faces the camera for fixture tracking overlays.

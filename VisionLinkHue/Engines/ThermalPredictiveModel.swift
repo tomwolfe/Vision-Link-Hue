@@ -18,17 +18,17 @@ final class ThermalPredictiveModel {
     
     /// Whether predictive throttling is currently active.
     var isPredictiveThrottling: Bool {
-        latencyTrendSlope > slopeThreshold || ewmaLatency >= latencyThresholdMs
+        latencyTrendSlope > configuration.slopeThreshold || ewmaLatency >= configuration.latencyThresholdMs
     }
     
     /// Predicted thermal state based on latency trends, potentially
     /// one level worse than the actual thermal state.
     var predictedThermalState: ThermalState {
-        if latencyTrendSlope > slopeThreshold * 2 {
+        if latencyTrendSlope > configuration.slopeThreshold * 2 {
             return .critical
-        } else if latencyTrendSlope > slopeThreshold {
+        } else if latencyTrendSlope > configuration.slopeThreshold {
             return .serious
-        } else if ewmaLatency >= latencyThresholdMs {
+        } else if ewmaLatency >= configuration.latencyThresholdMs {
             return .warning
         } else {
             return thermalState
@@ -123,7 +123,7 @@ final class ThermalPredictiveModel {
     /// Resets latency tracking on state transitions.
     func updateThermalState(_ newState: ThermalState) {
         if newState != thermalState {
-            logger.info("Predictive model: thermal state changed \(thermalState) -> \(newState)")
+            logger.info("Predictive model: thermal state changed \(self.thermalState) -> \(newState)")
             thermalState = newState
             reset()
         }
