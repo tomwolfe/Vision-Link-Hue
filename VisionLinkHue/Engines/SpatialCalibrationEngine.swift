@@ -480,7 +480,7 @@ final class SpatialCalibrationEngine {
         let epsilon: Float = 1e-5
         for _ in 0..<maxIterations {
             let MX = M * X
-            let MX2 = MX * MX
+            let MX2 = MX * X
             let threeI_minus_MX2 = simd_float3x3(
                 SIMD3<Float>(3 - MX2.columns.0.x, -MX2.columns.0.y, -MX2.columns.0.z),
                 SIMD3<Float>(-MX2.columns.1.x, 3 - MX2.columns.1.y, -MX2.columns.1.z),

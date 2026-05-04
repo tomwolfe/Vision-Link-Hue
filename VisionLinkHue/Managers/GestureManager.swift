@@ -81,8 +81,8 @@ final class GestureManager: SpatialInputHandler, Sendable {
     /// Previously smoothed vertical position.
     private var smoothedVerticalPosition: Float?
     
-    /// Previous pinch state for delta calculation.
-    private var previousPinchDistance: Double?
+    /// Previous smoothed vertical position for delta calculation.
+    private var previousSmoothedVerticalPosition: Float?
     
     /// Hue client for brightness control.
     private weak var hueClient: HueClientProtocol?
@@ -160,9 +160,9 @@ final class GestureManager: SpatialInputHandler, Sendable {
         
         // Calculate brightness delta from vertical movement.
         var brightnessDelta: Float = 0
-        if let prevDistance = previousPinchDistance {
-            let distanceChange = prevDistance - pinchDistance
-            brightnessDelta = Float(distanceChange) * 200.0
+        if let prevY = previousSmoothedVerticalPosition {
+            let movement = currentVertical - prevY
+            brightnessDelta = movement * 200.0
         }
         
         // Apply EMA smoothing to vertical movement.
@@ -190,7 +190,7 @@ final class GestureManager: SpatialInputHandler, Sendable {
             }
         }
         
-        previousPinchDistance = pinchDistance
+        previousSmoothedVerticalPosition = smoothedVerticalPosition
         
         return pinchState
     }
@@ -266,7 +266,7 @@ final class GestureManager: SpatialInputHandler, Sendable {
         isPinching = false
         targetedFixtureID = nil
         smoothedVerticalPosition = nil
-        previousPinchDistance = nil
+        previousSmoothedVerticalPosition = nil
         lastBrightness = 100
     }
     

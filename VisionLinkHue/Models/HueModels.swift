@@ -133,24 +133,24 @@ struct ResourceUpdate: Codable, Sendable {
     let lights: [HueLightResource]?
     let scenes: [HueSceneResource]?
     let groups: [BridgeGroup]?
-    let spatial_awareness: SpatialAwareInfo?
-    let matter_lights: [MatterLightDevice]?
-    let matter_devices_changed: Bool
+    let spatialAwareness: SpatialAwareInfo?
+    let matterLights: [MatterLightDevice]?
+    let matterDevicesChanged: Bool
     
     init(
         lights: [HueLightResource]? = nil,
         scenes: [HueSceneResource]? = nil,
         groups: [BridgeGroup]? = nil,
-        spatial_awareness: SpatialAwareInfo? = nil,
-        matter_lights: [MatterLightDevice]? = nil,
-        matter_devices_changed: Bool = false
+        spatialAwareness: SpatialAwareInfo? = nil,
+        matterLights: [MatterLightDevice]? = nil,
+        matterDevicesChanged: Bool = false
     ) {
         self.lights = lights
         self.scenes = scenes
         self.groups = groups
-        self.spatial_awareness = spatial_awareness
-        self.matter_lights = matter_lights
-        self.matter_devices_changed = matter_devices_changed
+        self.spatialAwareness = spatialAwareness
+        self.matterLights = matterLights
+        self.matterDevicesChanged = matterDevicesChanged
     }
 }
 
@@ -394,7 +394,7 @@ struct SpatialAwareSyncResponse: Codable, Sendable {
 
 /// Partial spatial awareness update from SSE events.
 struct SpatialAwareUpdate: Codable, Sendable {
-    let spatial_awareness: [SpatialAwareResource]?
+    let spatialAwareness: [SpatialAwareResource]?
     
     struct SpatialAwareResource: Codable, Sendable {
         let id: String
@@ -450,7 +450,7 @@ struct BridgeSpatialInfo: Sendable {
     let supportedMaterialLabels: [String]
     
     static func from(bridgeState: HueBridgeState) -> BridgeSpatialInfo {
-        let fw = bridgeState.resources?.spatial_awareness?.firmware_version ?? "0.0"
+        let fw = bridgeState.resources?.spatialAwareness?.firmware_version ?? "0.0"
         let parts = fw.split(separator: ".").compactMap { Int($0) }
         let major = parts.first ?? 0
         let minor = parts.count > 1 ? parts[1] : 0

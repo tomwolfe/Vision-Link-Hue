@@ -268,18 +268,18 @@ extension ResourceUpdate {
     /// Create a ResourceUpdate with Matter light device updates.
     static func matterUpdate(lights: [MatterLightDevice], devicesChanged: Bool = true) -> ResourceUpdate {
         ResourceUpdate(
-            matter_lights: lights,
-            matter_devices_changed: devicesChanged
+            matterLights: lights,
+            matterDevicesChanged: devicesChanged
         )
     }
     
     /// Convenience accessor for Matter lights from the codable property.
     var matterLights: [MatterLightDevice]? {
-        matter_lights
+        matterLights
     }
     
     /// Convenience accessor for Matter devices changed flag.
     var matterDevicesChanged: Bool {
-        matter_devices_changed
+        matterDevicesChanged
     }
 }
