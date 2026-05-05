@@ -48,7 +48,7 @@ final class WorldMapPersistenceTests: XCTestCase {
     
     // MARK: - Integration with Fixture Persistence
     
-    func testFixturePersistenceStillWorksAfterWorldMapMethods() {
+    func testFixturePersistenceStillWorksAfterWorldMapMethods() async {
         // Ensure adding world map methods didn't break existing fixture persistence.
         let fixtureId = UUID()
         let position = SIMD3<Float>(1.0, 1.5, -2.0)
@@ -64,11 +64,11 @@ final class WorldMapPersistenceTests: XCTestCase {
             confidence: 0.9
         )
         
-        let mappings = try! persistence.modelContext.fetch(FetchDescriptor<FixtureMapping>())
+        let mappings = await persistence.loadAllMappings()
         XCTAssertEqual(mappings.count, 1, "Should have one saved mapping")
     }
     
-    func testWorldMapDoesNotInterfereWithFixtureMappings() {
+    func testWorldMapDoesNotInterfereWithFixtureMappings() async {
         // Save a fixture mapping.
         let fixtureId = UUID()
         persistence.saveMapping(
@@ -82,7 +82,7 @@ final class WorldMapPersistenceTests: XCTestCase {
         )
         
         // Verify the mapping is still accessible.
-        let loaded = try! persistence.modelContext.fetch(FetchDescriptor<FixtureMapping>())
+        let loaded = await persistence.loadAllMappings()
         XCTAssertEqual(loaded.count, 1)
         XCTAssertEqual(loaded.first?.lightId, "light-1")
     }

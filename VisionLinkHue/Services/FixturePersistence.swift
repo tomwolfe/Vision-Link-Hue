@@ -164,6 +164,21 @@ actor FixturePersistence {
         }
     }
     
+    /// Load all persisted fixture mappings with full spatial data for testing.
+    /// Returns Sendable tuples to avoid crossing actor boundaries with ModelContext.
+    func loadAllMappings() async -> [(fixtureId: UUID, lightId: String?, position: SIMD3<Float>, fixtureType: String, confidence: Double)] {
+        let descriptor = FetchDescriptor<FixtureMapping>()
+        
+        do {
+            let mappings = try modelContext.fetch(descriptor)
+            return mappings
+                .map { ($0.fixtureId, $0.lightId, $0.position, $0.fixtureType, $0.confidence) }
+        } catch {
+            logger.error("Failed to load all fixture mappings: \(error.localizedDescription)")
+            return []
+        }
+    }
+    
     /// Load persisted fixture mappings that have bridge-space coordinates.
     /// These can be projected back into ARKit space using a calibration transform.
     func loadMappingsWithBridgeSpace() async -> [FixtureMapping] {

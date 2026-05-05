@@ -101,7 +101,7 @@ final class MatterBridgeService: NSObject, @unchecked Sendable {
         guard let controller = controller(for: deviceId) else {
             throw MatterError.accessoryNotReachable
         }
-        try await controller.setBrightness(Int(brightness * 255), transitionDuration: Int(transitionDuration))
+        try await controller.setBrightness(Int(brightness * 255), transitionDuration: Int(transitionDuration * 10))
     }
     
     /// Set the color temperature of a Matter light.
@@ -109,7 +109,7 @@ final class MatterBridgeService: NSObject, @unchecked Sendable {
         guard let controller = controller(for: deviceId) else {
             throw MatterError.accessoryNotReachable
         }
-        try await controller.setColorTemperature(Int(temperature), transitionDuration: Int(transitionDuration))
+        try await controller.setColorTemperature(Int(temperature), transitionDuration: Int(transitionDuration * 10))
     }
     
     /// Set the color of a Matter light using XY coordinates.
@@ -117,7 +117,7 @@ final class MatterBridgeService: NSObject, @unchecked Sendable {
         guard let controller = controller(for: deviceId) else {
             throw MatterError.accessoryNotReachable
         }
-        try await controller.setColorXY(x, y, transitionDuration: Int(transitionDuration))
+        try await controller.setColorXY(x, y, transitionDuration: Int(transitionDuration * 10))
     }
     
     /// Patch a Matter light with multiple state changes.

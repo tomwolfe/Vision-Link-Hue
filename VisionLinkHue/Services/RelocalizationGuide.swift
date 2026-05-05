@@ -181,11 +181,11 @@ final class RelocalizationGuide {
     /// Track the best feature density to detect improvement.
     private var bestFeatureDensity: Float = 0
     
-    /// Minimum valid depth value in millimeters (filters out invalid pixels).
-    private let minValidDepth: Int32 = 100
+    /// Minimum valid depth value in meters (filters out invalid pixels).
+    private let minValidDepth: Float = 0.1
     
-    /// Maximum valid depth value in millimeters (filters out far-away pixels).
-    private let maxValidDepth: Int32 = 10000
+    /// Maximum valid depth value in meters (filters out far-away pixels).
+    private let maxValidDepth: Float = 10.0
     
     /// Initialize the relocalization guide.
     init() {}
@@ -342,7 +342,7 @@ final class RelocalizationGuide {
         for y in stride(from: 0, to: height, by: sampleStride) {
             for x in stride(from: 0, to: width, by: sampleStride) {
                 let byteOffset = y * bytesPerRow + x * 4
-                let depthValue = Int32(baseAddress.load(fromByteOffset: byteOffset, as: Int32.self))
+                let depthValue = baseAddress.load(fromByteOffset: byteOffset, as: Float.self)
                 
                 guard depthValue >= minValidDepth, depthValue <= maxValidDepth else {
                     continue

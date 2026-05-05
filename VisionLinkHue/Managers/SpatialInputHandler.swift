@@ -165,7 +165,8 @@ final class GazeTargetingSystem: SpatialInputHandler, Sendable {
         // Check if gaze direction has changed significantly from last frame.
         if let lastDir = lastGazeDirection {
             let dotProduct = simd_dot(normalizedDirection, lastDir)
-            let angleDiff = acos(min(dotProduct, Float(1.0))) * Float(180.0) / Float(Double.pi)
+            let clampedDot = max(min(dotProduct, Float(1.0)), Float(-1.0))
+            let angleDiff = acos(clampedDot) * Float(180.0) / Float(Double.pi)
             
             // If gaze has moved beyond fixation angle, clear fixation timer.
             if angleDiff > Float(configuration.fixationAngleDegrees) {
@@ -188,7 +189,9 @@ final class GazeTargetingSystem: SpatialInputHandler, Sendable {
             guard distance > Float(0.1), distance < configuration.maxTargetDistance else { continue }
             
             let fixtureDirection = simd_normalize(toFixture)
-            let angle = acos(min(simd_dot(normalizedDirection, fixtureDirection), Float(1.0))) * Float(180.0) / Float(Double.pi)
+            let fixtureDot = simd_dot(normalizedDirection, fixtureDirection)
+            let clampedFixtureDot = max(min(fixtureDot, Float(1.0)), Float(-1.0))
+            let angle = acos(clampedFixtureDot) * Float(180.0) / Float(Double.pi)
             
             // Skip fixtures below confidence threshold.
             guard fixture.detection.confidence >= configuration.minConfidence else { continue }

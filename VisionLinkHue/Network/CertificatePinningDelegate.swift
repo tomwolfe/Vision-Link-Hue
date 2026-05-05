@@ -189,7 +189,7 @@ final class CertificatePinningDelegate: NSObject, URLSessionDelegate, @unchecked
             return
         }
         
-        guard let publicKey = SecTrustCopyPublicKey(serverTrust),
+        guard let publicKey = SecTrustCopyKey(serverTrust),
               let publicKeyData = SecKeyCopyExternalRepresentation(publicKey, nil) as Data? else {
             logger.warning("Failed to extract public key from server trust")
             completionHandler(.cancelAuthenticationChallenge, nil)
