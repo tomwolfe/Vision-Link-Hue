@@ -21,13 +21,13 @@ jobs:
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1.7.0
         with:
-          xcode-version: '26.3.0'
+          xcode-version: '26.4.1'
 
       - name: Build
         run: |
           xcodebuild build-for-testing \
             -scheme Vision-Link-Hue \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -destination 'platform=iOS Simulator,name=iPhone 16 (26.4)' \
             -configuration Release \
             2>&1 | xcpretty
 
@@ -35,7 +35,7 @@ jobs:
         run: |
           xcodebuild test-without-building \
             -scheme Vision-Link-Hue \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -destination 'platform=iOS Simulator,name=iPhone 16 (26.4)' \
             -configuration Release \
             2>&1 | xcpretty
 
@@ -50,7 +50,7 @@ jobs:
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1.7.0
         with:
-          xcode-version: '26.3.0'
+          xcode-version: '26.4.1'
 
       - name: Swift Format Check
         run: swift package --allow-writing-to-package-descriptor lint 2>&1 || true

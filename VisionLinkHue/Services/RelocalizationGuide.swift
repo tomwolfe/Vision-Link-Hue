@@ -265,9 +265,11 @@ final class RelocalizationGuide {
         }
         
         // Use feature point depth data distribution if available.
-        if let depthMap = frame.sceneDepth?.depthMap {
-            let imageSize = CGSize(width: CVPixelBufferGetWidth(depthMap), height: CVPixelBufferGetHeight(depthMap))
-            return analyzeDepthDistribution(depthMap, imageBufferSize: imageSize)
+        if #available(iOS 26, *) {
+            if let depthMap = frame.sceneDepth?.depthMap {
+                let imageSize = CGSize(width: CVPixelBufferGetWidth(depthMap), height: CVPixelBufferGetHeight(depthMap))
+                return analyzeDepthDistribution(depthMap, imageBufferSize: imageSize)
+            }
         }
         
         // Fallback: use camera transform to infer direction.

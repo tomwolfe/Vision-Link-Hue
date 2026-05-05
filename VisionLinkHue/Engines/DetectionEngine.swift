@@ -611,22 +611,25 @@ final class DetectionEngine {
             return nil
         }
         #if !targetEnvironment(simulator)
-        guard let sceneDepth = frame.sceneDepth else {
-            return nil
+        if #available(iOS 26, *) {
+            guard let sceneDepth = frame.sceneDepth else {
+                return nil
+            }
+            guard let materialLabel = sceneDepth.materialLabel else {
+                return nil
+            }
+            
+            if let region {
+                return materialClassifier.sampleMaterial(region: region, materialLabel: materialLabel)
+            } else {
+                return materialClassifier.sampleMaterial(
+                    at: SIMD2<Float>(0.5, 0.5),
+                    in: frame,
+                    materialLabel: materialLabel
+                )
+            }
         }
-        guard let materialLabel = sceneDepth.materialLabel else {
-            return nil
-        }
-        
-        if let region {
-            return materialClassifier.sampleMaterial(region: region, materialLabel: materialLabel)
-        } else {
-            return materialClassifier.sampleMaterial(
-                at: SIMD2<Float>(0.5, 0.5),
-                in: frame,
-                materialLabel: materialLabel
-            )
-        }
+        return nil
         #else
         return nil
         #endif

@@ -140,7 +140,9 @@ struct FixtureReticle: View {
         .accessibilityHint(Text("Detection confidence \(Int(fixture.detection.confidence * 100)) percent. Tap to select."))
         .accessibilityValue(Text("\(Int(fixture.detection.confidence * 100))% confidence"))
         #if !targetEnvironment(simulator)
-        .glassEffect(.liquid, alignment: .center)
+        if #available(iOS 26, *) {
+            .glassEffect(.liquid, alignment: .center)
+        }
         #endif
     }
     

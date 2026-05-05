@@ -386,11 +386,15 @@ final class ARSessionManager {
                 continue
             }
             let anchors = currentFrame.anchors
-            let objectAnchorIDs = anchors.compactMap { anchor -> String? in
-                if let objectAnchor = anchor as? ARObjectAnchor {
-                    return objectAnchor.name
+            let objectAnchorIDs: [String] = if #available(iOS 26, *) {
+                anchors.compactMap { anchor -> String? in
+                    if let objectAnchor = anchor as? ARObjectAnchor {
+                        return objectAnchor.name
+                    }
+                    return nil
                 }
-                return nil
+            } else {
+                []
             }
             
             if !objectAnchorIDs.isEmpty {
@@ -471,9 +475,11 @@ final class ARSessionManager {
                     logger.info("Relocalization completed from frame tracking")
                 } else {
                     // Update feature density for trend analysis during relocalization.
-                    if let depthMap = frame.sceneDepth?.depthMap {
-                        let density = self.computeFeatureDensity(depthMap)
-                        self.relocalizationGuide.updateFeatureDensity(density)
+                    if #available(iOS 26, *) {
+                        if let depthMap = frame.sceneDepth?.depthMap {
+                            let density = self.computeFeatureDensity(depthMap)
+                            self.relocalizationGuide.updateFeatureDensity(density)
+                        }
                     }
                 }
             }

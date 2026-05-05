@@ -255,10 +255,11 @@ final class SpatialProjector {
     ) -> ProjectionResult? {
         
         #if !targetEnvironment(simulator)
-        guard let sceneDepth = frame.sceneDepth,
-              let depthMap = sceneDepth.depthMap else {
-            return nil
-        }
+        if #available(iOS 26, *) {
+            guard let sceneDepth = frame.sceneDepth,
+                  let depthMap = sceneDepth.depthMap else {
+                return nil
+            }
 
         let intrinsics = provider.intrinsics
         
@@ -315,6 +316,9 @@ final class SpatialProjector {
                 material: nil
             )
         )
+        } else {
+            return nil
+        }
         #else
         return nil
         #endif

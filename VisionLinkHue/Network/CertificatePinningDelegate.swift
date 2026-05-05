@@ -26,7 +26,9 @@ enum CertificateEvaluationResult: Sendable {
 }
 
 /// Actor that manages certificate pin state with proper Swift concurrency isolation.
-/// All mutable state (`pinnedHash`) is confined to the actor, eliminating the need
+/// Supports multiple pinned hashes for seamless certificate rotation without
+/// service disruption during transition periods.
+/// All mutable state is confined to the actor, eliminating the need
 /// for `@unchecked Sendable` suppression.
 actor CertificatePinStore {
     
@@ -35,26 +37,43 @@ actor CertificatePinStore {
         category: "CertificatePinning"
     )
     
+    /// Primary pinned hash (current active certificate).
     var pinnedHash: Data?
+    
+    /// Secondary pinned hashes for certificate rotation support.
+    /// Contains old certificates that are still valid during transition.
+    var secondaryPins: [Data] = []
+    
+    /// All valid pinned hashes (primary + secondary) for matching.
+    var allPinnedHashes: [Data] {
+        var hashes: [Data] = []
+        if let pinnedHash {
+            hashes.append(pinnedHash)
+        }
+        hashes.append(contentsOf: secondaryPins)
+        return hashes
+    }
+    
     let keychainKey: String?
     let tofuCallback: @Sendable (Data) async -> Void
     
-    init(pinnedHash: Data?, keychainKey: String?, tofuCallback: @Sendable @escaping (Data) async -> Void) {
+    init(pinnedHash: Data?, keychainKey: String?, secondaryPins: [Data] = [], tofuCallback: @Sendable @escaping (Data) async -> Void) {
         self.pinnedHash = pinnedHash
         self.keychainKey = keychainKey
+        self.secondaryPins = secondaryPins
         self.tofuCallback = tofuCallback
     }
     
-    /// Evaluate a certificate challenge against the pinned hash.
+    /// Evaluate a certificate challenge against all pinned hashes.
     /// Returns the disposition and credential, or nil for TOFU mode
     /// where the caller must handle the async TOFU flow.
     func evaluateChallenge(publicKeyHash: Data) async -> (URLSession.AuthChallengeDisposition, URLCredential?)? {
-        if let pinnedHash {
-            // Enforcement mode: compare against stored hash.
-            if publicKeyHash == pinnedHash {
+        if pinnedHash != nil || !secondaryPins.isEmpty {
+            // Enforcement mode: compare against all stored hashes.
+            if allPinnedHashes.contains(publicKeyHash) {
                 return (.useCredential, nil)
             } else {
-                logger.error("Certificate pin mismatch - expected \(pinnedHash.count) bytes, got \(publicKeyHash.count) bytes")
+                logger.error("Certificate pin mismatch - expected one of \(allPinnedHashes.count) pinned hash(es), got \(publicKeyHash.count) bytes")
                 return (.cancelAuthenticationChallenge, nil)
             }
         } else {
@@ -69,6 +88,9 @@ actor CertificatePinStore {
     func evaluateChallengeDetailed(publicKeyHash: Data) async -> CertificateEvaluationResult {
         if let pinnedHash {
             if publicKeyHash == pinnedHash {
+                return .accepted
+            } else if secondaryPins.contains(publicKeyHash) {
+                // Certificate matches a secondary pin - valid during rotation
                 return .accepted
             } else {
                 logger.warning("Certificate pin mismatch detected - bridge may have been reset")
@@ -95,9 +117,15 @@ actor CertificatePinStore {
     }
     
     /// Accept a certificate after user confirmation (e.g., bridge reset).
-    /// Overwrites the existing TOFU hash in the Keychain.
+    /// Moves the current primary pin to secondary and sets the new hash as primary.
     func acceptPinChange(to newHash: Data) async {
         guard let keychainKey else { return }
+        
+        // Move current primary to secondary pins if it exists and differs from new hash
+        if let currentPrimary = pinnedHash, currentPrimary != newHash {
+            secondaryPins.append(currentPrimary)
+            logger.info("Moved previous primary pin to secondary during rotation")
+        }
         
         do {
             try await KeychainManager.shared.saveCertPin(to: keychainKey, hash: newHash)
@@ -108,6 +136,32 @@ actor CertificatePinStore {
         }
         
         await tofuCallback(newHash)
+    }
+    
+    /// Add a secondary pin for certificate rotation support.
+    /// The secondary pin is retained for a transition period to avoid
+    /// service disruption when the bridge certificate changes.
+    func addSecondaryPin(_ hash: Data) async {
+        // Avoid duplicate pins
+        guard !allPinnedHashes.contains(hash) else {
+            logger.debug("Secondary pin already exists, skipping")
+            return
+        }
+        secondaryPins.append(hash)
+        logger.info("Added secondary pin for certificate rotation (total: \(secondaryPins.count))")
+    }
+    
+    /// Remove a secondary pin. Useful after rotation is complete.
+    func removeSecondaryPin(_ hash: Data) async {
+        secondaryPins.removeAll { $0 == hash }
+        logger.info("Removed secondary pin (remaining: \(secondaryPins.count))")
+    }
+    
+    /// Clear all secondary pins. Call after rotation is complete and
+    /// the old certificate is no longer needed.
+    func clearSecondaryPins() async {
+        secondaryPins.removeAll()
+        logger.info("Cleared all secondary pins")
     }
 }
 
@@ -168,10 +222,11 @@ final class CertificatePinningDelegate: NSObject, URLSessionDelegate, @unchecked
     /// to present a prompt for the user to accept a new certificate.
     var onPinMismatch: @Sendable (Data, Data) async -> Void
     
-    init(pinnedHash: Data?, keychainKey: String? = nil, tofuCallback: @escaping @Sendable (Data) async -> Void, onPinMismatch: @escaping @Sendable (Data, Data) async -> Void = { _, _ in }) {
+    init(pinnedHash: Data?, keychainKey: String? = nil, secondaryPins: [Data] = [], tofuCallback: @escaping @Sendable (Data) async -> Void, onPinMismatch: @escaping @Sendable (Data, Data) async -> Void = { _, _ in }) {
         self.pinStore = CertificatePinStore(
             pinnedHash: pinnedHash,
             keychainKey: keychainKey,
+            secondaryPins: secondaryPins,
             tofuCallback: tofuCallback
         )
         self.onPinMismatch = onPinMismatch
@@ -238,6 +293,29 @@ final class CertificatePinningDelegate: NSObject, URLSessionDelegate, @unchecked
     func handlePinMismatch(newHash: Data) {
         Task { [weak self] in
             await self?.pinStore.acceptPinChange(to: newHash)
+        }
+    }
+    
+    /// Add a secondary pin for certificate rotation.
+    /// This allows the old and new certificates to coexist during
+    /// a transition period, preventing service disruption.
+    func addSecondaryPin(_ hash: Data) {
+        Task { [weak self] in
+            await self?.pinStore.addSecondaryPin(hash)
+        }
+    }
+    
+    /// Remove a secondary pin after rotation is complete.
+    func removeSecondaryPin(_ hash: Data) {
+        Task { [weak self] in
+            await self?.pinStore.removeSecondaryPin(hash)
+        }
+    }
+    
+    /// Clear all secondary pins after rotation is complete.
+    func clearSecondaryPins() {
+        Task { [weak self] in
+            await self?.pinStore.clearSecondaryPins()
         }
     }
 }

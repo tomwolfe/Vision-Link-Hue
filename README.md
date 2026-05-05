@@ -128,9 +128,86 @@ See [`.github/workflows/ci.yml`](.github/workflows/ci.yml) for pipeline configur
 
 ## 🔒 Security
 
-- **Certificate Pinning**: Trust-On-First-Use (TOFU) with SHA-256 public key hashing stored securely in Keychain.
+- **Certificate Pinning**: Trust-On-First-Use (TOFU) with SHA-256 public key hashing stored securely in Keychain. Supports multiple pinned certificates for seamless rotation without service disruption.
+- **ECDSA Signature Verification**: OTA classification rules are cryptographically signed and verified before parsing, preventing injection attacks.
 - **mTLS**: All Hue Bridge communication uses mutual TLS.
 - **Strict Concurrency**: Full Swift 6.1+ strict concurrency compliance with minimal `@unchecked Sendable` suppressions only where required by `URLSessionDelegate` protocol constraints.
+
+---
+
+## 📋 API Version Matrix
+
+| Feature | Minimum iOS | Minimum ARKit | Availability Notes |
+|---------|------------|---------------|-------------------|
+| Core detection (rectangle) | 13.0+ | — | Works on all iOS devices with camera |
+| CoreML intent classification | 13.0+ | — | Requires bundled `.mlmodel` |
+| 3D spatial projection (raycast) | 11.0+ | 11.0 | Works on LiDAR and non-LiDAR devices |
+| Depth map unprojection | 12.0+ | 12.0 | LiDAR devices only for full accuracy |
+| World reconstruction | 15.0+ | 15.0 | Requires `.worldReconstructionMode = .automatic` |
+| Neural Surface Synthesis (material labels) | 26.0 | 2026 | `frame.sceneDepth?.materialLabel` — runtime checked via `#available(iOS 26, *)` |
+| Object anchor tracking | 16.0+ | 16.0 | `ARObjectAnchor` — runtime checked via `#available(iOS 26, *)` |
+| RealityKit ViewAttachmentComponent | 26.0 | — | SwiftUI view lifecycle management — runtime checked via `#available(iOS 26, *)` |
+| Liquid glass effects | 26.0 | — | `.glassEffect(.liquid)` — runtime checked via `#available(iOS 26, *)` |
+| `AnchorEntity.world()` | 26.0 | — | Requires world reconstruction — runtime checked via `#available(iOS 26, *)` |
+
+All speculative iOS 26 / ARKit 2026 APIs include both compile-time (`#if !targetEnvironment(simulator)`) and runtime (`#available(iOS 26, *)`) guards for graceful degradation.
+
+---
+
+## 🏠 Bridge Compatibility
+
+### Philips Hue Bridge Requirements
+
+| Feature | Minimum Firmware | Notes |
+|---------|-----------------|-------|
+| CLIP v2 API | v2 | All Hue Bridges supporting the new API (Bridge 2.0, Hue Hub) |
+| SpatialAware positioning | v1976094010+ (v1.14+) | Requires Bridge firmware v1976+ for `position` resource support |
+| Event stream (SSE) | v2 | Real-time state updates via `/eventstream/clip/v2` |
+| Group control | v2 | Multi-light control via CLIP v2 groups |
+| Scene recall | v2 | Scene activation and scheduling |
+
+### Matter/Thread Fallback
+
+When the Hue Bridge is unavailable, the app supports Matter-certified lights on a Thread network:
+
+- **Matter version**: 1.3+ (Thread 1.3 network)
+- **Compatible devices**: Any Matter-certified smart light or bulb
+- **Commissioning**: Uses standard Matter pairing via the HomeKit framework
+- **Fallback activation**: Automatic when Hue Bridge is unreachable after 5 retries
+
+---
+
+## 🔄 OTA Update Process
+
+Classification rules and material mappings are delivered over-the-air via ECDSA-signed JSON updates.
+
+### Key Rotation Procedure
+
+1. **Generate new ECDSA key pair**:
+   ```bash
+   openssl ecparam -genkey -name prime256v1 -noout -out new_private_key.pem
+   openssl ec -in new_private_key.pem -pubout -out new_public_key.pem
+   ```
+
+2. **Sign new classification rules**:
+   ```bash
+   openssl dgst -sha256 -sign new_private_key.pem -out rules.sig classification_rules.json
+   ```
+
+3. **Embed new public key** in the build configuration:
+   ```bash
+   export ECDSA_DEFAULT_PUBLIC_KEY=$(base64 -i new_public_key.pem)
+   ```
+
+4. **Certificate rotation** (for Hue Bridge):
+   - The app supports multiple pinned certificates via `CertificatePinStore.secondaryPins`
+   - Add the new bridge certificate hash as a secondary pin: `delegate.addSecondaryPin(newHash)`
+   - After user confirms the new certificate, call `delegate.handlePinMismatch(newHash)`
+   - Once rotation is complete, clear old pins: `delegate.clearSecondaryPins()`
+
+### Debug Build Handling
+
+In DEBUG builds, ECDSA key embedding is skipped to prevent test failures. The `_embeddedPublicKeyBytes` is set to `nil` via `#if DEBUG`, allowing all tests to run without requiring a valid ECDSA key. Set `ENABLE_DEBUG_EMBED=1` to force key embedding in debug builds if needed.
 
 ---
 

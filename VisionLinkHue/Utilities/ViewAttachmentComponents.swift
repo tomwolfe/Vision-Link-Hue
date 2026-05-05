@@ -38,7 +38,9 @@ final class FixtureHUDFactory {
         
         entity.components.set(BillboardComponent())
         
-        entity.components.set(ViewAttachmentComponent(FixtureHUDView(fixture: fixture)))
+        if #available(iOS 26, *) {
+            entity.components.set(ViewAttachmentComponent(FixtureHUDView(fixture: fixture)))
+        }
         
         anchor.addChild(entity)
         

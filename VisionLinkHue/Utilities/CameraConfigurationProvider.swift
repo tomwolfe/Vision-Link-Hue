@@ -38,7 +38,10 @@ final class DefaultCameraConfigurationProvider: CameraConfigurationProvider {
     
     var worldReconstructionMode: Int? {
         #if !targetEnvironment(simulator)
-        return 1
+        if #available(iOS 26, *) {
+            return 1
+        }
+        return nil
         #else
         return nil
         #endif
@@ -46,7 +49,10 @@ final class DefaultCameraConfigurationProvider: CameraConfigurationProvider {
     
     func makeWorldAnchor() -> AnchorEntity {
         #if !targetEnvironment(simulator)
-        return AnchorEntity.world()
+        if #available(iOS 26, *) {
+            return AnchorEntity.world()
+        }
+        return AnchorEntity()
         #else
         return AnchorEntity()
         #endif
@@ -57,8 +63,10 @@ final class DefaultCameraConfigurationProvider: CameraConfigurationProvider {
 extension ARWorldTrackingConfiguration {
     func configuredWithEnvironment() -> ARWorldTrackingConfiguration {
         #if !targetEnvironment(simulator)
-        self.worldReconstructionMode = .automatic
-        self.lightEstimation = .automatic
+        if #available(iOS 26, *) {
+            self.worldReconstructionMode = .automatic
+            self.lightEstimation = .automatic
+        }
         #endif
         self.planeDetection = [.horizontal, .vertical]
         return self
