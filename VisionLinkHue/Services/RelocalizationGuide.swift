@@ -6,15 +6,15 @@ import Metal
 import MetalPerformanceShaders
 
 /// Represents one of the four quadrants of the depth map.
-/// Uses `RawRepresentable` with `RawValue` matching `InlineArray` indices
-/// for zero-cost indexing into `Span`-backed quadrant arrays.
+/// Index maps directly to the tuple element position in
+/// `QuadrantCounts` and `QuadrantDensities`.
 enum DepthQuadrant: Int, Sendable, CaseIterable {
     case topLeft
     case topRight
     case bottomLeft
     case bottomRight
     
-    /// Returns the index for use with `InlineArray`/`Span` storage.
+    /// Returns the index for use with fixed-size tuple storage.
     var index: Int { rawValue }
     
     /// Human-readable label for the quadrant.
@@ -38,75 +38,73 @@ enum DepthQuadrant: Int, Sendable, CaseIterable {
     }
 }
 
-/// Fixed-size storage for exactly 4 quadrant values.
-/// Uses a fixed-size array to avoid heap allocation during
-/// CVPixelBuffer depth map analysis, reducing memory pressure during
-/// high-frequency feature density computation.
-struct QuadrantCounts {
-    var values: [Int]
+/// Fixed-size storage for exactly 4 quadrant counts.
+/// Uses a `(Int, Int, Int, Int)` tuple to guarantee zero heap
+/// allocation during CVPixelBuffer depth map analysis, eliminating
+/// memory pressure during high-frequency feature density computation.
+struct QuadrantCounts: Sendable {
+    var values: (Int, Int, Int, Int)
     
     /// Initialize with all counts set to zero.
     init() {
-        values = [0, 0, 0, 0]
+        values = (0, 0, 0, 0)
     }
     
     /// Access the count for a specific quadrant by index.
+    @inline(__always)
     subscript(quadrant: DepthQuadrant) -> Int {
-        get { values[quadrant.index] }
-        set { values[quadrant.index] = newValue }
+        get { _tupleAt(values, quadrant.index) }
+        set { _tupleSet(&values, quadrant.index, newValue) }
     }
     
     /// Compute the sum of all quadrant counts.
     func total() -> Int {
-        values.reduce(0, +)
+        values.0 + values.1 + values.2 + values.3
     }
     
     /// Find the quadrant index with the minimum count.
     func sparsest() -> Int {
         var minIdx = 0
-        var minVal = values[0]
-        for (i, count) in values.enumerated().dropFirst() {
-            if count < minVal {
-                minVal = count
-                minIdx = i
-            }
-        }
+        var minVal = values.0
+        if values.1 < minVal { minVal = values.1; minIdx = 1 }
+        if values.2 < minVal { minVal = values.2; minIdx = 2 }
+        if values.3 < minVal { minVal = values.3; minIdx = 3 }
         return minIdx
     }
     
     /// Find the quadrant index with the maximum count.
     func richest() -> Int {
         var maxIdx = 0
-        var maxVal = values[0]
-        for (i, count) in values.enumerated().dropFirst() {
-            if count > maxVal {
-                maxVal = count
-                maxIdx = i
-            }
-        }
+        var maxVal = values.0
+        if values.1 > maxVal { maxVal = values.1; maxIdx = 1 }
+        if values.2 > maxVal { maxVal = values.2; maxIdx = 2 }
+        if values.3 > maxVal { maxVal = values.3; maxIdx = 3 }
         return maxIdx
     }
 }
 
 /// Fixed-size density array for Shannon entropy
 /// computation on quadrant feature distributions.
-struct QuadrantDensities {
-    var values: [Float]
+/// Uses a `(Float, Float, Float, Float)` tuple to guarantee
+/// zero heap allocation during feature density analysis.
+struct QuadrantDensities: Sendable {
+    var values: (Float, Float, Float, Float)
     
     /// Initialize with all densities set to zero.
     init() {
-        values = [0.0, 0.0, 0.0, 0.0]
+        values = (0.0, 0.0, 0.0, 0.0)
     }
     
     /// Access the density for a specific quadrant by index.
+    @inline(__always)
     subscript(quadrant: DepthQuadrant) -> Float {
-        get { values[quadrant.index] }
-        set { values[quadrant.index] = newValue }
+        get { _tupleAt(values, quadrant.index) }
+        set { _tupleSet(&values, quadrant.index, newValue) }
     }
     
     /// Compute the total density across all quadrants.
     func total() -> Float {
-        values.reduce(0.0, +)
+        values.0 + values.1 + values.2 + values.3
     }
     
     /// Compute Shannon entropy of the normalized density distribution.
@@ -115,7 +113,8 @@ struct QuadrantDensities {
         guard total > 0 else { return 0.0 }
         
         var entropy: Float = 0.0
-        for density in values {
+        let densities: [Float] = (values.0, values.1, values.2, values.3)
+        for density in densities {
             let probability = density / total
             guard probability > 0 else { continue }
             entropy -= probability * log(probability)
@@ -126,26 +125,20 @@ struct QuadrantDensities {
     /// Find the quadrant index with the minimum density.
     func sparsest() -> Int {
         var minIdx = 0
-        var minVal = values[0]
-        for (i, density) in values.enumerated().dropFirst() {
-            if density < minVal {
-                minVal = density
-                minIdx = i
-            }
-        }
+        var minVal = values.0
+        if values.1 < minVal { minVal = values.1; minIdx = 1 }
+        if values.2 < minVal { minVal = values.2; minIdx = 2 }
+        if values.3 < minVal { minVal = values.3; minIdx = 3 }
         return minIdx
     }
     
     /// Find the quadrant index with the maximum density.
     func richest() -> Int {
         var maxIdx = 0
-        var maxVal = values[0]
-        for (i, density) in values.enumerated().dropFirst() {
-            if density > maxVal {
-                maxVal = density
-                maxIdx = i
-            }
-        }
+        var maxVal = values.0
+        if values.1 > maxVal { maxVal = values.1; maxIdx = 1 }
+        if values.2 > maxVal { maxVal = values.2; maxIdx = 2 }
+        if values.3 > maxVal { maxVal = values.3; maxIdx = 3 }
         return maxIdx
     }
 }
@@ -300,9 +293,10 @@ final class RelocalizationGuide {
     /// reduces latency on iOS 26.3+ by offloading the pixel iteration to the GPU.
     /// Falls back to CPU-side sampling when MPS is unavailable (simulator).
     ///
-    /// Uses Swift 6.3 `InlineArray`/`Span` for zero-allocation quadrant
-    /// storage during CVPixelBuffer iteration, reducing memory pressure
-    /// during high-frequency feature density analysis.
+    /// Uses fixed-size `(Int, Int, Int, Int)` and `(Float, Float, Float, Float)`
+    /// tuples for zero-allocation quadrant storage during CVPixelBuffer iteration,
+    /// eliminating heap allocation and reducing memory pressure during
+    /// high-frequency feature density analysis.
     ///
     /// - Parameters:
     ///   - depthMap: The ARKit depth map CVPixelBuffer.
@@ -412,7 +406,7 @@ final class RelocalizationGuide {
     /// - Parameters:
     ///   - sparsestQuadrant: The quadrant with the fewest visual features.
     ///   - richest: The quadrant with the most visual features.
-    ///   - densities: Full density map for all quadrants via InlineArray-backed storage.
+    ///   - densities: Full density map for all quadrants via fixed-size tuple storage.
     /// - Returns: A LookDirection.environmental with specific guidance text.
     private func environmentalGuidance(
         from sparsestQuadrant: DepthQuadrant,
@@ -467,5 +461,55 @@ final class RelocalizationGuide {
         case .bottomLeft, .bottomRight:
             return "Floor-level objects provide strong visual features for tracking"
         }
+    }
+}
+
+// MARK: - Tuple Helpers
+
+/// Access the element at `index` in a 4-element tuple.
+@inline(__always)
+private func _tupleAt(_ tuple: (Int, Int, Int, Int), _ index: Int) -> Int {
+    switch index {
+    case 0: return tuple.0
+    case 1: return tuple.1
+    case 2: return tuple.2
+    case 3: return tuple.3
+    default: return tuple.0
+    }
+}
+
+/// Set the element at `index` in a 4-element tuple.
+@inline(__always)
+private func _tupleSet(_ tuple: inout (Int, Int, Int, Int), _ index: Int, _ value: Int) {
+    switch index {
+    case 0: tuple.0 = value
+    case 1: tuple.1 = value
+    case 2: tuple.2 = value
+    case 3: tuple.3 = value
+    default: break
+    }
+}
+
+/// Access the element at `index` in a 4-element Float tuple.
+@inline(__always)
+private func _tupleAt(_ tuple: (Float, Float, Float, Float), _ index: Int) -> Float {
+    switch index {
+    case 0: return tuple.0
+    case 1: return tuple.1
+    case 2: return tuple.2
+    case 3: return tuple.3
+    default: return tuple.0
+    }
+}
+
+/// Set the element at `index` in a 4-element Float tuple.
+@inline(__always)
+private func _tupleSet(_ tuple: inout (Float, Float, Float, Float), _ index: Int, _ value: Float) {
+    switch index {
+    case 0: tuple.0 = value
+    case 1: tuple.1 = value
+    case 2: tuple.2 = value
+    case 3: tuple.3 = value
+    default: break
     }
 }

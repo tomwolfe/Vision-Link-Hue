@@ -31,11 +31,13 @@ final class SpatialProjector {
     private weak var session: ARSession?
     
     /// Exponential Moving Average of successful depth measurements for
-    /// robust fallback distance estimation. The smoothing factor (0.2)
-    /// balances responsiveness to real depth changes against resistance
-    /// to spurious readings from mirrors, windows, or reflective surfaces.
+    /// robust fallback distance estimation. Uses adaptive smoothing:
+    /// alpha ramps to 0.8 when depth changes significantly (rapid pan),
+    /// then drops to 0.2 for micro-jitter smoothing during steady tracking.
     private var emaDepth: Float?
-    private let emaSmoothingFactor: Float = 0.2
+    private let emaBaseSmoothingFactor: Float = 0.2
+    private let emaAdaptiveAlphaPeak: Float = 0.8
+    private let emaDepthChangeThreshold: Float = 0.5
     
     init(session: ARSession? = nil, configuration: Configuration = .init(), provider: CameraConfigurationProvider? = nil) {
         self.configuration = configuration
@@ -223,7 +225,7 @@ final class SpatialProjector {
         
         let orientation = simd_quatf(hit.worldTransform)
         let distance = length(position - ray.origin)
-        emaDepth = updateEMA(depth: distance, currentEma: emaDepth, alpha: emaSmoothingFactor)
+        emaDepth = updateEMA(depth: distance, currentEma: emaDepth)
         
         let adjustedPosition = position + configuration.hudOffset
         
@@ -292,7 +294,7 @@ final class SpatialProjector {
         let rotationMatrix = SpatialMath.rotationMatrix(from: frame.camera.transform)
         let orientation = simd_quatf(rotationMatrix)
         
-        emaDepth = updateEMA(depth: depthMeters, currentEma: emaDepth, alpha: emaSmoothingFactor)
+        emaDepth = updateEMA(depth: depthMeters, currentEma: emaDepth)
         
         let adjustedPosition = position + configuration.hudOffset
         
@@ -364,21 +366,34 @@ final class SpatialProjector {
     }
 }
 
-// MARK: - EMA Depth Smoothing
+// MARK: - Adaptive EMA Depth Smoothing
 
 extension SpatialProjector {
-    /// Apply an Exponential Moving Average (EMA) filter to depth measurements.
-    /// The EMA smooths out spurious depth readings (e.g., from mirrors or windows)
-    /// while still adapting to genuine depth changes over time.
+    /// Apply an adaptive Exponential Moving Average (EMA) filter to depth measurements.
+    /// When the depth change exceeds `emaDepthChangeThreshold`, the alpha ramps up to
+    /// `emaAdaptiveAlphaPeak` (0.8) to snap to the new depth boundary quickly. Once
+    /// measurements stabilize, alpha drops back to `emaBaseSmoothingFactor` (0.2) for
+    /// micro-jitter resistance against mirrors, windows, or reflective surfaces.
     ///
     /// - Parameters:
     ///   - depth: The new depth measurement in meters.
     ///   - currentEma: The current EMA value, or nil for the first measurement.
-    ///   - alpha: The smoothing factor in (0, 1]. Lower values produce smoother
-    ///     output but slower adaptation to genuine changes.
     /// - Returns: The updated EMA value.
-    private func updateEMA(depth: Float, currentEma: Float?, alpha: Float) -> Float {
+    private func updateEMA(depth: Float, currentEma: Float?) -> Float {
         guard let currentEma = currentEma else { return depth }
+        
+        let depthDelta = abs(depth - currentEma)
+        
+        // Adaptive alpha: ramp up when depth changes significantly
+        let alpha: Float
+        if depthDelta > emaDepthChangeThreshold {
+            // Large depth change detected — snap quickly to new boundary
+            alpha = emaAdaptiveAlphaPeak
+        } else {
+            // Small change — smooth out micro-jitter
+            alpha = emaBaseSmoothingFactor
+        }
+        
         return alpha * depth + (1 - alpha) * currentEma
     }
 }

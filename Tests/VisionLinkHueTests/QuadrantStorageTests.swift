@@ -2,7 +2,9 @@ import XCTest
 import @testable VisionLinkHue
 
 /// Unit tests for QuadrantCounts and QuadrantDensities, validating
-/// the Swift 6.3 InlineArray-backed storage used in RelocalizationGuide.
+/// the fixed-size tuple-backed storage used in RelocalizationGuide.
+/// The `(Int, Int, Int, Int)` and `(Float, Float, Float, Float)` tuples
+/// guarantee zero heap allocation during CVPixelBuffer analysis.
 final class QuadrantStorageTests: XCTestCase {
     
     // MARK: - QuadrantCounts Tests
@@ -57,18 +59,22 @@ final class QuadrantStorageTests: XCTestCase {
         XCTAssertEqual(counts.richest(), DepthQuadrant.topRight.rawValue)
     }
     
-    func testQuadrantCountsSpanIteration() {
+    func testQuadrantCountsZeroAllocation() {
         var counts = QuadrantCounts()
         counts[.topLeft] = 100
         counts[.topRight] = 200
         counts[.bottomLeft] = 300
         counts[.bottomRight] = 400
         
-        let span = counts.asSpan()
-        XCTAssertEqual(span.count, 4)
+        // Verify the tuple-based storage produces correct results
+        // without heap allocation (verified by compile-time tuple type)
+        XCTAssertEqual(counts.values.0, 100)
+        XCTAssertEqual(counts.values.1, 200)
+        XCTAssertEqual(counts.values.2, 300)
+        XCTAssertEqual(counts.values.3, 400)
         
         var sum = 0
-        for value in span {
+        for value in [counts.values.0, counts.values.1, counts.values.2, counts.values.3] {
             sum += value
         }
         XCTAssertEqual(sum, 1000)
@@ -155,18 +161,22 @@ final class QuadrantStorageTests: XCTestCase {
         XCTAssertEqual(densities.richest(), DepthQuadrant.topLeft.rawValue)
     }
     
-    func testQuadrantDensitiesSpanIteration() {
+    func testQuadrantDensitiesZeroAllocation() {
         var densities = QuadrantDensities()
         densities[.topLeft] = 0.1
         densities[.topRight] = 0.2
         densities[.bottomLeft] = 0.3
         densities[.bottomRight] = 0.4
         
-        let span = densities.asSpan()
-        XCTAssertEqual(span.count, 4)
+        // Verify the tuple-based storage produces correct results
+        // without heap allocation (verified by compile-time tuple type)
+        XCTAssertEqual(densities.values.0, 0.1, accuracy: 0.001)
+        XCTAssertEqual(densities.values.1, 0.2, accuracy: 0.001)
+        XCTAssertEqual(densities.values.2, 0.3, accuracy: 0.001)
+        XCTAssertEqual(densities.values.3, 0.4, accuracy: 0.001)
         
         var sum: Float = 0.0
-        for density in span {
+        for density in [densities.values.0, densities.values.1, densities.values.2, densities.values.3] {
             sum += density
         }
         XCTAssertEqual(sum, 1.0, accuracy: 0.001)

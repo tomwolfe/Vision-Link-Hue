@@ -27,12 +27,18 @@ enum ECDSASignatureValidator {
     /// The minimum acceptable schema version for OTA configuration files.
     private static let minimumSchemaVersion = "1.1.0"
     
-    /// Default ECDSA P-256 public key for OTA config verification, embedded at compile time.
+    /// Default ECDSA P-256 public key for OTA config verification.
+    /// Loaded from the app bundle's Info.plist at launch.
+    /// The key is embedded during the Xcode build via the
+    /// `ECDSA_PUBLIC_KEY_BASE64` build setting, ensuring it is
+    /// physically present in the compiled app bundle on all devices.
+    /// In DEBUG builds, returns nil to allow testing without a real key.
     private static let defaultPublicKeyData: Data? = {
         #if DEBUG
         return nil
         #else
-        guard let keyString = ProcessInfo.processInfo.environment["ECDSA_DEFAULT_PUBLIC_KEY"] else {
+        guard let keyString = Bundle.main.infoDictionary?["ECDSA_PUBLIC_KEY_BASE64"] as? String,
+              !keyString.isEmpty else {
             return nil
         }
         return Data(base64Encoded: keyString)
@@ -100,16 +106,16 @@ enum ECDSASignatureValidator {
             throw SignatureError.publicKeyNotFound
         }
         
-        var messageHash = [UInt8](repeating: 0, count: Int(CC_SHA1_DIGEST_LENGTH))
+        var messageHash = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
         payload.withUnsafeBytes { ptr in
-            CC_SHA1(ptr.baseAddress, UInt32(ptr.count), &messageHash)
+            CC_SHA256(ptr.baseAddress, UInt32(ptr.count), &messageHash)
         }
         let messageHashData = Data(messageHash)
         
         var error: Unmanaged<CFError>?
         let verified = SecKeyVerifySignature(
             publicKey,
-            .ecdsaSignatureMessageX962SHA1,
+            .ecdsaSignatureMessageX962SHA256,
             messageHashData as CFData,
             signature as CFData,
             &error
@@ -252,14 +258,14 @@ enum ECDSASignatureValidator {
     
     /// Sign a payload using an ECDSA private key.
     static func sign(payload: Data, privateKey: SecKey) throws -> Data {
-        var messageHash = [UInt8](repeating: 0, count: Int(CC_SHA1_DIGEST_LENGTH))
+        var messageHash = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
         payload.withUnsafeBytes { ptr in
-            CC_SHA1(ptr.baseAddress, UInt32(ptr.count), &messageHash)
+            CC_SHA256(ptr.baseAddress, UInt32(ptr.count), &messageHash)
         }
         let messageHashData = Data(messageHash)
         var error: Unmanaged<CFError>?
         
-        guard let signature = SecKeyCreateSignature(privateKey, .ecdsaSignatureMessageX962SHA1, messageHashData as CFData, &error) else {
+        guard let signature = SecKeyCreateSignature(privateKey, .ecdsaSignatureMessageX962SHA256, messageHashData as CFData, &error) else {
             throw SignatureError.signatureVerificationFailed
         }
         

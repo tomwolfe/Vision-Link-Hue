@@ -16,6 +16,8 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>ECDSA_PUBLIC_KEY_BASE64</key>
+	<string>${ECDSA_PUBLIC_KEY_BASE64}</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Vision-Link Hue uses your camera to detect lighting fixtures in your environment via on-device AI and anchor AR controls to them.</string>
 	<key>NSLocalNetworkUsageDescription</key>

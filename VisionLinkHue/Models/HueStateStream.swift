@@ -185,68 +185,72 @@ final class HueStateStream {
     private var _groups: [String: BridgeGroup] = [:]
     private var _matterDevices: [String: MatterLightDevice] = [:]
     
-    /// Whether the lights array needs re-sorting before UI access.
+    /// Cached sorted lights array, kept in order by ID for O(1) incremental updates.
+    private var _lightsSorted: [HueLightResource] = []
+    
+    /// Cached sorted scenes array, kept in order by ID for O(1) incremental updates.
+    private var _scenesSorted: [HueSceneResource] = []
+    
+    /// Cached sorted groups array, kept in order by ID for O(1) incremental updates.
+    private var _groupsSorted: [BridgeGroup] = []
+    
+    /// Cached sorted Matter devices array, kept in order by ID for O(1) incremental updates.
+    private var _matterDevicesSorted: [MatterLightDevice] = []
+    
+    /// Whether the lights array needs full resort.
     private var _lightsNeedsResort = false
     
-    /// Whether the scenes array needs re-sorting before UI access.
+    /// Whether the scenes array needs full resort.
     private var _scenesNeedsResort = false
     
-    /// Whether the groups array needs re-sorting before UI access.
+    /// Whether the groups array needs full resort.
     private var _groupsNeedsResort = false
     
-    /// Whether the Matter devices array needs re-sorting before UI access.
+    /// Whether the Matter devices array needs full resort.
     private var _matterDevicesNeedsResort = false
     
-    /// Cached sorted lights array to avoid redundant sorting.
-    private var _lightsCache: [HueLightResource]?
-    
-    /// Cached sorted scenes array to avoid redundant sorting.
-    private var _scenesCache: [HueSceneResource]?
-    
-    /// Cached sorted groups array to avoid redundant sorting.
-    private var _groupsCache: [BridgeGroup]?
-    
-    /// Cached sorted Matter devices array to avoid redundant sorting.
-    private var _matterDevicesCache: [MatterLightDevice]?
-    
     /// Computed array of lights for SwiftUI observation and UI consumption.
-    /// Uses lazy sorting with caching to avoid O(n log n) on every SSE packet.
+    /// Uses incremental sorted-array updates for O(1) per-item changes instead
+    /// of O(n log n) full re-sort on every SSE packet.
     var lights: [HueLightResource] {
-        if _lightsNeedsResort || _lightsCache == nil {
-            _lightsCache = _lights.values.sorted { $0.id < $1.id }
+        if _lightsNeedsResort {
+            _lightsSorted = _lights.values.sorted { $0.id < $1.id }
             _lightsNeedsResort = false
         }
-        return _lightsCache!
+        return _lightsSorted
     }
     
     /// Computed array of scenes for SwiftUI observation and UI consumption.
-    /// Uses lazy sorting with caching to avoid O(n log n) on every SSE packet.
+    /// Uses incremental sorted-array updates for O(1) per-item changes instead
+    /// of O(n log n) full re-sort on every SSE packet.
     var scenes: [HueSceneResource] {
-        if _scenesNeedsResort || _scenesCache == nil {
-            _scenesCache = _scenes.values.sorted { $0.id < $1.id }
+        if _scenesNeedsResort {
+            _scenesSorted = _scenes.values.sorted { $0.id < $1.id }
             _scenesNeedsResort = false
         }
-        return _scenesCache!
+        return _scenesSorted
     }
     
     /// Computed array of groups for SwiftUI observation and UI consumption.
-    /// Uses lazy sorting with caching to avoid O(n log n) on every SSE packet.
+    /// Uses incremental sorted-array updates for O(1) per-item changes instead
+    /// of O(n log n) full re-sort on every SSE packet.
     var groups: [BridgeGroup] {
-        if _groupsNeedsResort || _groupsCache == nil {
-            _groupsCache = _groups.values.sorted { $0.id < $1.id }
+        if _groupsNeedsResort {
+            _groupsSorted = _groups.values.sorted { $0.id < $1.id }
             _groupsNeedsResort = false
         }
-        return _groupsCache!
+        return _groupsSorted
     }
     
     /// Computed array of Matter devices for SwiftUI observation and UI consumption.
-    /// Uses lazy sorting with caching to avoid O(n log n) on every update.
+    /// Uses incremental sorted-array updates for O(1) per-item changes instead
+    /// of O(n log n) full re-sort on every SSE packet.
     var matterDevices: [MatterLightDevice] {
-        if _matterDevicesNeedsResort || _matterDevicesCache == nil {
-            _matterDevicesCache = _matterDevices.values.sorted { $0.id < $1.id }
+        if _matterDevicesNeedsResort {
+            _matterDevicesSorted = _matterDevices.values.sorted { $0.id < $1.id }
             _matterDevicesNeedsResort = false
         }
-        return _matterDevicesCache!
+        return _matterDevicesSorted
     }
     
     var isConnected: Bool = false
@@ -315,32 +319,33 @@ final class HueStateStream {
     
     /// Process a partial resource update from the SSE stream.
     /// Merges incoming resources into the dictionary store in O(1) per item,
-    /// deferring sorting until UI access to avoid O(n log n) on every packet.
+    /// then incrementally updates the sorted array using binary search for
+    /// O(log n) insertion instead of O(n log n) full re-sort.
     func applyUpdate(_ update: ResourceUpdate) {
         if let lights = update.lights {
             mergeIntoDictionary(&self._lights, incoming: lights)
-            _lightsNeedsResort = true
-            _lightsCache = nil
+            _incrementalUpdate(&self._lightsSorted, incoming: lights, keyPath: \HueLightResource.id)
+            _lightsNeedsResort = false
         }
         
         if let scenes = update.scenes {
             mergeIntoDictionary(&self._scenes, incoming: scenes)
-            _scenesNeedsResort = true
-            _scenesCache = nil
+            _incrementalUpdate(&self._scenesSorted, incoming: scenes, keyPath: \HueSceneResource.id)
+            _scenesNeedsResort = false
         }
         
         if let groups = update.groups {
             mergeIntoDictionary(&self._groups, incoming: groups)
-            _groupsNeedsResort = true
-            _groupsCache = nil
+            _incrementalUpdate(&self._groupsSorted, incoming: groups, keyPath: \BridgeGroup.id)
+            _groupsNeedsResort = false
         }
         
         if let matterLights = update.matterLights {
             for device in matterLights {
                 _matterDevices[device.id] = device
             }
-            _matterDevicesNeedsResort = true
-            _matterDevicesCache = nil
+            _incrementalUpdate(&self._matterDevicesSorted, incoming: matterLights, keyPath: \MatterLightDevice.id)
+            _matterDevicesNeedsResort = false
         }
     }
     
@@ -353,6 +358,30 @@ final class HueStateStream {
     ) where T.ID == String {
         for item in incoming {
             store[item.id] = item
+        }
+    }
+    
+    /// Incrementally update a sorted array with incoming items.
+    /// For each incoming item, either updates an existing entry in O(log n)
+    /// via binary search, or inserts a new entry maintaining sort order.
+    /// This avoids O(n log n) full re-sort when only a few items change.
+    private func _incrementalUpdate<T: Identifiable>(
+        _ sortedArray: inout [T],
+        incoming: [T],
+        keyPath: KeyPath<T, String>
+    ) where T.ID == String {
+        for item in incoming {
+            let id = item[keyPath: keyPath]
+            if let existingIndex = sortedArray.firstIndex(where: { $0[keyPath: keyPath] == id }) {
+                // Update existing entry in-place
+                sortedArray[existingIndex] = item
+            } else {
+                // Insert new entry maintaining sorted order
+                let insertIndex = sortedArray.lowerBound(
+                    by: { $0[keyPath: keyPath] < id }
+                )
+                sortedArray.insert(item, at: insertIndex)
+            }
         }
     }
     
@@ -479,10 +508,6 @@ final class HueStateStream {
         _scenesNeedsResort = true
         _groupsNeedsResort = true
         _matterDevicesNeedsResort = true
-        _lightsCache = nil
-        _scenesCache = nil
-        _groupsCache = nil
-        _matterDevicesCache = nil
     }
     
     /// Update Matter device state from the MatterBridgeService.
@@ -490,8 +515,8 @@ final class HueStateStream {
         for device in devices {
             _matterDevices[device.id] = device
         }
-        _matterDevicesNeedsResort = true
-        _matterDevicesCache = nil
+        _incrementalUpdate(&self._matterDevicesSorted, incoming: devices, keyPath: \MatterLightDevice.id)
+        _matterDevicesNeedsResort = false
     }
     
     /// Resolve a Matter device by its ID.
