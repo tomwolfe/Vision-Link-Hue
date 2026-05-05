@@ -5,6 +5,11 @@ import os
 /// Service that manages Matter/Thread-based smart lighting as a fallback
 /// when the Philips Hue Bridge is unavailable. Provides device discovery,
 /// state management, and control commands through the HomeKit framework.
+///
+/// NOTE: This is a work-in-progress stub. The discovery, state management,
+/// and control methods are not yet implemented. They return empty results
+/// or throw `.homeKitNotAvailable` / `.accessoryNotReachable` until the
+/// Matter/Thread integration is complete per the roadmap.
 final class MatterBridgeService: NSObject, @unchecked Sendable {
     
     // MARK: - State
@@ -24,6 +29,7 @@ final class MatterBridgeService: NSObject, @unchecked Sendable {
     var isThreadNetworkAvailable: Bool { false }
     
     /// The current state of all Matter devices.
+    /// NOTE: Stub — returns empty state. WIP: will populate from HomeKit accessories.
     var state: MatterBridgeState {
         MatterBridgeState(
             lights: [],
@@ -155,22 +161,26 @@ final class MatterBridgeService: NSObject, @unchecked Sendable {
     // MARK: - Matter Area Metadata (Matter 1.5.1+)
     
     /// Import area metadata from all connected Thread Border Routers.
+    /// NOTE: Stub — returns empty array. WIP: parse Matter 1.5.1 Area Metadata.
     func importAreaMetadata() async -> [MatterAreaMetadata] {
         []
     }
     
     /// Get area metadata for a specific light device from the Matter network.
+    /// NOTE: Stub — returns nil. WIP: resolve from Matter area hierarchy.
     func areaForLight(_ lightId: String) -> MatterAreaMetadata? {
         nil
     }
     
     /// Pre-populate light group assignments from Matter area metadata.
+    /// NOTE: Stub — returns empty dictionary. WIP: map Matter areas to light groups.
     func prePopulateLightGroups() async -> [String: [String]] {
         [:]
     }
     
     // MARK: - Private Helpers
     
+    /// NOTE: Stub — controllers are not yet populated. WIP: instantiate from HomeKit accessories.
     private func controller(for deviceId: String) -> (any MatterLightController)? {
         if let existing = controllers[deviceId] {
             return existing

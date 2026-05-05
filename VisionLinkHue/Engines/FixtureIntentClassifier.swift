@@ -54,6 +54,9 @@ final class CoreMLIntentClassifier: @unchecked Sendable, FixtureIntentClassifier
     /// The loaded CoreML model.
     private var model: MLModel?
 
+    /// Pool for reusing CVPixelBuffers across classification calls to minimize memory churn.
+    private var pixelBufferPool: CVPixelBufferPool?
+
     /// Whether the model has been loaded successfully.
     var isReady: Bool { model != nil }
 
@@ -67,6 +70,8 @@ final class CoreMLIntentClassifier: @unchecked Sendable, FixtureIntentClassifier
         model = try await Task.detached {
             try MLModel(contentsOf: modelURL)
         }.value
+
+        pixelBufferPool = createPixelBufferPool()
     }
 
     /// Classify an observation using the CoreML model and Vision framework.
@@ -123,15 +128,25 @@ final class CoreMLIntentClassifier: @unchecked Sendable, FixtureIntentClassifier
     /// Get the override threshold value for external consumers.
     static let overrideThreshold: Double = overrideConfidenceThreshold
 
-    /// Create a pixel buffer for Vision framework processing.
+    /// Create a pixel buffer for Vision framework processing, pulling from the pool when available.
     private func createPixelBuffer(from box: CGRect) throws -> CVPixelBuffer {
         let width = 224
         let height = 224
-        return try createPixelBufferDirect(width: width, height: height)
+
+        if let pool = pixelBufferPool {
+            var pixelBuffer: CVPixelBuffer?
+            let status = CVPixelBufferPoolCreatePixelBuffer(nil, pool, &pixelBuffer)
+            guard status == kCVReturnSuccess, let buffer = pixelBuffer else {
+                return try createPixelBufferFallback(width: width, height: height)
+            }
+            return buffer
+        }
+
+        return try createPixelBufferFallback(width: width, height: height)
     }
 
-    /// Create a pixel buffer directly without pool reuse.
-    private func createPixelBufferDirect(width: Int, height: Int) throws -> CVPixelBuffer {
+    /// Fallback: create a pixel buffer directly when the pool is unavailable.
+    private func createPixelBufferFallback(width: Int, height: Int) throws -> CVPixelBuffer {
         let attributes: [String: Any] = [
             kCVPixelBufferCGImageCompatibilityKey as String: true,
             kCVPixelBufferCGBitmapContextCompatibilityKey as String: true,
@@ -157,5 +172,32 @@ final class CoreMLIntentClassifier: @unchecked Sendable, FixtureIntentClassifier
         }
 
         return buffer
+    }
+
+    /// Create a CVPixelBufferPool for the given dimensions.
+    private func createPixelBufferPool() -> CVPixelBufferPool? {
+        let width = 224
+        let height = 224
+        let poolAttributes: [String: Any] = [
+            kCVPixelBufferPoolAllocationLimitKey as String: 8
+        ]
+        let pixelBufferAttributes: [String: Any] = [
+            kCVPixelBufferCGBitmapContextCompatibilityKey as String: true,
+            kCVPixelBufferIOSurfacePropertiesKey as String: [:]
+        ]
+
+        var pool: CVPixelBufferPool?
+        let status = CVPixelBufferPoolCreate(
+            nil,
+            poolAttributes as CFDictionary,
+            pixelBufferAttributes as CFDictionary,
+            &pool
+        )
+
+        guard status == kCVReturnSuccess else {
+            return nil
+        }
+
+        return pool
     }
 }

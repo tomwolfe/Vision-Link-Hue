@@ -19,7 +19,6 @@ targets:
         ENTITLEMENTS_DIRECTORY: .
         ENTITLEMENTS_FILENAME: VisionLinkHue.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        ECDSA_PUBLIC_KEY_BASE64: ""
         SWIFT_VERSION: 6.3
     sources:
       - VisionLinkHue

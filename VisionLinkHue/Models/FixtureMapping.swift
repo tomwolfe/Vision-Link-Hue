@@ -8,7 +8,7 @@ import simd
 @Model
 final class FixtureMapping {
     /// Local UUID for the detected fixture.
-    var fixtureId: String
+    var fixtureId: UUID
     
     /// Philips Hue light ID (CLIP v2 UUID) mapped to this fixture.
     var lightId: String?
@@ -63,7 +63,7 @@ final class FixtureMapping {
         fixtureType: String,
         confidence: Double
     ) {
-        self.fixtureId = fixtureId.uuidString
+        self.fixtureId = fixtureId
         self.lightId = lightId
         self.positionX = position.x
         self.positionY = position.y
@@ -81,9 +81,6 @@ final class FixtureMapping {
         self.bridgePositionY = nil
         self.bridgePositionZ = nil
     }
-    
-    /// Convenience accessor for the fixture UUID.
-    var uuid: UUID { UUID(uuidString: fixtureId) ?? UUID() }
     
     /// Convenience accessor for the 3D position.
     var position: SIMD3<Float> {

@@ -119,7 +119,7 @@ final class SpatialSyncRecord {
     var cloudKitRecordID: String?
     
     /// The fixture UUID this record represents.
-    var fixtureId: String
+    var fixtureId: UUID
     
     /// Philips Hue light ID mapped to this fixture.
     var lightId: String?
@@ -172,7 +172,7 @@ final class SpatialSyncRecord {
         fixtureType: String,
         confidence: Double
     ) {
-        self.fixtureId = fixtureId.uuidString
+        self.fixtureId = fixtureId
         self.lightId = lightId
         self.positionX = position.x
         self.positionY = position.y
@@ -191,9 +191,6 @@ final class SpatialSyncRecord {
         self.isSynced = false
         self.lastSyncError = nil
     }
-    
-    /// Convenience accessor for the fixture UUID.
-    var uuid: UUID { UUID(uuidString: fixtureId) ?? UUID() }
     
     /// Convenience accessor for the 3D position.
     var position: SIMD3<Float> {
@@ -371,7 +368,7 @@ final class SpatialSyncService: @unchecked Sendable {
             } catch {
                 logger.error("Failed to upload mapping for \(mapping.fixtureId): \(error.localizedDescription)")
                 success = false
-                pendingUploads[mapping.uuid] = await loadPendingSyncRecord(for: mapping.uuid)
+                pendingUploads[mapping.fixtureId] = await loadPendingSyncRecord(for: mapping.fixtureId)
             }
         }
         
@@ -453,7 +450,7 @@ final class SpatialSyncService: @unchecked Sendable {
                 conflictCount += 1
                 logger.debug("CRDT conflict resolved for \(fixtureKey): kept local version \(localVersion)")
             case .remoteWins:
-                await applyRemoteChanges(for: UUID(uuidString: fixtureKey) ?? UUID())
+                await applyRemoteChanges(for: record.fixtureId)
                 conflictCount += 1
                 logger.debug("CRDT conflict resolved for \(fixtureKey): applied remote version \(remoteVersion)")
             case .equivalent:
@@ -468,7 +465,7 @@ final class SpatialSyncService: @unchecked Sendable {
     /// Create or update a spatial sync record from a local fixture mapping.
     private func createOrUpdateSyncRecord(from mapping: FixtureMapping) async -> SpatialSyncRecord {
         // Check if a sync record already exists for this fixture.
-        if let existing = await loadSyncRecord(for: UUID(uuidString: mapping.fixtureId) ?? UUID()) {
+        if let existing = await loadSyncRecord(for: mapping.fixtureId) {
             existing.lightId = mapping.lightId
             existing.positionX = mapping.position.x
             existing.positionY = mapping.position.y
@@ -482,8 +479,8 @@ final class SpatialSyncService: @unchecked Sendable {
             existing.confidence = mapping.confidence
             existing.lastSyncedAt = Date()
             existing.lastModifiedByDevice = deviceIdentifier
-            existing.version = incrementVersion(for: UUID(uuidString: mapping.fixtureId) ?? UUID())
-            existing.vectorClockJSON = serializeVectorClock(for: UUID(uuidString: mapping.fixtureId) ?? UUID())
+            existing.version = incrementVersion(for: mapping.fixtureId)
+            existing.vectorClockJSON = serializeVectorClock(for: mapping.fixtureId)
             existing.lastSyncError = nil
             
             return existing
@@ -491,7 +488,7 @@ final class SpatialSyncService: @unchecked Sendable {
         
         // Create a new sync record.
         return SpatialSyncRecord(
-            fixtureId: UUID(uuidString: mapping.fixtureId) ?? UUID(),
+            fixtureId: mapping.fixtureId,
             lightId: mapping.lightId,
             position: mapping.position,
             orientation: mapping.orientation,
@@ -509,10 +506,10 @@ final class SpatialSyncService: @unchecked Sendable {
             throw SpatialSyncError.cloudKitUnavailable
         }
         
-        let ckRecordID = CKRecord.ID(recordName: "fixture:\(record.fixtureId)")
+        let ckRecordID = CKRecord.ID(recordName: "fixture:\(record.fixtureId.uuidString)")
         var ckRecord = CKRecord(recordType: "FixtureSpatialSync", recordID: ckRecordID)
         
-        ckRecord["fixture_id"] = record.fixtureId
+        ckRecord["fixture_id"] = record.fixtureId.uuidString
         ckRecord["light_id"] = record.lightId
         ckRecord["position_x"] = record.positionX
         ckRecord["position_y"] = record.positionY
@@ -600,7 +597,7 @@ final class SpatialSyncService: @unchecked Sendable {
     /// Updates the local FixtureMapping with position, orientation,
     /// and light ID from the remote record to maintain consistency.
     private func applyRemoteRecord(_ record: SpatialSyncRecord) async {
-        let fixtureUUID = record.uuid
+        let fixtureUUID = record.fixtureId
         
         // Link the fixture to the light ID from the remote record.
         if let lightId = record.lightId {
@@ -659,7 +656,7 @@ final class SpatialSyncService: @unchecked Sendable {
             }
             
             let descriptor = FetchDescriptor<FixtureMapping>(
-                predicate: #Predicate<FixtureMapping> { $0.fixtureId == fixtureId.uuidString }
+                predicate: #Predicate<FixtureMapping> { $0.fixtureId == fixtureId }
             )
             
             var mappings = try modelContext.fetch(descriptor)
@@ -691,7 +688,7 @@ final class SpatialSyncService: @unchecked Sendable {
         record.lastSyncError = nil
         
         // Remove from pending uploads.
-        pendingUploads.removeValue(forKey: record.uuid)
+        pendingUploads.removeValue(forKey: record.fixtureId)
     }
     
     /// Serialize the vector clock for a fixture to JSON string.
@@ -779,7 +776,7 @@ final class SpatialSyncService: @unchecked Sendable {
     /// Load a sync record for a specific fixture.
     private func loadSyncRecord(for fixtureId: UUID) async -> SpatialSyncRecord? {
         let descriptor = FetchDescriptor<SpatialSyncRecord>(
-            predicate: #Predicate<SpatialSyncRecord> { $0.fixtureId == fixtureId.uuidString }
+            predicate: #Predicate<SpatialSyncRecord> { $0.fixtureId == fixtureId }
         )
         
         do {

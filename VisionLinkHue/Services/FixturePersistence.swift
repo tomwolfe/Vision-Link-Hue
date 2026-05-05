@@ -156,7 +156,7 @@ actor FixturePersistence {
         do {
             let mappings = try modelContext.fetch(descriptor)
             return mappings
-                .map { ($0.uuid, $0.lightId) }
+                .map { ($0.fixtureId, $0.lightId) }
                 .sorted { $0.1 ?? "" < $1.1 ?? "" }
         } catch {
             logger.error("Failed to load fixture mappings: \(error.localizedDescription)")
@@ -246,7 +246,7 @@ actor FixturePersistence {
         do {
             // Check if a mapping already exists for this fixture
             let descriptor = FetchDescriptor<FixtureMapping>(
-                predicate: #Predicate<FixtureMapping> { $0.fixtureId == fixtureId.uuidString }
+                predicate: #Predicate<FixtureMapping> { $0.fixtureId == fixtureId }
             )
             
             let results = try modelContext.fetch(descriptor)
@@ -345,7 +345,7 @@ actor FixturePersistence {
     func linkFixture(_ fixtureId: UUID, toLight lightId: String) {
         do {
             let descriptor = FetchDescriptor<FixtureMapping>(
-                predicate: #Predicate<FixtureMapping> { $0.fixtureId == fixtureId.uuidString }
+                predicate: #Predicate<FixtureMapping> { $0.fixtureId == fixtureId }
             )
             
             let results = try modelContext.fetch(descriptor)
@@ -364,7 +364,7 @@ actor FixturePersistence {
     func unlinkFixture(_ fixtureId: UUID) {
         do {
             let descriptor = FetchDescriptor<FixtureMapping>(
-                predicate: #Predicate<FixtureMapping> { $0.fixtureId == fixtureId.uuidString }
+                predicate: #Predicate<FixtureMapping> { $0.fixtureId == fixtureId }
             )
             
             let results = try modelContext.fetch(descriptor)
@@ -383,7 +383,7 @@ actor FixturePersistence {
     func removeMapping(for fixtureId: UUID) {
         do {
             let descriptor = FetchDescriptor<FixtureMapping>(
-                predicate: #Predicate<FixtureMapping> { $0.fixtureId == fixtureId.uuidString }
+                predicate: #Predicate<FixtureMapping> { $0.fixtureId == fixtureId }
             )
             
             let results = try modelContext.fetch(descriptor)
@@ -401,7 +401,7 @@ actor FixturePersistence {
     func markSynced(_ fixtureId: UUID) {
         do {
             let descriptor = FetchDescriptor<FixtureMapping>(
-                predicate: #Predicate<FixtureMapping> { $0.fixtureId == fixtureId.uuidString }
+                predicate: #Predicate<FixtureMapping> { $0.fixtureId == fixtureId }
             )
             
             let results = try modelContext.fetch(descriptor)
@@ -577,7 +577,7 @@ actor FixturePersistence {
     func saveManualAssignment(fixtureId: UUID, roomId: String, areaId: String?) async {
         do {
             let descriptor = FetchDescriptor<FixtureMapping>(
-                predicate: #Predicate<FixtureMapping> { $0.fixtureId == fixtureId.uuidString }
+                predicate: #Predicate<FixtureMapping> { $0.fixtureId == fixtureId }
             )
             let results = try modelContext.fetch(descriptor)
             if let mapping = results.first {

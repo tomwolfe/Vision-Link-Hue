@@ -87,6 +87,9 @@ final class DetectionEngine {
     /// Whether the model is currently being loaded.
     var isModelLoading: Bool = false
     
+    /// Whether the quantization fallback error has already been reported.
+    private var hasReportedQuantizationFallback: Bool = false
+    
     /// Callback for model loading progress updates.
     private var onModelLoadingProgress: (@Sendable (Double) -> Void)?
     
@@ -266,7 +269,9 @@ final class DetectionEngine {
                 logger.debug("4-bit quantization not available for model, falling back to unquantized: \(error.localizedDescription)")
                 
                 // Report quantization fallback to stateStream for thermal model baseline tracking.
-                if let stateStream {
+                // Rate-limit to a single report per session to avoid spamming on older devices.
+                if let stateStream, !hasReportedQuantizationFallback {
+                    hasReportedQuantizationFallback = true
                     let fallbackError = NSError(
                         domain: "DetectionEngine",
                         code: 2,
@@ -322,6 +327,7 @@ final class DetectionEngine {
         onModelLoadingProgress?(0.0)
         isObjectModelLoaded = false
         isModelQuantized = false
+        hasReportedQuantizationFallback = false
         objectDetectionModel = nil
         objectDetectionRequest = nil
         intentClassifier = CoreMLIntentClassifier()

@@ -545,6 +545,8 @@ final class ARSessionManager {
         anchor: AnchorEntity,
         material: String?
     ) async -> TrackedFixture? {
+        guard !Task.isCancelled else { return nil }
+        
         // Check if we already have this detection
         if trackedFixtures.first(where: { $0.id == detection.id }) != nil {
             return nil
@@ -553,11 +555,14 @@ final class ARSessionManager {
         // Project 2D detection to 3D world coordinates.
         // SpatialProjector is @MainActor isolated; calling from background
         // task automatically crosses the actor boundary.
+        guard !Task.isCancelled else { return nil }
         let result = await spatialProjector.project(
             region: detection.region,
             inFrame: frame,
             anchor: anchor
         )
+        
+        guard !Task.isCancelled else { return nil }
         
         guard case .anchored(let fixture) = result else {
             logger.warning("Projection failed: \(result.errorMessage ?? "unknown")")

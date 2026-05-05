@@ -46,7 +46,7 @@ final class SpatialSyncServiceTests: XCTestCase {
             confidence: 0.9
         )
         
-        XCTAssertEqual(record.fixtureId, fixtureId.uuidString)
+        XCTAssertEqual(record.fixtureId, fixtureId)
         XCTAssertEqual(record.lightId, "test-light")
         XCTAssertEqual(record.positionX, 1.0)
         XCTAssertEqual(record.positionY, 2.0)
@@ -114,7 +114,7 @@ final class SpatialSyncServiceTests: XCTestCase {
             confidence: 0.85
         )
         
-        XCTAssertEqual(record.uuid, fixtureId)
+        XCTAssertEqual(record.fixtureId, fixtureId)
     }
     
     // MARK: - SpatialSyncService Tests
