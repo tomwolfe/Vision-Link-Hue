@@ -67,6 +67,9 @@ actor HueEventStreamActor {
     /// Track parse failures for degradation detection.
     private var parseFailures = 0
     
+    /// Maximum SSE data buffer length to prevent OOM crashes.
+    private var maxSSEBufferLength: Int = 5 * 1024 * 1024
+    
     /// Connection health metrics for adaptive reconnection tuning.
     private(set) var connectionHealthMetrics = SSEConnectionHealthMetrics()
     
@@ -86,6 +89,11 @@ actor HueEventStreamActor {
         
         /// Whether to enable connection health metrics tracking.
         var trackHealthMetrics: Bool = true
+        
+        /// Maximum SSE data buffer length in bytes to prevent OOM crashes.
+        /// If the accumulated buffer exceeds this limit, the stream enters
+        /// degraded mode to protect against unbounded memory growth.
+        var maxSSEBufferLength: Int = 5 * 1024 * 1024
         
         static let `default` = Configuration()
     }
@@ -212,7 +220,8 @@ actor HueEventStreamActor {
         self.baseReconnectDelay = configuration.baseReconnectDelay
         self.maxReconnectDelay = configuration.maxReconnectDelay
         self.minReconnectDelay = configuration.minReconnectDelay
-        logger.info("SSE configuration updated: maxParseFailures=\(configuration.maxParseFailures), baseDelay=\(String(format: "%.1f", configuration.baseReconnectDelay))s")
+        self.maxSSEBufferLength = configuration.maxSSEBufferLength
+        logger.info("SSE configuration updated: maxParseFailures=\(configuration.maxParseFailures), baseDelay=\(String(format: "%.1f", configuration.baseReconnectDelay))s, maxBuffer=\(configuration.maxSSEBufferLength) bytes")
     }
     
     /// Get the current connection health metrics for monitoring.
@@ -281,7 +290,16 @@ actor HueEventStreamActor {
                 
                 // Accumulate data lines for multi-line SSE events
                 if line.hasPrefix("data: ") {
-                    sseDataBuffer += String(line.dropFirst(6)) + "\n"
+                    let extracted = String(line.dropFirst(6))
+                    sseDataBuffer += extracted + "\n"
+                    
+                    // Enforce buffer size limit to prevent OOM from unbounded growth
+                    if sseDataBuffer.utf8.count > maxSSEBufferLength {
+                        logger.warning("SSE data buffer exceeded \(maxSSEBufferLength) bytes, discarding buffer and entering degraded mode")
+                        sseDataBuffer = ""
+                        parseFailures = maxParseFailures
+                        state = .degraded
+                    }
                 }
             }
         } catch {

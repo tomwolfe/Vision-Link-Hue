@@ -663,15 +663,19 @@ actor FixturePersistence {
     /// When processing large batches of fixture mappings (e.g., 50+ fixtures
     /// during initial spatial sync), the SwiftData context accumulates tracked
     /// objects that can consume significant memory. This method saves all
-    /// pending changes to the persistent store and then resets the context,
-    /// creating a fresh one for continued operations.
+    /// pending changes to the persistent store and then rolls back the context,
+    /// allowing SwiftData's autorelease pool to reclaim memory without breaking
+    /// `@Query` references observed by SwiftUI views.
+    ///
+    /// Replaces the previous approach of recreating `ModelContext`, which caused
+    /// object identity loss for active SwiftUI view bindings.
     ///
     /// - Parameter batchSize: The number of operations after which to trigger
     ///   a context save and reset. Defaults to 50.
     func checkpointContext(batchSize: Int = 50) async {
         do {
             try modelContext.save()
-            self.modelContext = ModelContext(modelContainer)
+            modelContext.rollback()
             logger.debug("Model context checkpointed and memory reclaimed")
         } catch {
             logger.error("Failed to checkpoint model context: \(error.localizedDescription)")
@@ -684,7 +688,7 @@ actor FixturePersistence {
     func flushContext() async {
         do {
             try modelContext.save()
-            self.modelContext = ModelContext(modelContainer)
+            modelContext.rollback()
             logger.debug("Model context flushed and memory reclaimed")
         } catch {
             logger.error("Failed to flush model context: \(error.localizedDescription)")
@@ -693,7 +697,8 @@ actor FixturePersistence {
     
     /// Execute a batch of update operations with periodic context checkpoints.
     /// This keeps the memory footprint low during massive syncs by saving
-    /// and resetting the context after every `batchSize` operations.
+    /// and rolling back the context after every `batchSize` operations,
+    /// avoiding the object identity loss caused by recreating ModelContext.
     ///
     /// - Parameters:
     ///   - count: The total number of operations to execute.

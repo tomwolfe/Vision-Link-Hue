@@ -153,6 +153,20 @@ final class DetectionEngineTests: XCTestCase {
     }
     
     // MARK: - Vision Coordinate Space Tests
+
+    // MARK: Vision Coordinate System & Device Orientation Considerations
+
+    // NOTE: Vision framework uses a bottom-left origin for bounding boxes.
+    // When creating a NormalizedRect from a Vision bounding box,
+    // the Y values must be flipped for ARKit/Camera coordinate space.
+    //
+    // CRITICAL: If device rotation is ever unlocked (iPad, Vision Pro landscape),
+    // the ARKit frame's `displayTransform` will modify how Vision coordinates
+    // map to physical space. The current NormalizedRect conversion does NOT
+    // account for device orientation transforms. Before enabling rotation,
+    // ensure the detection pipeline applies the displayTransform's rotation
+    // and flip components to normalize Vision bounding boxes consistently.
+    // See: ARKitFrame.displayTransform documentation for orientation handling.
     
     func testNormalizedRectYAxisFlipping() {
         // Vision framework uses bottom-left origin.

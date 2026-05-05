@@ -71,6 +71,14 @@ final class ThermalPredictiveModel {
     private var latencyHistory: [Double]
     private var sampleCount: Int = 0
     
+    /// Precomputed least-squares constants for the fixed slope window.
+    /// For x = [0, 1, ..., n-1]:
+    ///   sumX = n*(n-1)/2, sumX2 = (n-1)*n*(2n-1)/6
+    ///   denominator = n*sumX2 - sumX²
+    private var precomputedSumX: Double
+    private var precomputedSumX2: Double
+    private var precomputedDenominator: Double
+    
     /// Initialize the predictive thermal model.
     /// - Parameters:
     ///   - thermalState: The current actual thermal state.
@@ -81,6 +89,11 @@ final class ThermalPredictiveModel {
         self.ewmaLatency = 0.0
         self.latencyTrendSlope = 0.0
         self.latencyHistory = []
+        
+        let n = Double(configuration.slopeWindow)
+        precomputedSumX = n * (n - 1.0) / 2.0
+        precomputedSumX2 = (n - 1.0) * n * (2.0 * n - 1.0) / 6.0
+        precomputedDenominator = n * precomputedSumX2 - precomputedSumX * precomputedSumX
     }
     
     /// Update the predictive model with a new inference latency measurement.
@@ -133,28 +146,25 @@ final class ThermalPredictiveModel {
     /// Uses the standard least-squares formula:
     ///     slope = (n * sum(x*y) - sum(x) * sum(y)) / (n * sum(x^2) - (sum(x))^2)
     /// where x is the sample index and y is the EWMA latency.
+    ///
+    /// Optimized for a fixed-window regression: sumX, sumX2, and the denominator
+    /// are precomputed at init time since x is always [0, 1, ..., n-1].
+    /// Only sumY and sumXY are computed per call.
     private func computeSlope(_ data: [Double]) -> Double {
         let n = Double(data.count)
-        var sumX: Double = 0
         var sumY: Double = 0
         var sumXY: Double = 0
-        var sumX2: Double = 0
         
         for (i, y) in data.enumerated() {
-            let x = Double(i)
-            sumX += x
             sumY += y
-            sumXY += x * y
-            sumX2 += x * x
+            sumXY += Double(i) * y
         }
         
-        let denominator = n * sumX2 - sumX * sumX
-        
-        if abs(denominator) < 1e-10 {
+        if abs(precomputedDenominator) < 1e-10 {
             return 0.0
         }
         
-        return (n * sumXY - sumX * sumY) / denominator
+        return (n * sumXY - precomputedSumX * sumY) / precomputedDenominator
     }
     
     private let logger = Logger(
