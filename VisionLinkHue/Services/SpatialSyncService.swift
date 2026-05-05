@@ -283,7 +283,11 @@ final class SpatialSyncService: @unchecked Sendable {
     /// Uses the app's CloudKit container with the public database.
     /// Returns nil if the CloudKit container is not configured.
     private static func setupCloudKitDatabase() -> CKDatabase? {
+        #if targetEnvironment(simulator)
+        return nil
+        #else
         return CKContainer(identifier: "iCloud.com.visionlinkhue.spatial").publicCloudDatabase
+        #endif
     }
     
     /// Check if CloudKit sharing is available for spatial sync.
