@@ -69,7 +69,7 @@ enum SpatialMath {
         cameraTransform: simd_float4x4
     ) -> SIMD3<Float>? {
         guard let intrinsics else {
-            return normalize(normalize(rotationMatrix(from: cameraTransform) * SIMD3<Float>(0, 0, -1)))
+            return normalize(rotationMatrix(from: cameraTransform) * SIMD3<Float>(0, 0, -1))
         }
         
         let cx = intrinsics.k2

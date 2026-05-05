@@ -405,6 +405,7 @@ final class DetectionEngine {
         
         let box = ObjectDetectionBox(handler: handler, request: coreMLRequest)
         let observations = try await Task.detached(priority: priority, operation: { [box] in
+            Task.checkCancellation()
             try box.run()
         }).value
         
@@ -441,6 +442,7 @@ final class DetectionEngine {
         
         let box = RectangleDetectionBox(handler: handler, request: request)
         let observations = try await Task.detached(priority: priority, operation: { [box] in
+            Task.checkCancellation()
             try box.run()
         }).value
         

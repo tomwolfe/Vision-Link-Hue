@@ -29,53 +29,29 @@ extension ARFrame {
 // MARK: - Date/Time Formatting
 
 extension Date {
+    /// Format as ISO 8601 string using native format style.
+    var formatString: String {
+        self.format(.iso8601)
+    }
+    
     /// Format as ISO 8601 string.
     func toISO8601() -> String {
-        let formatter = ISO8601DateFormatter()
-        return formatter.string(from: self)
+        self.format(.iso8601)
     }
 }
 
 // MARK: - JSON Utilities
 
-private final class ISO8601DateFormatterBox: @unchecked Sendable {
-    let formatter: ISO8601DateFormatter
-    init(_ formatter: ISO8601DateFormatter) {
-        self.formatter = formatter
-    }
-    func date(from string: String) -> Date? {
-        formatter.date(from: string)
-    }
-}
-
-private let iso8601FormatterWithFractional: ISO8601DateFormatterBox = {
-    let f = ISO8601DateFormatter()
-    f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    return ISO8601DateFormatterBox(f)
-}()
-
-private let iso8601FormatterWithoutFractional: ISO8601DateFormatterBox = {
-    let f = ISO8601DateFormatter()
-    f.formatOptions = [.withInternetDateTime]
-    return ISO8601DateFormatterBox(f)
-}()
-
 extension JSONDecoder {
-    /// Create a decoder with ISO 8601 date decoding strategy that handles
-    /// Hue's specific ISO 8601 flavor, including fractional seconds.
+    /// Create a decoder with ISO 8601 date decoding strategy using native
+    /// Date.ISO8601FormatStyle for optimal performance under high SSE event loads.
     static var hueDecoder: JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
             let dateString = try container.decode(String.self)
             
-            // Try standard ISO8601DateFormatter with fractional seconds first
-            if let date = iso8601FormatterWithFractional.date(from: dateString) {
-                return date
-            }
-            
-            // Fallback: try without fractional seconds
-            if let date = iso8601FormatterWithoutFractional.date(from: dateString) {
+            if let date = try? Date(dateString, formatStyle: .iso8601) {
                 return date
             }
             
@@ -90,16 +66,13 @@ extension JSONDecoder {
 }
 
 extension JSONEncoder {
-    /// Create an encoder with ISO 8601 date encoding strategy that includes
-    /// fractional seconds for compatibility with Hue Bridge API.
+    /// Create an encoder with ISO 8601 date encoding strategy using native
+    /// Date.ISO8601FormatStyle for optimal performance.
     static var hueEncoder: JSONEncoder {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .custom { date, encoder in
             var container = encoder.singleValueContainer()
-            let formatter = ISO8601DateFormatter()
-            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            let dateString = formatter.string(from: date)
-            try container.encode(dateString)
+            try container.encode(date.formatString)
         }
         encoder.keyEncodingStrategy = .convertToSnakeCase
         return encoder

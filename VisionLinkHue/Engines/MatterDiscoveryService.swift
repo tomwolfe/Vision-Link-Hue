@@ -63,6 +63,29 @@ final class MatterDiscoveryService: NSObject, @unchecked Sendable {
     
     private let serviceType = "visionlinkhue-matter-discovery"
     
+    private static let peerIDKey = "com.tomwolfe.visionlinkhue.matter-peer-id"
+    
+    private var cachedPeerID: MCPeerID?
+    
+    private func persistentPeerID() -> MCPeerID {
+        if let cachedPeerID {
+            return cachedPeerID
+        }
+        
+        let defaults = UserDefaults.standard
+        if let storedUUID = defaults.string(forKey: Self.peerIDKey),
+           let storedPeerID = MCPeerID(uuidString: storedUUID) {
+            cachedPeerID = storedPeerID
+            return storedPeerID
+        }
+        
+        let newUUID = UUID().uuidString
+        defaults.set(newUUID, forKey: Self.peerIDKey)
+        let newPeerID = MCPeerID(displayName: "Vision-Link-Hue-\(newUUID.prefix(8))")
+        cachedPeerID = newPeerID
+        return newPeerID
+    }
+    
     private var session: MCSession?
     private var browser: MCBrowserViewController?
     private var advertiser: MCAdvertiserAssistant?
@@ -91,7 +114,7 @@ final class MatterDiscoveryService: NSObject, @unchecked Sendable {
             return
         }
         
-        let peerID = MCPeerID(displayName: "Vision-Link-Hue-\(UUID().uuidString.prefix(8))")
+        let peerID = persistentPeerID()
         let session = MCSession(peer: peerID)
         session.delegate = self as? MCSessionDelegate
         self.session = session
