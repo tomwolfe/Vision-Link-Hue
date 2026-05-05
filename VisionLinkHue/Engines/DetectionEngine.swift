@@ -164,7 +164,13 @@ final class DetectionEngine {
     /// device thermal throttling (which forces LiDAR shut-off).
     /// Uses CoreML object detection when available, falling back to
     /// rectangle detection for broader coverage.
-    func processFrame(_ pixelBuffer: CVPixelBuffer, timestamp: TimeInterval) async throws -> [FixtureDetection] {
+    ///
+    /// - Parameters:
+    ///   - pixelBuffer: The camera frame pixel buffer.
+    ///   - timestamp: The frame timestamp.
+    ///   - displayTransform: ARKit's display transform for device-orientation-aware
+    ///     coordinate mapping. When `nil`, defaults to portrait orientation.
+    func processFrame(_ pixelBuffer: CVPixelBuffer, timestamp: TimeInterval, displayTransform: CGAffineTransform? = nil) async throws -> [FixtureDetection] {
         guard isRunning else { return [] }
         
         let now = ContinuousClock.now
@@ -353,21 +359,21 @@ final class DetectionEngine {
     /// Run the hybrid detection pipeline: CoreML object detection first,
     /// with rectangle detection as fallback when CoreML is unavailable
     /// or returns no high-confidence results.
-    private func runHybridDetection(_ pixelBuffer: CVPixelBuffer, lowPower: Bool = false) async throws -> [FixtureDetection] {
+    private func runHybridDetection(_ pixelBuffer: CVPixelBuffer, lowPower: Bool = false, displayTransform: CGAffineTransform) async throws -> [FixtureDetection] {
         let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
         
         var detections: [FixtureDetection] = []
         
         // Phase 1: CoreML object detection for architectural archetypes
         if isObjectDetectionActive, isCoreMLAvailable, isObjectModelLoaded, !lowPower {
-            let objectDetections = try await runObjectDetection(handler: handler, pixelBuffer: pixelBuffer)
+            let objectDetections = try await runObjectDetection(handler: handler, pixelBuffer: pixelBuffer, displayTransform: displayTransform)
             detections.append(contentsOf: objectDetections)
         }
         
         // Phase 2: Rectangle detection as fallback / supplement
         // Always run rectangle detection to catch fixtures not covered by the object model
         // In low-power mode, use reduced confidence threshold to compensate
-        let rectangleDetections = try await runRectangleDetection(handler: handler, lowPower: lowPower)
+        let rectangleDetections = try await runRectangleDetection(handler: handler, lowPower: lowPower, displayTransform: displayTransform)
         
         // Merge detections, prioritizing CoreML results for overlapping regions
         detections = mergeDetections(detections, rectangleDetections: rectangleDetections)
@@ -378,7 +384,8 @@ final class DetectionEngine {
     /// Run CoreML-based object detection for lighting archetypes.
     private func runObjectDetection(
         handler: VNImageRequestHandler,
-        pixelBuffer: CVPixelBuffer
+        pixelBuffer: CVPixelBuffer,
+        displayTransform: CGAffineTransform
     ) async throws -> [FixtureDetection] {
         guard let model = objectDetectionModel else { return [] }
         guard let coreMLRequest = objectDetectionRequest else { return [] }
@@ -412,11 +419,11 @@ final class DetectionEngine {
         // Classify observations using intent classification (CoreML) with
         // heuristic fallback. Intent classification takes priority when
         // CoreML confidence exceeds the override threshold.
-        return await classifyObjects(from: observations)
+        return await classifyObjects(from: observations, displayTransform: displayTransform)
     }
     
     /// Run Vision rectangle detection as fallback.
-    private func runRectangleDetection(handler: VNImageRequestHandler, lowPower: Bool) async throws -> [FixtureDetection] {
+    private func runRectangleDetection(handler: VNImageRequestHandler, lowPower: Bool, displayTransform: CGAffineTransform) async throws -> [FixtureDetection] {
         let request = VNDetectRectanglesRequest()
         // Lower confidence threshold in low-power mode to compensate for reduced accuracy
         request.minimumConfidence = lowPower ? DetectionConstants.rectangleMinimumConfidence * 0.75
@@ -446,7 +453,7 @@ final class DetectionEngine {
             try box.run()
         }).value
         
-        return classifyFixtures(from: observations)
+        return classifyFixtures(from: observations, displayTransform: displayTransform)
     }
     
     /// Merge CoreML object detections with rectangle detections.
@@ -485,17 +492,14 @@ final class DetectionEngine {
     
     /// Classify CoreML object detections into fixture types.
     /// CoreML archetype labels override heuristic classification when confidence is high.
-    private func classifyObjects(from observations: [ObservationData]) async -> [FixtureDetection] {
+    private func classifyObjects(from observations: [ObservationData], displayTransform: CGAffineTransform) async -> [FixtureDetection] {
         var detections: [FixtureDetection] = []
         
         for observation in observations {
             guard observation.boundingBox.minY < DetectionConstants.maxDetectionY else { continue }
             guard observation.boundingBox.width > DetectionConstants.minBoundingBoxSize && observation.boundingBox.height > DetectionConstants.minBoundingBoxSize else { continue }
             
-            let region = NormalizedRect(
-                topLeft: SIMD2<Float>(Float(observation.boundingBox.minX), Float(1.0 - observation.boundingBox.maxY)),
-                bottomRight: SIMD2<Float>(Float(observation.boundingBox.maxX), Float(1.0 - observation.boundingBox.minY))
-            )
+            let region = NormalizedRect(visionBoundingBox: observation.boundingBox, displayTransform: displayTransform)
             
             // Run intent classification via CoreML
             let intentResult = await intentClassifier.classify(observation)
@@ -521,17 +525,14 @@ final class DetectionEngine {
     }
     
     /// Classify detected objects into fixture types using heuristic scoring.
-    private func classifyFixtures(from observations: [ObservationData]) -> [FixtureDetection] {
+    private func classifyFixtures(from observations: [ObservationData], displayTransform: CGAffineTransform) -> [FixtureDetection] {
         var detections: [FixtureDetection] = []
         
         for observation in observations {
             guard observation.boundingBox.minY < DetectionConstants.maxDetectionY else { continue }
             guard observation.boundingBox.width > DetectionConstants.minBoundingBoxSize && observation.boundingBox.height > DetectionConstants.minBoundingBoxSize else { continue }
             
-            let region = NormalizedRect(
-                topLeft: SIMD2<Float>(Float(observation.boundingBox.minX), Float(1.0 - observation.boundingBox.maxY)),
-                bottomRight: SIMD2<Float>(Float(observation.boundingBox.maxX), Float(1.0 - observation.boundingBox.minY))
-            )
+            let region = NormalizedRect(visionBoundingBox: observation.boundingBox, displayTransform: displayTransform)
             
             let type = classifier.classify(typeFrom: observation)
             let confidence = classifier.calculateConfidence(from: observation)

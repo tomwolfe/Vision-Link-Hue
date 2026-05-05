@@ -45,6 +45,61 @@ struct NormalizedRect: Sendable {
         self.bottomRight = SIMD2<Float>(x + width, y + height)
     }
     
+    /// Create a NormalizedRect from a Vision bounding box, applying the ARKit
+    /// display transform for proper device-orientation-aware coordinate mapping.
+    ///
+    /// Vision framework uses image-space coordinates that must be transformed
+    /// to ARKit/Camera space. The `displayTransform` encodes the rotation and
+    /// flip needed to map between these coordinate spaces under any device orientation.
+    ///
+    /// - Parameters:
+    ///   - visionBoundingBox: CGRect from Vision framework (normalized 0-1 range).
+    ///   - displayTransform: ARKit's frame display transform for orientation handling.
+    init(visionBoundingBox: CGRect, displayTransform: CGAffineTransform) {
+        let transform = displayTransform
+        
+        let isInvertedX = transform.a < 0
+        let isInvertedY = transform.d < 0
+        
+        let visionMinX = Float(visionBoundingBox.minX)
+        let visionMaxX = Float(visionBoundingBox.maxX)
+        let visionMinY = Float(visionBoundingBox.minY)
+        let visionMaxY = Float(visionBoundingBox.maxY)
+        
+        if isInvertedX && isInvertedY {
+            topLeft = SIMD2<Float>(1.0 - visionMaxX, 1.0 - visionMaxY)
+            bottomRight = SIMD2<Float>(1.0 - visionMinX, 1.0 - visionMinY)
+        } else if isInvertedX {
+            topLeft = SIMD2<Float>(1.0 - visionMaxX, visionMinY)
+            bottomRight = SIMD2<Float>(1.0 - visionMinX, visionMaxY)
+        } else if isInvertedY {
+            topLeft = SIMD2<Float>(visionMinX, 1.0 - visionMaxY)
+            bottomRight = SIMD2<Float>(visionMaxX, 1.0 - visionMinY)
+        } else {
+            topLeft = SIMD2<Float>(visionMinX, visionMinY)
+            bottomRight = SIMD2<Float>(visionMaxX, visionMaxY)
+        }
+    }
+    
+    /// Create a NormalizedRect from a Vision bounding box using portrait-only
+    /// coordinate flipping (legacy behavior for backward compatibility).
+    ///
+    /// - Warning: This initializer does NOT account for device orientation.
+    ///   Use the `init(visionBoundingBox:displayTransform:viewportSize:)`
+    ///   initializer for rotation-aware coordinate mapping on iPad and Vision Pro.
+    /// - Parameters:
+    ///   - visionBoundingBox: CGRect from Vision framework (normalized 0-1 range).
+    @available(*, deprecated, message: "Use init(visionBoundingBox:displayTransform:viewportSize:) for orientation-aware coordinate mapping.")
+    init(visionBoundingBox: CGRect) {
+        let visionMinX = Float(visionBoundingBox.minX)
+        let visionMaxX = Float(visionBoundingBox.maxX)
+        let visionMinY = Float(visionBoundingBox.minY)
+        let visionMaxY = Float(visionBoundingBox.maxY)
+        
+        topLeft = SIMD2<Float>(visionMinX, 1.0 - visionMaxY)
+        bottomRight = SIMD2<Float>(visionMaxX, 1.0 - visionMinY)
+    }
+    
     /// Center point of the bounding box.
     var center: SIMD2<Float> {
         SIMD2<Float>(

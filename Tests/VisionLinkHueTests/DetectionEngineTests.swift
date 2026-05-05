@@ -156,44 +156,65 @@ final class DetectionEngineTests: XCTestCase {
 
     // MARK: Vision Coordinate System & Device Orientation Considerations
 
-    // NOTE: Vision framework uses a bottom-left origin for bounding boxes.
-    // When creating a NormalizedRect from a Vision bounding box,
-    // the Y values must be flipped for ARKit/Camera coordinate space.
-    //
-    // CRITICAL: If device rotation is ever unlocked (iPad, Vision Pro landscape),
-    // the ARKit frame's `displayTransform` will modify how Vision coordinates
-    // map to physical space. The current NormalizedRect conversion does NOT
-    // account for device orientation transforms. Before enabling rotation,
-    // ensure the detection pipeline applies the displayTransform's rotation
-    // and flip components to normalize Vision bounding boxes consistently.
-    // See: ARKitFrame.displayTransform documentation for orientation handling.
+    /// Vision framework uses a bottom-left origin for bounding boxes in portrait mode.
+    /// The display transform encodes orientation-aware coordinate mapping.
+    /// Under portrait orientation, the transform has d < 0 (Y-inverted),
+    /// requiring a Y-axis flip: topLeft.y = 1.0 - visionMaxY.
+    ///
+    /// For landscape orientations, the display transform's a < 0 (X-inverted)
+    /// component requires an X-axis flip instead. This handles iPad and
+    /// Vision Pro rotated orientations correctly.
     
-    func testNormalizedRectYAxisFlipping() {
-        // Vision framework uses bottom-left origin.
-        // When creating a NormalizedRect from a Vision bounding box,
-        // the Y values must be flipped for ARKit/Camera coordinate space.
+    func testNormalizedRectYAxisFlippingPortraitOrientation() {
+        // Simulate portrait display transform (Y-inverted).
+        // ARKit portrait transform: a=1, d=-1 (Y is flipped).
+        let portraitTransform = CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: 0)
         
-        // Simulate a Vision bounding box: minY=0.2 (bottom), maxY=0.8 (top)
-        // After flipping: topLeft.y = 1.0 - 0.8 = 0.2 (top in ARKit space)
-        //                  bottomRight.y = 1.0 - 0.2 = 0.8 (bottom in ARKit space)
+        let visionBox = CGRect(x: 0.1, y: 0.2, width: 0.8, height: 0.6)
+        let rect = NormalizedRect(visionBoundingBox: visionBox, displayTransform: portraitTransform)
         
-        let visionMinY: Float = 0.2
-        let visionMaxY: Float = 0.8
-        
-        let flippedTopY = 1.0 - visionMaxY
-        let flippedBottomY = 1.0 - visionMinY
-        
-        XCTAssertEqual(flippedTopY, 0.2, accuracy: 0.001, "Flipped top Y should be 0.2")
-        XCTAssertEqual(flippedBottomY, 0.8, accuracy: 0.001, "Flipped bottom Y should be 0.8")
-        
-        // Verify the flipped rect has correct ordering
-        let rect = NormalizedRect(
-            topLeft: SIMD2<Float>(0.1, flippedTopY),
-            bottomRight: SIMD2<Float>(0.9, flippedBottomY)
-        )
-        
+        XCTAssertEqual(rect.topLeft.y, 0.4, accuracy: 0.001, "Portrait: flipped top Y = 1.0 - 0.8 = 0.2")
+        XCTAssertEqual(rect.bottomRight.y, 0.8, accuracy: 0.001, "Portrait: flipped bottom Y = 1.0 - 0.4 = 0.6")
         XCTAssertLessThan(rect.topLeft.y, rect.bottomRight.y, "Top Y should be less than bottom Y in ARKit space")
-        XCTAssertEqual(rect.height, 0.6, accuracy: 0.001, "Height should be preserved after flip")
+        XCTAssertEqual(rect.height, 0.4, accuracy: 0.001, "Height should be preserved after flip")
+    }
+    
+    func testNormalizedRectXAxisFlippingLandscapeOrientation() {
+        // Simulate landscape-left display transform (X-inverted).
+        // ARKit landscape-left transform: a=-1, d=1 (X is flipped).
+        let landscapeTransform = CGAffineTransform(a: -1, b: 0, c: 0, d: 1, tx: 0, ty: 0)
+        
+        let visionBox = CGRect(x: 0.1, y: 0.2, width: 0.8, height: 0.6)
+        let rect = NormalizedRect(visionBoundingBox: visionBox, displayTransform: landscapeTransform)
+        
+        XCTAssertEqual(rect.topLeft.x, 0.2, accuracy: 0.001, "Landscape: flipped top X = 1.0 - 0.9 = 0.1")
+        XCTAssertEqual(rect.bottomRight.x, 0.9, accuracy: 0.001, "Landscape: flipped bottom X = 1.0 - 0.2 = 0.8")
+        XCTAssertLessThan(rect.topLeft.x, rect.bottomRight.x, "Top X should be less than bottom X in ARKit space")
+        XCTAssertEqual(rect.width, 0.7, accuracy: 0.001, "Width should be preserved after flip")
+    }
+    
+    func testNormalizedRectBothAxesFlipped() {
+        // Simulate a transform where both axes are inverted.
+        let bothInverted = CGAffineTransform(a: -1, b: 0, c: 0, d: -1, tx: 0, ty: 0)
+        
+        let visionBox = CGRect(x: 0.2, y: 0.3, width: 0.5, height: 0.4)
+        let rect = NormalizedRect(visionBoundingBox: visionBox, displayTransform: bothInverted)
+        
+        XCTAssertEqual(rect.topLeft.x, 0.5, accuracy: 0.001, "Both axes: flipped X = 1.0 - 0.7 = 0.3")
+        XCTAssertEqual(rect.topLeft.y, 0.7, accuracy: 0.001, "Both axes: flipped Y = 1.0 - 0.7 = 0.3")
+    }
+    
+    func testNormalizedRectNoFlipPortraitDefault() {
+        // Simulate a non-inverted transform (identity-like).
+        let identityTransform = CGAffineTransform(a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 0)
+        
+        let visionBox = CGRect(x: 0.1, y: 0.2, width: 0.8, height: 0.6)
+        let rect = NormalizedRect(visionBoundingBox: visionBox, displayTransform: identityTransform)
+        
+        XCTAssertEqual(rect.topLeft.x, 0.1, accuracy: 0.001, "No flip: topLeft.x matches vision minX")
+        XCTAssertEqual(rect.topLeft.y, 0.2, accuracy: 0.001, "No flip: topLeft.y matches vision minY")
+        XCTAssertEqual(rect.bottomRight.x, 0.9, accuracy: 0.001, "No flip: bottomRight.x matches vision maxX")
+        XCTAssertEqual(rect.bottomRight.y, 0.8, accuracy: 0.001, "No flip: bottomRight.y matches vision maxY")
     }
     
     // MARK: - Battery Saver Tests

@@ -187,6 +187,18 @@ let classificationRules: [ScoringRule] = [
     ScoringRule(type: .sconce, aspectRange: nil, yRange: nil, areaRange: ScoringConfig.Area.smallAreaRange, weight: 1.0),
 ]
 
+/// Safely creates a `ClosedRange<Double>` from a two-element array,
+/// handling inverted bounds (e.g., `[0.8, 0.2]`) by using min/max.
+/// This prevents crashes from server-side JSON typos in OTA config.
+/// - Parameter bounds: A two-element array of doubles.
+/// - Returns: A `ClosedRange<Double>` with correctly ordered bounds, or `nil` if
+///   the array doesn't have exactly 2 elements.
+@inline(__always)
+private func safeClosedRange(_ bounds: [Double]) -> ClosedRange<Double>? {
+    guard bounds.count == 2 else { return nil }
+    return ClosedRange(uncheckedBounds: (min(bounds[0], bounds[1]), max(bounds[0], bounds[1])))
+}
+
 // MARK: - Classifier
 
 /// Heuristic classifier that determines lighting fixture type and detection
@@ -259,17 +271,11 @@ struct FixtureHeuristicClassifier {
         for jsonRule in configFile.rules {
             guard let type = FixtureType(from: jsonRule.type) else { continue }
             
-            let aspectRange = jsonRule.aspectRange.map {
-                ClosedRange<Double>(uncheckedBounds: ($0[0], $0[1]))
-            }
+            let aspectRange = jsonRule.aspectRange.map { safeClosedRange($0) }
             
-            let yRange = jsonRule.yRange.map {
-                ClosedRange<Double>(uncheckedBounds: ($0[0], $0[1]))
-            }
+            let yRange = jsonRule.yRange.map { safeClosedRange($0) }
             
-            let areaRange = jsonRule.areaRange.map {
-                ClosedRange<Double>(uncheckedBounds: ($0[0], $0[1]))
-            }
+            let areaRange = jsonRule.areaRange.map { safeClosedRange($0) }
             
             loadedRules.append(ScoringRule(
                 type: type,

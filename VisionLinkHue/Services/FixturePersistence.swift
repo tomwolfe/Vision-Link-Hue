@@ -700,6 +700,12 @@ actor FixturePersistence {
     /// and rolling back the context after every `batchSize` operations,
     /// avoiding the object identity loss caused by recreating ModelContext.
     ///
+    /// Each operation is wrapped in its own save-and-rollback boundary to ensure
+    /// no data is silently lost. The save persists the changes to the store, and
+    /// the rollback clears the context's change tracker to free memory. This
+    /// guarantees that every operation is durably committed before the context
+    /// is cleared.
+    ///
     /// - Parameters:
     ///   - count: The total number of operations to execute.
     ///   - batchSize: How many operations between each checkpoint.
@@ -708,11 +714,15 @@ actor FixturePersistence {
         var results: [T] = []
         
         for i in 0..<count {
-            let result = try await operation(i)
-            results.append(result)
-            
-            if (i + 1) % batchSize == 0 {
-                await checkpointContext()
+            do {
+                let result = try await operation(i)
+                results.append(result)
+                
+                try modelContext.save()
+                modelContext.rollback()
+            } catch {
+                logger.error("Failed to execute batched operation at index \(i): \(error.localizedDescription)")
+                throw error
             }
         }
         

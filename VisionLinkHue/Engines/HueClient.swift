@@ -120,7 +120,7 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
         self.stateStream = stateStream
         self.discoveryService = HueDiscoveryService()
         self.spatialService = HueSpatialService(stateStream: stateStream)
-        self.matterService = MatterBridgeService()
+        self.matterService = MatterBridgeService(hueClient: self)
         self.onCertificatePinMismatch = { _, _ in }
         setupURLSession()
     }
