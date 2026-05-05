@@ -425,8 +425,9 @@ final class DetectionEngine {
     /// Run Vision rectangle detection as fallback.
     private func runRectangleDetection(handler: VNImageRequestHandler, lowPower: Bool, displayTransform: CGAffineTransform) async throws -> [FixtureDetection] {
         let request = VNDetectRectanglesRequest()
-        // Lower confidence threshold in low-power mode to compensate for reduced accuracy
-        request.minimumConfidence = lowPower ? DetectionConstants.rectangleMinimumConfidence * 0.75
+        // Raise confidence threshold in low-power mode to reduce false-positive bounding boxes
+        // that would increase downstream CPU/GPU load during thermal throttling
+        request.minimumConfidence = lowPower ? DetectionConstants.rectangleMinimumConfidence * 1.25
             : DetectionConstants.rectangleMinimumConfidence
         
         let priority: TaskPriority = lowPower ? .utility : .userInitiated

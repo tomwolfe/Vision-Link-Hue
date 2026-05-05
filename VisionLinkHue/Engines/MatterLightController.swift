@@ -136,6 +136,9 @@ final class DefaultMatterLightController: MatterLightController {
         isReachable = accessory.isReachable
     }
     
+    /// Minimum interval between characteristic writes to prevent flooding Thread network (100ms).
+    private var lastWriteInstant: ContinuousClock.Instant = .now
+    
     func patch(_ patch: MatterLightStatePatch) async throws {
         var characteristics: [HMCharacteristic] = []
         
@@ -153,6 +156,13 @@ final class DefaultMatterLightController: MatterLightController {
         }
         
         guard !characteristics.isEmpty else { return }
+        
+        let debounceInterval = Duration.milliseconds(100)
+        let elapsed = ContinuousClock.now - lastWriteInstant
+        if elapsed < debounceInterval {
+            try await Task.sleep(for: debounceInterval - elapsed)
+        }
+        lastWriteInstant = .now
         
         try await home.performWaitForAccess(characteristics: characteristics) { completion in
             var writeActions: [() -> Void] = []

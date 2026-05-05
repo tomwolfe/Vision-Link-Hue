@@ -10,9 +10,15 @@ public enum QuaternionTransform {
     
     /// Transforms `simd_quatf` into `Data` for storage.
     public static func transform(_ value: simd_quatf) -> Data {
-        withUnsafeBytes(of: value) { bytes in
-            Data(bytes: bytes.baseAddress!, count: quaternionSize)
+        var bytes = Data(count: 16)
+        bytes.withUnsafeMutableBytes { mutableBytes in
+            let ptr = mutableBytes.baseAddress!
+            ptr.assumingMemoryBound(to: Float.self).pointee = value.x
+            ptr.advanced(by: 4).assumingMemoryBound(to: Float.self).pointee = value.y
+            ptr.advanced(by: 8).assumingMemoryBound(to: Float.self).pointee = value.z
+            ptr.advanced(by: 12).assumingMemoryBound(to: Float.self).pointee = value.w
         }
+        return bytes
     }
     
     /// Transforms stored `Data` back into a `simd_quatf`.
@@ -21,8 +27,14 @@ public enum QuaternionTransform {
             return simd_quatf()
         }
         
-        return data.withUnsafeBytes { bytes in
-            bytes.loadUnaligned(as: simd_quatf.self)
+        var x: Float = 0, y: Float = 0, z: Float = 0, w: Float = 0
+        data.withUnsafeBytes { bytes in
+            let ptr = bytes.baseAddress!.assumingMemoryBound(to: Float.self)
+            x = ptr.pointee
+            y = ptr.advanced(by: 1).pointee
+            z = ptr.advanced(by: 2).pointee
+            w = ptr.advanced(by: 3).pointee
         }
+        return simd_quatf(x: x, y: y, z: z, w: w)
     }
 }
