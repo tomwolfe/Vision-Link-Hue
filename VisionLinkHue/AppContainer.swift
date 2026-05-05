@@ -30,7 +30,7 @@ protocol SpatialProjectorFactory {
 }
 
 /// Protocol for creating `ARSessionManager` instances.
-/// Enables dependency injection of mock managers in tests.
+/// Enables dependency injection of mock managers for tests.
 @MainActor
 protocol ARSessionManagerFactory {
     func create(
@@ -41,7 +41,8 @@ protocol ARSessionManagerFactory {
         fixturePersistence: FixturePersistence,
         objectAnchorService: ObjectAnchorPersistenceService,
         clusterEngine: SpatialClusterEngine,
-        detectionSettings: DetectionSettings
+        detectionSettings: DetectionSettings,
+        relocalizationMonitor: RelocalizationMonitoringService
     ) -> ARSessionManager
 }
 
@@ -138,7 +139,8 @@ final class DefaultARSessionManagerFactory: ARSessionManagerFactory {
         fixturePersistence: FixturePersistence,
         objectAnchorService: ObjectAnchorPersistenceService,
         clusterEngine: SpatialClusterEngine,
-        detectionSettings: DetectionSettings
+        detectionSettings: DetectionSettings,
+        relocalizationMonitor: RelocalizationMonitoringService
     ) -> ARSessionManager {
         ARSessionManager(
             detectionEngine: detectionEngine,
@@ -147,9 +149,12 @@ final class DefaultARSessionManagerFactory: ARSessionManagerFactory {
             stateStream: stateStream,
             fixturePersistence: fixturePersistence,
             objectAnchorService: objectAnchorService,
-            clusterEngine: clusterEngine
+            clusterEngine: clusterEngine,
+            detectionSettings: detectionSettings,
+            relocalizationMonitor: relocalizationMonitor
         )
     }
+}
 }
 
 /// Default factory for `MatterBridgeService`.
@@ -187,6 +192,7 @@ final class AppContainer {
     let matterService: MatterBridgeService
     let spatialSyncService: SpatialSyncService
     let detectionSettings: DetectionSettings
+    let relocalizationMonitor: RelocalizationMonitoringService
     
     private let factories: DefaultFactories
     
@@ -197,6 +203,7 @@ final class AppContainer {
         let detectionSettings = DetectionSettings()
         self.detectionSettings = detectionSettings
         let objectAnchorService = ObjectAnchorPersistenceService(detectionSettings: detectionSettings)
+        let relocalizationMonitor = RelocalizationMonitoringService()
         
         // Create dependencies through factories for testability.
         let stream = factories.stateStreamFactory.create(persistence: persistence)
@@ -213,7 +220,8 @@ final class AppContainer {
             fixturePersistence: persistence,
             objectAnchorService: objectAnchorService,
             clusterEngine: clusterEngine,
-            detectionSettings: detectionSettings
+            detectionSettings: detectionSettings,
+            relocalizationMonitor: relocalizationMonitor
         )
         
         // Wire up calibration persistence to the spatial service's engine
@@ -233,5 +241,6 @@ final class AppContainer {
         self.spatialProjector = projector
         self.matterService = matterService
         self.spatialSyncService = spatialSyncService
+        self.relocalizationMonitor = relocalizationMonitor
     }
 }

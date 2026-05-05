@@ -55,6 +55,10 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
     /// Isolates high-frequency network events from the MainActor.
     private let eventStream = HueEventStreamActor()
     
+    /// Observer for app lifecycle notifications (background/foreground).
+    /// Used to pause/resume the SSE stream based on app state.
+    private var lifecycleObserver: NSObjectProtocol?
+    
     /// Configure the SSE event stream behavior.
     func configureEventStream(_ configuration: HueEventStreamActor.Configuration) {
         Task { await self.eventStream.configure(configuration) }
@@ -63,6 +67,36 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
     /// Get the current SSE connection health metrics.
     func eventStreamHealthMetrics() async -> HueEventStreamActor.SSEConnectionHealthMetrics {
         await self.eventStream.healthMetrics()
+    }
+    
+    /// Register app lifecycle observers to pause/resume SSE stream.
+    /// Called once at app launch to handle background/foreground transitions.
+    func registerLifecycleObservers() {
+        let notificationCenter = NotificationCenter.default
+        
+        lifecycleObserver = notificationCenter.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { [weak self] in
+                await self?.eventStream.pause()
+            }
+        }
+        
+        notificationCenter.addObserver(
+            forName: UIApplication.willEnterForegroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { [weak self] in
+                await self?.eventStream.resume()
+                // Restart event stream if it was connected when paused
+                if self?.apiKey != nil, self?.bridgeIP != nil {
+                    self?.startEventStream()
+                }
+            }
+        }
     }
     
     /// State stream publisher.

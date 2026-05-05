@@ -9,6 +9,13 @@ import SwiftUI
 @main
 struct VisionLinkHueApp: App {
     
+    init() {
+        // Register app lifecycle observers for SSE stream pause/resume.
+        // This ensures the SSE stream is paused when the app enters the
+        // background and resumed when it returns to the foreground.
+        AppContainer.shared.hueClient.registerLifecycleObservers()
+    }
+    
     var body: some Scene {
         WindowGroup {
             ContentView()

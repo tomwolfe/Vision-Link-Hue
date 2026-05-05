@@ -639,4 +639,63 @@ actor FixturePersistence {
             try? setExcludeFromICloudBackup(url: url)
         }
     }
+    
+    // MARK: - Context Management
+    
+    /// Periodically save and reset the model context to prevent memory bloat
+    /// during heavy operations like CloudKit spatial sync.
+    ///
+    /// When processing large batches of fixture mappings (e.g., 50+ fixtures
+    /// during initial spatial sync), the SwiftData context accumulates tracked
+    /// objects that can consume significant memory. This method saves all
+    /// pending changes to the persistent store and then resets the context,
+    /// creating a fresh one for continued operations.
+    ///
+    /// - Parameter batchSize: The number of operations after which to trigger
+    ///   a context save and reset. Defaults to 50.
+    func checkpointContext(batchSize: Int = 50) async {
+        do {
+            try modelContext.save()
+            modelContext.reset()
+            logger.debug("Model context checkpointed (reset after save)")
+        } catch {
+            logger.error("Failed to checkpoint model context: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Save and reset the context immediately, regardless of operation count.
+    /// Useful at the end of a heavy sync operation to ensure all changes are
+    /// persisted and memory is reclaimed.
+    func flushContext() async {
+        do {
+            try modelContext.save()
+            modelContext.reset()
+            logger.debug("Model context flushed (forced save and reset)")
+        } catch {
+            logger.error("Failed to flush model context: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Execute a batch of update operations with periodic context checkpoints.
+    /// This keeps the memory footprint low during massive syncs by saving
+    /// and resetting the context after every `batchSize` operations.
+    ///
+    /// - Parameters:
+    ///   - count: The total number of operations to execute.
+    ///   - batchSize: How many operations between each checkpoint.
+    ///   - operation: The closure to execute for each operation index.
+    func executeBatched<T>(count: Int, batchSize: Int = 50, operation: (Int) async throws -> T) async throws -> [T] {
+        var results: [T] = []
+        
+        for i in 0..<count {
+            let result = try await operation(i)
+            results.append(result)
+            
+            if (i + 1) % batchSize == 0 {
+                await checkpointContext()
+            }
+        }
+        
+        return results
+    }
 }

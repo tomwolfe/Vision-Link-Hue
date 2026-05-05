@@ -578,9 +578,32 @@ final class SpatialCalibrationEngine {
     /// Gram-Schmidt re-orthogonalization corrects these issues with minimal
     /// computational cost.
     ///
+    /// ## NaN Guard
+    ///
+    /// Before normalizing the first column, the length is checked against a
+    /// minimum threshold (`1e-6`). If the column length is effectively zero
+    /// (which can occur from a highly degenerate covariance matrix despite
+    /// the `det(HTH)` check), the function returns the identity matrix to
+    /// prevent NaN from poisoning the transformation.
+    ///
     /// - Parameter M: A 3×3 matrix with approximately orthogonal columns.
-    /// - Returns: A strictly orthogonal 3×3 rotation matrix.
+    /// - Returns: A strictly orthogonal 3×3 rotation matrix, or identity
+    ///   if the input is degenerate.
     private func orthogonalize(_ M: simd_float3x3) -> simd_float3x3 {
+        let col0Length = simd_length(M.columns.0)
+        guard col0Length > 1e-6 else {
+            logger.warning(
+                "Gram-Schmidt orthogonalization: first column length \(col0Length) is effectively zero. " +
+                "Returning identity matrix to prevent NaN propagation. " +
+                "This may indicate a degenerate covariance matrix from collinear calibration points."
+            )
+            return simd_float3x3(
+                SIMD3<Float>(1, 0, 0),
+                SIMD3<Float>(0, 1, 0),
+                SIMD3<Float>(0, 0, 1)
+            )
+        }
+        
         let c0 = normalize(M.columns.0)
         var c1 = M.columns.1 - c0 * dot(c0, M.columns.1)
         c1 = normalize(c1)

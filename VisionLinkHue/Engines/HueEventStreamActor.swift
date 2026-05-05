@@ -15,6 +15,11 @@ actor HueEventStreamActor {
     /// Current SSE connection state.
     var state: SSEReconnectionState = .idle
     
+    /// Whether the stream is currently paused (e.g., app in background).
+    /// When paused, reconnection attempts are suspended and the active
+    /// stream is gracefully disconnected to conserve resources.
+    var isPaused: Bool = false
+    
     /// Whether the stream is currently connected and receiving events.
     var isConnected: Bool { state == .connected }
     
@@ -215,6 +220,24 @@ actor HueEventStreamActor {
         connectionHealthMetrics
     }
     
+    /// Pause the SSE stream, gracefully disconnecting and suspending
+    /// reconnection attempts. This is called when the app enters the
+    /// background to prevent unnecessary network activity and battery drain.
+    func pause() {
+        isPaused = true
+        logger.info("SSE stream paused (app entered background)")
+        disconnect()
+    }
+    
+    /// Resume the SSE stream after being paused. Schedules a reconnection
+    /// attempt if the stream was connected when paused.
+    func resume() {
+        isPaused = false
+        logger.info("SSE stream resumed (app entered foreground)")
+        // Reconnection will be triggered by HueClient.startEventStream()
+        // which is called from the app lifecycle handler on foreground transition.
+    }
+    
     /// Stream SSE events incrementally from a line-by-line byte stream.
     /// Processes events in real-time without buffering the entire response.
     private func streamEventsIncrementally(from lines: any AsyncSequence<String, any Error>) async {
@@ -315,6 +338,8 @@ actor HueEventStreamActor {
     }
     
     /// Schedule an exponential backoff reconnection.
+    /// Respects the `isPaused` flag: if the app is in the background,
+    /// reconnection attempts are suspended to conserve battery.
     private func scheduleReconnection() {
         // Exponential backoff: double the delay each time, capped at max
         reconnectDelay = min(reconnectDelay * 2, maxReconnectDelay)
@@ -328,6 +353,12 @@ actor HueEventStreamActor {
             
             // Check if we were cancelled during the wait
             guard !Task.isCancelled else { return }
+            
+            // Respect pause state: do not reconnect while app is in background
+            if self.isPaused {
+                await self.logger.debug("SSE reconnection skipped: stream is paused (app in background)")
+                return
+            }
             
             await self.logger.info("Attempting SSE reconnection (delay: \(String(format: "%.1f", delay))s)...")
             

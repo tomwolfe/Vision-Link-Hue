@@ -101,6 +101,7 @@ final class ARSessionManager {
     private let objectAnchorService: ObjectAnchorPersistenceService
     private let clusterEngine: SpatialClusterEngine
     private let detectionSettings: DetectionSettings
+    private let relocalizationMonitor: RelocalizationMonitoringService
     
     private var arView: ARView?
     private var anchorEntity: AnchorEntity?
@@ -138,7 +139,8 @@ final class ARSessionManager {
         relocalizationGuide: RelocalizationGuide = RelocalizationGuide(),
         objectAnchorService: ObjectAnchorPersistenceService = ObjectAnchorPersistenceService(),
         clusterEngine: SpatialClusterEngine = SpatialClusterEngine(),
-        detectionSettings: DetectionSettings = DetectionSettings()
+        detectionSettings: DetectionSettings = DetectionSettings(),
+        relocalizationMonitor: RelocalizationMonitoringService = RelocalizationMonitoringService()
     ) {
         self.detectionEngine = detectionEngine
         self.spatialProjector = spatialProjector
@@ -151,6 +153,7 @@ final class ARSessionManager {
         self.objectAnchorService = objectAnchorService
         self.clusterEngine = clusterEngine
         self.detectionSettings = detectionSettings
+        self.relocalizationMonitor = relocalizationMonitor
         
         clusterEngine.onClustersChange = { [weak self] _ in
             self?.stateStream.clusters = self?.clusterEngine.clusters ?? []
@@ -227,6 +230,10 @@ final class ARSessionManager {
         isRelocalizing = true
         relocalizationState = .relocalizing(progress: 0.0)
         logger.info("Attempting relocalization with saved world map")
+        
+        // Record ARWorldMap relocalization attempt for monitoring.
+        relocalizationMonitor.recordWorldMapAttempt()
+        let worldMapStartTime = ContinuousClock.now
         
         // Configure session with the saved world map for initial pose
         let config = arView.session.configuration
@@ -312,10 +319,14 @@ final class ARSessionManager {
             }
             
             if let frame = frame, frame.camera.trackingState == .normal {
+                let elapsed = ContinuousClock.now - worldMapStartTime
+                let elapsedSeconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
+                
                 await MainActor.run {
                     self.isRelocalizing = false
                     self.relocalizationState = .relocalized
                     self.relocalizationProgress = 1.0
+                    self.relocalizationMonitor.recordWorldMapSuccess(elapsedTime: elapsedSeconds)
                 }
                 logger.info("Relocalization successful")
                 worldMapCaptureTask?.cancel()
@@ -338,6 +349,7 @@ final class ARSessionManager {
                         self.relocalizationState = .failed
                     }
                     self.relocalizationProgress = 0.0
+                    self.relocalizationMonitor.recordWorldMapFailure()
                 }
                 logger.warning("Relocalization timed out")
                 worldMapCaptureTask?.cancel()
@@ -358,6 +370,7 @@ final class ARSessionManager {
         let checkInterval = Duration.milliseconds(500)
         let timeout = Duration.seconds(12)
         let startTime = ContinuousClock.now
+        var foundMatch = false
         
         while !Task.isCancelled {
             let elapsed = ContinuousClock.now - startTime
@@ -384,11 +397,26 @@ final class ARSessionManager {
                 }
                 
                 if objectAnchorService.isRelocalized {
+                    foundMatch = true
                     break
                 }
             }
             
             try? await Task.sleep(for: checkInterval)
+        }
+        
+        // Record ObjectAnchor relocalization metrics
+        let elapsed = ContinuousClock.now - startTime
+        let elapsedSeconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
+        
+        if foundMatch {
+            await MainActor.run {
+                self.relocalizationMonitor.recordObjectAnchorSuccess(elapsedTime: elapsedSeconds)
+            }
+        } else {
+            await MainActor.run {
+                self.relocalizationMonitor.recordObjectAnchorFailure()
+            }
         }
     }
     
