@@ -656,7 +656,6 @@ actor FixturePersistence {
     func checkpointContext(batchSize: Int = 50) async {
         do {
             try modelContext.save()
-            modelContext.reset()
             logger.debug("Model context checkpointed (reset after save)")
         } catch {
             logger.error("Failed to checkpoint model context: \(error.localizedDescription)")
@@ -669,7 +668,6 @@ actor FixturePersistence {
     func flushContext() async {
         do {
             try modelContext.save()
-            modelContext.reset()
             logger.debug("Model context flushed (forced save and reset)")
         } catch {
             logger.error("Failed to flush model context: \(error.localizedDescription)")

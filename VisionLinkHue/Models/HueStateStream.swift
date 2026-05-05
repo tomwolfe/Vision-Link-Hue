@@ -377,9 +377,7 @@ final class HueStateStream {
                 sortedArray[existingIndex] = item
             } else {
                 // Insert new entry maintaining sorted order
-                let insertIndex = sortedArray.lowerBound(
-                    by: { $0[keyPath: keyPath] < id }
-                )
+                let insertIndex = sortedArray.firstIndex(where: { $0[keyPath: keyPath] >= id }) ?? sortedArray.count
                 sortedArray.insert(item, at: insertIndex)
             }
         }

@@ -113,7 +113,7 @@ struct QuadrantDensities: Sendable {
         guard total > 0 else { return 0.0 }
         
         var entropy: Float = 0.0
-        let densities: [Float] = (values.0, values.1, values.2, values.3)
+        let densities: [Float] = [values.0, values.1, values.2, values.3]
         for density in densities {
             let probability = density / total
             guard probability > 0 else { continue }
@@ -258,7 +258,7 @@ final class RelocalizationGuide {
         // If tracking is normal or limited to localization, no guidance needed.
         let trackingState = frame.camera.trackingState
         switch trackingState {
-        case .normal, .limited:
+        case .normal, .limited, .notAvailable:
             return .none
         @unknown default:
             return .none

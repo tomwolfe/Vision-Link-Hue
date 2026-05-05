@@ -92,18 +92,14 @@ final class RelocalizationMonitoringService {
     func recordWorldMapSuccess(elapsedTime: TimeInterval) {
         worldMapSuccesses += 1
         worldMapTotalTime += elapsedTime
-        logger.info(
-            "ARWorldMap relocalization succeeded in \(String(format: "%.1f", elapsedTime))s " +
-            "(total: \(worldMapSuccesses)/\(worldMapAttempts), rate: \(String(format: "%.1f", worldMapSuccessRate * 100))%)"
-        )
+        let msg = "ARWorldMap relocalization succeeded in \(String(format: "%.1f", elapsedTime))s (total: \(worldMapSuccesses)/\(worldMapAttempts), rate: \(String(format: "%.1f", worldMapSuccessRate * 100))%)"
+        logger.info("\(msg)")
     }
     
     /// Record a failed ARWorldMap relocalization attempt.
     func recordWorldMapFailure() {
-        logger.info(
-            "ARWorldMap relocalization failed " +
-            "(total: \(worldMapSuccesses)/\(worldMapAttempts), rate: \(String(format: "%.1f", worldMapSuccessRate * 100))%)"
-        )
+        let msg = "ARWorldMap relocalization failed (total: \(worldMapSuccesses)/\(worldMapAttempts), rate: \(String(format: "%.1f", worldMapSuccessRate * 100))%)"
+        logger.info("\(msg)")
     }
     
     /// Record an ObjectAnchor relocalization attempt.
@@ -115,22 +111,19 @@ final class RelocalizationMonitoringService {
     func recordObjectAnchorSuccess(elapsedTime: TimeInterval) {
         objectAnchorSuccesses += 1
         objectAnchorTotalTime += elapsedTime
-        logger.info(
-            "ObjectAnchor relocalization succeeded in \(String(format: "%.1f", elapsedTime))s " +
-            "(total: \(objectAnchorSuccesses)/\(objectAnchorAttempts), rate: \(String(format: "%.1f", objectAnchorSuccessRate * 100))%)"
-        )
+        let msg = "ObjectAnchor relocalization succeeded in \(String(format: "%.1f", elapsedTime))s (total: \(objectAnchorSuccesses)/\(objectAnchorAttempts), rate: \(String(format: "%.1f", objectAnchorSuccessRate * 100))%)"
+        logger.info("\(msg)")
     }
     
     /// Record a failed ObjectAnchor relocalization attempt.
     func recordObjectAnchorFailure() {
-        logger.info(
-            "ObjectAnchor relocalization failed " +
-            "(total: \(objectAnchorSuccesses)/\(objectAnchorAttempts), rate: \(String(format: "%.1f", objectAnchorSuccessRate * 100))%)"
-        )
+        let msg = "ObjectAnchor relocalization failed (total: \(objectAnchorSuccesses)/\(objectAnchorAttempts), rate: \(String(format: "%.1f", objectAnchorSuccessRate * 100))%)"
+        logger.info("\(msg)")
     }
     
     /// Log the current metrics summary.
     func logSummary() {
-        logger.info(summary)
+        let msg = summary
+        logger.info("\(msg)")
     }
 }

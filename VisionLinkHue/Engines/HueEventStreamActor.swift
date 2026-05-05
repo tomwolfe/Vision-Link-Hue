@@ -355,7 +355,7 @@ actor HueEventStreamActor {
             guard !Task.isCancelled else { return }
             
             // Respect pause state: do not reconnect while app is in background
-            if self.isPaused {
+            if await self.isPaused {
                 await self.logger.debug("SSE reconnection skipped: stream is paused (app in background)")
                 return
             }

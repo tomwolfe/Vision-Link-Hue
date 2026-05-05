@@ -3,6 +3,7 @@ import Network
 import os
 import simd
 import CommonCrypto
+import UIKit
 #if canImport(Darwin)
 import Darwin
 #endif
@@ -92,8 +93,8 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
             Task { [weak self] in
                 await self?.eventStream.resume()
                 // Restart event stream if it was connected when paused
-                if self?.apiKey != nil, self?.bridgeIP != nil {
-                    self?.startEventStream()
+                if let self, await self.apiKey != nil, await self.bridgeIP != nil {
+                    await self.startEventStream()
                 }
             }
         }

@@ -155,7 +155,6 @@ final class DefaultARSessionManagerFactory: ARSessionManagerFactory {
         )
     }
 }
-}
 
 /// Default factory for `MatterBridgeService`.
 @MainActor

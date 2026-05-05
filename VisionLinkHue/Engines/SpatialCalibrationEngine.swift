@@ -593,9 +593,7 @@ final class SpatialCalibrationEngine {
         let col0Length = simd_length(M.columns.0)
         guard col0Length > 1e-6 else {
             logger.warning(
-                "Gram-Schmidt orthogonalization: first column length \(col0Length) is effectively zero. " +
-                "Returning identity matrix to prevent NaN propagation. " +
-                "This may indicate a degenerate covariance matrix from collinear calibration points."
+                "Gram-Schmidt orthogonalization: first column length \(col0Length) is effectively zero. Returning identity matrix to prevent NaN propagation. This may indicate a degenerate covariance matrix from collinear calibration points."
             )
             return simd_float3x3(
                 SIMD3<Float>(1, 0, 0),

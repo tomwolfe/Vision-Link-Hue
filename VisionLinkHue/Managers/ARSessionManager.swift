@@ -74,6 +74,8 @@ final class ARSessionManager {
     var frameTimestamp: TimeInterval = 0
     var trackingState: ARTrackingState = .notAvailable
     var worldMapAvailable: Bool = false
+    
+    private var worldMapStartTime: ContinuousClock.Instant?
     var trackedFixtures: [TrackedFixture] = []
     
     /// Whether the session is currently relocalizing against a saved world map.
@@ -233,7 +235,7 @@ final class ARSessionManager {
         
         // Record ARWorldMap relocalization attempt for monitoring.
         relocalizationMonitor.recordWorldMapAttempt()
-        let worldMapStartTime = ContinuousClock.now
+        worldMapStartTime = ContinuousClock.now
         
         // Configure session with the saved world map for initial pose
         let config = arView.session.configuration
@@ -318,8 +320,8 @@ final class ARSessionManager {
                 lastGuidanceUpdate = .now
             }
             
-            if let frame = frame, frame.camera.trackingState == .normal {
-                let elapsed = ContinuousClock.now - worldMapStartTime
+            if let frame = frame, frame.camera.trackingState == .normal, let startTime = worldMapStartTime {
+                let elapsed = ContinuousClock.now - startTime
                 let elapsedSeconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
                 
                 await MainActor.run {
