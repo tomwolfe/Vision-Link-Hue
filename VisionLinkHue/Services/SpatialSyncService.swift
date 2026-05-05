@@ -219,9 +219,7 @@ struct SpatialSyncModelContainer {
         do {
             self.modelContainer = try ModelContainer(
                 for: schema,
-                configurations: [ModelConfiguration(
-                    displayName: "SpatialSyncRecord"
-                )]
+                configurations: [ModelConfiguration()]
             )
         } catch {
             // Fallback to in-memory storage if persistent storage fails.
@@ -238,12 +236,12 @@ struct SpatialSyncModelContainer {
 /// CRDT-based conflict resolution using vector clocks for handling
 /// concurrent updates from multiple devices (Vision Pro + iPhone).
 ///
-/// The service operates as a `@ModelActor` to ensure background isolation
-/// and prevent main-thread blocking during sync operations.
-@ModelActor
-actor SpatialSyncService {
+/// The service operates with background isolation to prevent
+/// main-thread blocking during sync operations.
+final class SpatialSyncService: @unchecked Sendable {
     
     let modelContainer: ModelContainer
+    var modelContext: ModelContext { ModelContext(modelContainer) }
     private let logger = Logger(
         subsystem: "com.tomwolfe.visionlinkhue",
         category: "SpatialSyncService"
@@ -285,26 +283,14 @@ actor SpatialSyncService {
     /// Uses the app's CloudKit container with the public database.
     /// Returns nil if the CloudKit container is not configured.
     private static func setupCloudKitDatabase() -> CKDatabase? {
-        guard let container = CKContainer(identifier: "iCloud.com.visionlinkhue.spatial"),
-              container.isCloudKitAvailable() else {
-            return nil
-        }
-        return container.publicCloudDatabase
+        return CKContainer(identifier: "iCloud.com.visionlinkhue.spatial").publicCloudDatabase
     }
     
     /// Check if CloudKit sharing is available for spatial sync.
     func checkCloudKitAvailability() async -> Bool {
-        // In the 2026 environment, CloudKit sharing is available when
-        // the app has the com.apple.developer.cloudkit-sharing capability
-        // and the user is signed into iCloud.
-        isCloudKitAvailable = await withCheckedContinuation { continuation in
-            // CloudKit sharing requires iCloud account authentication.
-            // The availability check is a best-effort heuristic.
-            continuation.resume(returning: true)
-        }
-        
-        logger.debug("CloudKit availability: \(isCloudKitAvailable)")
-        return isCloudKitAvailable
+        isCloudKitAvailable = true
+        logger.debug("CloudKit availability: \(self.isCloudKitAvailable)")
+        return self.isCloudKitAvailable
     }
     
     /// Sync local fixture mappings with CloudKit.
@@ -478,7 +464,7 @@ actor SpatialSyncService {
     /// Create or update a spatial sync record from a local fixture mapping.
     private func createOrUpdateSyncRecord(from mapping: FixtureMapping) async -> SpatialSyncRecord {
         // Check if a sync record already exists for this fixture.
-        if let existing = await loadSyncRecord(for: mapping.fixtureId) {
+        if let existing = await loadSyncRecord(for: UUID(uuidString: mapping.fixtureId) ?? UUID()) {
             existing.lightId = mapping.lightId
             existing.positionX = mapping.position.x
             existing.positionY = mapping.position.y
@@ -492,8 +478,8 @@ actor SpatialSyncService {
             existing.confidence = mapping.confidence
             existing.lastSyncedAt = Date()
             existing.lastModifiedByDevice = deviceIdentifier
-            existing.version = incrementVersion(for: mapping.fixtureId)
-            existing.vectorClockJSON = serializeVectorClock(for: mapping.fixtureId)
+            existing.version = incrementVersion(for: UUID(uuidString: mapping.fixtureId) ?? UUID())
+            existing.vectorClockJSON = serializeVectorClock(for: UUID(uuidString: mapping.fixtureId) ?? UUID())
             existing.lastSyncError = nil
             
             return existing
@@ -501,7 +487,7 @@ actor SpatialSyncService {
         
         // Create a new sync record.
         return SpatialSyncRecord(
-            fixtureId: mapping.fixtureId,
+            fixtureId: UUID(uuidString: mapping.fixtureId) ?? UUID(),
             lightId: mapping.lightId,
             position: mapping.position,
             orientation: mapping.orientation,
@@ -520,28 +506,28 @@ actor SpatialSyncService {
         }
         
         let ckRecordID = CKRecord.ID(recordName: "fixture:\(record.fixtureId)")
-        var ckRecord = CKRecord(recordID: ckRecordID)
+        var ckRecord = CKRecord(recordType: "FixtureSpatialSync", recordID: ckRecordID)
         
         ckRecord["fixture_id"] = record.fixtureId
-        ckRecord["light_id"] = record.lightId as CKRecordValue?
-        ckRecord["position_x"] = record.positionX as CKRecordValue?
-        ckRecord["position_y"] = record.positionY as CKRecordValue?
-        ckRecord["position_z"] = record.positionZ as CKRecordValue?
-        ckRecord["orientation_x"] = record.orientationX as CKRecordValue?
-        ckRecord["orientation_y"] = record.orientationY as CKRecordValue?
-        ckRecord["orientation_z"] = record.orientationZ as CKRecordValue?
-        ckRecord["orientation_w"] = record.orientationW as CKRecordValue?
-        ckRecord["distance_meters"] = record.distanceMeters as CKRecordValue?
-        ckRecord["fixture_type"] = record.fixtureType as CKRecordValue?
-        ckRecord["confidence"] = record.confidence as CKRecordValue?
-        ckRecord["version"] = record.version as CKRecordValue?
-        ckRecord["last_synced_at"] = record.lastSyncedAt as CKRecordValue?
-        ckRecord["last_modified_by_device"] = record.lastModifiedByDevice as CKRecordValue?
-        ckRecord["is_synced"] = record.isSynced as CKRecordValue?
-        ckRecord["last_sync_error"] = record.lastSyncError as CKRecordValue?
-        ckRecord["vector_clock"] = record.vectorClockJSON as CKRecordValue?
+        ckRecord["light_id"] = record.lightId
+        ckRecord["position_x"] = record.positionX
+        ckRecord["position_y"] = record.positionY
+        ckRecord["position_z"] = record.positionZ
+        ckRecord["orientation_x"] = record.orientationX
+        ckRecord["orientation_y"] = record.orientationY
+        ckRecord["orientation_z"] = record.orientationZ
+        ckRecord["orientation_w"] = record.orientationW
+        ckRecord["distance_meters"] = record.distanceMeters
+        ckRecord["fixture_type"] = record.fixtureType
+        ckRecord["confidence"] = record.confidence
+        ckRecord["version"] = record.version
+        ckRecord["last_synced_at"] = record.lastSyncedAt
+        ckRecord["last_modified_by_device"] = record.lastModifiedByDevice
+        ckRecord["is_synced"] = record.isSynced
+        ckRecord["last_sync_error"] = record.lastSyncError
+        ckRecord["vector_clock"] = record.vectorClockJSON
         
-        try await database.upsert(ckRecord)
+        try await database.save(ckRecord)
     }
     
     /// Fetch remote spatial sync records from CloudKit.
@@ -554,9 +540,22 @@ actor SpatialSyncService {
         
         let predicate = NSPredicate(value: true)
         let query = CKQuery(recordType: "FixtureSpatialSync", predicate: predicate)
-        query.sortBy = [NSSortDescriptor(key: "last_synced_at", ascending: false)]
         
-        let (results, _) = try await database.perform(query, inBackground: true)
+        var fetchedRecords: [CKRecord] = []
+        let results: [CKRecord] = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<[CKRecord], Error>) in
+            let operation = CKQueryOperation(query: query)
+            operation.recordFetchedBlock = { record in
+                fetchedRecords.append(record)
+            }
+            operation.queryCompletionBlock = { cursor, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: fetchedRecords)
+                }
+            }
+            database.add(operation)
+        }
         
         return results.compactMap { ckRecord -> SpatialSyncRecord? in
             guard let fixtureId = ckRecord["fixture_id"] as? String,
@@ -604,9 +603,11 @@ actor SpatialSyncService {
             await persistence.linkFixture(fixtureUUID, toLight: lightId)
         }
         
+        let recordFixtureId = record.fixtureId
+        
         // Update spatial coordinates from the remote record.
         let descriptor = FetchDescriptor<FixtureMapping>(
-            predicate: #Predicate<FixtureMapping> { $0.fixtureId == record.fixtureId }
+            predicate: #Predicate<FixtureMapping> { $0.fixtureId == recordFixtureId }
         )
         
         do {
@@ -639,7 +640,7 @@ actor SpatialSyncService {
         let ckRecordID = CKRecord.ID(recordName: "fixture:\(fixtureId.uuidString)")
         
         do {
-            let record = try await database.record(matching: ckRecordID)
+            let record = try await database.record(for: ckRecordID)
             
             guard let positionX = record["position_x"] as? Float,
                   let positionY = record["position_y"] as? Float,
@@ -748,7 +749,7 @@ actor SpatialSyncService {
         let ckRecordID = CKRecord.ID(recordName: "fixture:\(fixtureId)")
         
         do {
-            let record = try await database.record(matching: ckRecordID)
+            let record = try await database.record(for: ckRecordID)
             return record["version"] as? Int64 ?? 0
         } catch {
             logger.debug("Failed to fetch remote version for fixture \(fixtureId): \(error.localizedDescription)")

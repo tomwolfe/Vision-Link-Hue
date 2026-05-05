@@ -29,9 +29,11 @@ enum KeychainError: Error, LocalizedError {
 /// Trust-On-First-Use (TOFU) pinning.
 /// All operations are async to avoid blocking the calling thread,
 /// satisfying Swift 6.1 strict-concurrency requirements.
-actor KeychainManager {
+final class KeychainManager: @unchecked Sendable {
     
     static let shared = KeychainManager()
+    
+    private let queue = DispatchQueue(label: "com.tomwolfe.visionlinkhue.keychain")
     
     /// Save a certificate pin hash to the Keychain.
     /// - Parameters:
@@ -39,16 +41,18 @@ actor KeychainManager {
     ///   - hash: The SHA-256 hash of the certificate's public key.
     /// - Throws: `KeychainError.addFailed` if the operation fails.
     func saveCertPin(to keychainKey: String, hash: Data) async throws {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassKey,
-            kSecAttrService as String: KeychainKeys.service,
-            kSecAttrAccount as String: keychainKey,
-            kSecValueData as String: hash,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
-        ]
-        SecItemDelete(query as CFDictionary)
-        guard SecItemAdd(query as CFDictionary, nil) == errSecSuccess else {
-            throw KeychainError.addFailed
+        try await queue.sync {
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassKey,
+                kSecAttrService as String: KeychainKeys.service,
+                kSecAttrAccount as String: keychainKey,
+                kSecValueData as String: hash,
+                kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+            ]
+            SecItemDelete(query as CFDictionary)
+            guard SecItemAdd(query as CFDictionary, nil) == errSecSuccess else {
+                throw KeychainError.addFailed
+            }
         }
     }
     
@@ -56,29 +60,33 @@ actor KeychainManager {
     /// - Parameter keychainKey: The account key for this bridge's pin.
     /// - Returns: The stored hash, or `nil` if not found.
     func loadCertPin(from keychainKey: String) async throws -> Data? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassKey,
-            kSecAttrService as String: KeychainKeys.service,
-            kSecAttrAccount as String: keychainKey,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
-        var result: AnyObject?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess else {
-            return nil
+        try await queue.sync {
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassKey,
+                kSecAttrService as String: KeychainKeys.service,
+                kSecAttrAccount as String: keychainKey,
+                kSecReturnData as String: true,
+                kSecMatchLimit as String: kSecMatchLimitOne,
+            ]
+            var result: AnyObject?
+            guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess else {
+                return nil
+            }
+            return result as? Data
         }
-        return result as? Data
     }
     
     /// Delete a certificate pin hash from the Keychain.
     /// - Parameter keychainKey: The account key for this bridge's pin.
     func deleteCertPin(from keychainKey: String) async {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassKey,
-            kSecAttrService as String: KeychainKeys.service,
-            kSecAttrAccount as String: keychainKey,
-        ]
-        SecItemDelete(query as CFDictionary)
+        await queue.sync {
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassKey,
+                kSecAttrService as String: KeychainKeys.service,
+                kSecAttrAccount as String: keychainKey,
+            ]
+            SecItemDelete(query as CFDictionary)
+        }
     }
     
     // MARK: - ECDSA Keychain Operations
@@ -129,5 +137,62 @@ actor KeychainManager {
             kSecAttrAccount as String: keyID,
         ]
         SecItemDelete(query as CFDictionary)
+    }
+    
+    // MARK: - Generic Keychain Operations
+    
+    /// Save an arbitrary Data item to the Keychain.
+    /// - Parameters:
+    ///   - data: The Data to store.
+    ///   - forKey: The account key for this item.
+    /// - Throws: `KeychainError.addFailed` if the operation fails.
+    func setItem(_ data: Data, forKey key: String) async throws {
+        try await queue.sync {
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassKey,
+                kSecAttrService as String: KeychainKeys.service,
+                kSecAttrAccount as String: key,
+                kSecValueData as String: data,
+                kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+            ]
+            SecItemDelete(query as CFDictionary)
+            guard SecItemAdd(query as CFDictionary, nil) == errSecSuccess else {
+                throw KeychainError.addFailed
+            }
+        }
+    }
+    
+    /// Load an arbitrary Data item from the Keychain.
+    /// - Parameter key: The account key for this item.
+    /// - Returns: The stored Data, or `nil` if not found.
+    /// - Throws: `KeychainError.queryFailed` if the query fails unexpectedly.
+    func getItem(forKey key: String) async throws -> Data? {
+        try await queue.sync {
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassKey,
+                kSecAttrService as String: KeychainKeys.service,
+                kSecAttrAccount as String: key,
+                kSecReturnData as String: true,
+                kSecMatchLimit as String: kSecMatchLimitOne,
+            ]
+            var result: AnyObject?
+            guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess else {
+                return nil
+            }
+            return result as? Data
+        }
+    }
+    
+    /// Delete an arbitrary Data item from the Keychain.
+    /// - Parameter key: The account key for this item.
+    func removeItem(forKey key: String) async {
+        await queue.sync {
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassKey,
+                kSecAttrService as String: KeychainKeys.service,
+                kSecAttrAccount as String: key,
+            ]
+            SecItemDelete(query as CFDictionary)
+        }
     }
 }

@@ -88,14 +88,14 @@ final class SpatialClusterEngine {
     
     /// Initialize with a configurable cluster radius.
     /// - Parameter clusterRadiusMeters: Distance threshold for grouping fixtures.
-    init(clusterRadiusMeters: Float = Self.defaultClusterRadius) {
+    init(clusterRadiusMeters: Float = 1.5) {
         self.clusterRadiusMeters = clusterRadiusMeters
     }
     
     /// Configure the engine with tracked fixtures for clustering.
     /// - Parameter fixtures: Array of tracked fixtures to cluster.
     func configure(trackedFixtures: [TrackedFixture]) {
-        self.trackedFixtures = fixtures
+        self.trackedFixtures = trackedFixtures
         computeClusters()
     }
     
@@ -111,7 +111,7 @@ final class SpatialClusterEngine {
         
         if newClusters.count != clusters.count {
             logger.info(
-                "Clustered \(trackedFixtures.count) fixtures into \(newClusters.count) cluster(s) (radius: \(String(format: "%.1f", clusterRadiusMeters))m)"
+                "Clustered \(self.trackedFixtures.count) fixtures into \(newClusters.count) cluster(s) (radius: \(String(format: "%.1f", self.clusterRadiusMeters))m)"
             )
         }
         

@@ -4,14 +4,15 @@ import Foundation
 /// Allows the `SpatialCalibrationEngine` to save and restore calibration
 /// across app launches without being tightly coupled to a specific
 /// storage mechanism.
+/// Represents persisted calibration data.
 @MainActor
-protocol SpatialCalibrationPersistenceStore {
-    
-    /// Represents persisted calibration data.
-    struct CalibrationData {
-        let rotationData: Data
-        let translationData: Data
-    }
+public struct CalibrationData {
+    public let rotationData: Data
+    public let translationData: Data
+}
+
+@MainActor
+protocol SpatialCalibrationPersistenceStore: AnyObject {
     
     /// Load previously saved calibration data.
     /// Returns `nil` if no calibration has been persisted.

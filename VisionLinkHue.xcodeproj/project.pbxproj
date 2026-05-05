@@ -7,54 +7,87 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		"'C3NC1PROT01'" = {isa = PBXBuildFile; fileRef = E5NC1PROT01; };
 		0AC7C10CE6B0DC77312C87ED /* FixtureMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E5E8EEB1B69F992D330E955 /* FixtureMapping.swift */; };
-		A1B2C3D4E5F6A7B8C9D0E1F2 /* AppContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E1D0C9B8A7F6E5D4C3B2A1 /* AppContainer.swift */; };
-		B2C3D4E5F6A7B8C9D0E1F2A3 /* NeuralSurfaceMaterialClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3F2E1D0C9B8A7F6E5D4C3B2 /* NeuralSurfaceMaterialClassifier.swift */; };
-		C3D4E5F6A7B8C9D0E1F2A3B4 /* ThermalMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4A3F2E1D0C9B8A7F6E5D4C3 /* ThermalMonitor.swift */; };
-		C4D5E6F7A8B9C0D1E2F3A4B5 /* ThermalPredictiveModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5A4F3E2D1C0B9A8F7E6D5C4 /* ThermalPredictiveModel.swift */; };
 		11B44BA2FD7378C702D08504 /* SpatialProjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27CF45B419A50697200CF344 /* SpatialProjector.swift */; };
+		12D34CD4AFC3BEBF529B494D /* ObjectAnchorPersistenceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4194FABB4F5BA74AF732B29 /* ObjectAnchorPersistenceService.swift */; };
+		15AD48E4AD7D45123A2B5266 /* SpatialInputHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 748149FDA211D1B05A7D22ED /* SpatialInputHandler.swift */; };
 		17FE64294D6E1CF17EAC0579 /* HueStateStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BD4020BBE9F66E6C7A12BF4 /* HueStateStream.swift */; };
 		181096DD07FCC8886791A171 /* classification_rules.json in Resources */ = {isa = PBXBuildFile; fileRef = 3AFA647508BF564F9F9FA5F6 /* classification_rules.json */; };
 		23BAF78E0C0819A4C9FEC78F /* FixturePersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCCF3CBE0E6613D3E9DF0DFB /* FixturePersistence.swift */; };
+		260B4759A2BD587307767D2D /* SpatialSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0178429CAC775E2C8C7A0B95 /* SpatialSyncService.swift */; };
+		27454846B6DE46187C30A1D5 /* RelocalizationGuide.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC454CA7B6A5149A7B89D531 /* RelocalizationGuide.swift */; };
 		29BA3BD4BA9E48D3E85CF905 /* SpatialProjectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 705489F3F2BF68688FA1975B /* SpatialProjectorTests.swift */; };
+		2D87475F882021338E6F4A44 /* MatterBridgeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01F143B19299DD8EDCAB9442 /* MatterBridgeService.swift */; };
 		32CF656269CE2229B491F8DB /* BridgeDiscoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E443EB84995113663DCA191 /* BridgeDiscoveryView.swift */; };
 		338734094F83463E10A63B48 /* CalibrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1421575C5E9232F749767E85 /* CalibrationTests.swift */; };
+		34BA463DA59CB9A273717CE6 /* HueNetworkClientProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40C7424C9BA82F41360A00A0 /* HueNetworkClientProtocol.swift */; };
 		3765CCE937030AAF783682C8 /* HueControlPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77C3C0947E5619E680836273 /* HueControlPanel.swift */; };
+		3B9E42A9A75506BE25018B4B /* DetectionSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F75E4830A079BC549E341A69 /* DetectionSettings.swift */; };
+		3F934154B5E11232742C1626 /* MatterModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D324D5694CD24A23E08B78A /* MatterModels.swift */; };
+		41D448968ADF7514CD77C62A /* MatterBridgeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01F143B19299DD8EDCAB9442 /* MatterBridgeService.swift */; };
+		4CA486D86DFB4B2F94020CE5314EA28C /* HueSpatialService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409760E1ED34400A85795D8E6212A466 /* HueSpatialService.swift */; };
 		4E8D4846FAB8B6DC24F909B5 /* CertificatePinningDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A58A999810DADAC4665355D9 /* CertificatePinningDelegate.swift */; };
-		7EFF0F0C087C4B79B8E8331E6AEC7CBA /* CameraConfigurationProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AE827F3F80A4A03AC7CD7CF99B2A900 /* CameraConfigurationProvider.swift */; };
 		4EBD8F5E9DC7711DC5B9505A /* SpatialMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A04FE47AED193FE58A7AC30 /* SpatialMath.swift */; };
+		4F4F4F288400C0FC0EBC6FF5 /* ManualPlacementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57DF40C3B954A38AF5B4ED02 /* ManualPlacementView.swift */; };
 		532949754C9D06A1539ABF00 /* SpatialCalibrationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = E47BA61F9090C83D7B16D92D /* SpatialCalibrationEngine.swift */; };
+		5630423E9CF4C60890FE6B79 /* ClusterReticle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14854422B037C9371E92956F /* ClusterReticle.swift */; };
+		58AC40DCA4F95E08C6C43F06 /* RelocalizationGuide.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC454CA7B6A5149A7B89D531 /* RelocalizationGuide.swift */; };
 		6007944BF9ABED62B06E5F4F /* HueClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38F7EE4EE247B64F3F5EA4A9 /* HueClient.swift */; };
+		610A4ED5B826513FE6F94352 /* ClusterReticle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14854422B037C9371E92956F /* ClusterReticle.swift */; };
 		641D1BC8A6308149CC1A7ACC /* VisionLinkHueApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42E513DE585187B5BC0098AA /* VisionLinkHueApp.swift */; };
+		69184BFCAE467E6CECFE4EE5 /* SpatialSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0178429CAC775E2C8C7A0B95 /* SpatialSyncService.swift */; };
+		6C684CEBAC979E9740152E02 /* HueNetworkClientProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40C7424C9BA82F41360A00A0 /* HueNetworkClientProtocol.swift */; };
 		6F8832B09A2529FF44500541 /* FixtureHeuristicClassifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 788CFC6CAFD604FC2DE4DF7A /* FixtureHeuristicClassifierTests.swift */; };
 		7335AB60C3C527C53294FAD3 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0B2F9CD762C0B9580DDD3AD /* ContentView.swift */; };
 		73AC28EA9E04D8AAEFB51CC4 /* FixtureHeuristicClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F602CDBD2A936AAA555F9B8 /* FixtureHeuristicClassifier.swift */; };
 		7E56506D8990A271C15C25CE /* FixtureReticle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98E97358C8FE198BCF090646 /* FixtureReticle.swift */; };
+		7EFF0F0C087C4B79B8E8331E6AEC7CBA /* CameraConfigurationProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AE827F3F80A4A03AC7CD7CF99B2A900 /* CameraConfigurationProvider.swift */; };
 		828E5F737EDCD2FA4D368DAE /* LiquidGlassHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20229124698A9076EB0AC0B5 /* LiquidGlassHUD.swift */; };
+		83324065B794D916FF50E48B /* FixtureIntentClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA6444F486089D99817ACF5B /* FixtureIntentClassifier.swift */; };
+		89B54C03ACAD1A8CEA6C83CE /* ManualPlacementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57DF40C3B954A38AF5B4ED02 /* ManualPlacementView.swift */; };
+		8A6F428FABC5440FA01805E6 /* SpatialCalibrationPersistenceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 034F42239FDD3C5093E0FA42 /* SpatialCalibrationPersistenceStore.swift */; };
+		8C3E459DBA68F2EEA0AD7A1B /* ObjectAnchorPersistenceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4194FABB4F5BA74AF732B29 /* ObjectAnchorPersistenceService.swift */; };
+		9070455D92D0D1B1AE99CA09 /* FixtureIntentClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA6444F486089D99817ACF5B /* FixtureIntentClassifier.swift */; };
 		93733C0DBB56E68BEA6BA70C /* FixtureModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE3AF9C2519C92FD05483887 /* FixtureModels.swift */; };
 		94786EF9EBC77ECF7FD7E7AA /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B4136600B738D9973D35B21 /* Constants.swift */; };
+		973646CF9B651FB2F659DA7F /* MatterLightController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 621E437EA7690144C3F54C4E /* MatterLightController.swift */; };
+		9AB7433D8A5FB6C121C24D6A /* DetectionSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F75E4830A079BC549E341A69 /* DetectionSettings.swift */; };
+		A0D1470E8942C0E25084AF85 /* SpatialClusterEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 423340619734605E2C27377E /* SpatialClusterEngine.swift */; };
+		A1B2C3D4E5F6A7B8C9D0E1F2 /* AppContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E1D0C9B8A7F6E5D4C3B2A1 /* AppContainer.swift */; };
 		A419B6FCA9A50F54908E3943 /* DetectionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2EB75B6F6438D47B0DC3518 /* DetectionEngine.swift */; };
+		A7BB4C25AA7F0FE7B3DE2526 /* GestureManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD744276AB1CB23053A319EA /* GestureManager.swift */; };
+		A8413737CF974EAC832F59807427206B /* HueDiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D157B71FB99429D860AC749CC433F05 /* HueDiscoveryService.swift */; };
+		ABB8496E96456BBFD7B9AFB8 /* MatterModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D324D5694CD24A23E08B78A /* MatterModels.swift */; };
+		AD71452DBFAD67C213A916C5 /* GestureManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD744276AB1CB23053A319EA /* GestureManager.swift */; };
 		ADA2735170B0F5910CFF8F59 /* DetectionEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49DA178056BF1F365DB4D2C5 /* DetectionEngineTests.swift */; };
 		B093D1DB4970EFA16ACA4B4F /* ScenePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FEED54E9BED2EDF0DDAF8EE /* ScenePickerView.swift */; };
 		B0FD97156859E176C54B288F /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C7CFE88E1083C9D9ADC6DE6 /* KeychainManager.swift */; };
+		B2C3D4E5F6A7B8C9D0E1F2A3 /* NeuralSurfaceMaterialClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3F2E1D0C9B8A7F6E5D4C3B2 /* NeuralSurfaceMaterialClassifier.swift */; };
 		BD1754EB51AAA94D737475F2 /* MockHueClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20436443E97ED90C6AA2852D /* MockHueClient.swift */; };
 		C35A9803FA2101A929F1E93E /* SpatialMathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF9FF5ED8521E57492B18C2B /* SpatialMathTests.swift */; };
+		C3D4E5F6A7B8C9D0E1F2A3B4 /* ThermalMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4A3F2E1D0C9B8A7F6E5D4C3 /* ThermalMonitor.swift */; };
 		C3F32E9354AB32F1879F2789 /* HueClientProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA918F1B394BBC49BD3E7292 /* HueClientProtocol.swift */; };
-		C3NC1PROT01 /* HueNetworkClientProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5NC1PROT01 /* HueNetworkClientProtocol.swift */; };
+		C48343A280E3C9B065BD5B27 /* KeychainCalibrationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF1943829FDA421A53C16611 /* KeychainCalibrationStore.swift */; };
+		C4D5E6F7A8B9C0D1E2F3A4B5 /* ThermalPredictiveModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5A4F3E2D1C0B9A8F7E6D5C4 /* ThermalPredictiveModel.swift */; };
+		C6114449B6BAFFCDB771CE4C /* MatterDiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC7496FA9633EFCAB5867C2 /* MatterDiscoveryService.swift */; };
 		CBB5FDACB767159363B36302 /* ARSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0038078F889E45E668262CA4 /* ARSessionManager.swift */; };
 		CD92A32B79565AAB54CD28C7 /* HueModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 265706314D8CA066D282077E /* HueModels.swift */; };
+		CF7441A2B9172BF6B1585DD3 /* SpatialCalibrationPersistenceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 034F42239FDD3C5093E0FA42 /* SpatialCalibrationPersistenceStore.swift */; };
+		CFEA486F88944105BDF727D6 /* SpatialClusterEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 423340619734605E2C27377E /* SpatialClusterEngine.swift */; };
 		D1493CA94B784A5627A4D4CC /* ARViewContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63D52FBF9BEA54F3BB00A0A2 /* ARViewContainer.swift */; };
+		D3404EC0ADAE0CFB076EB871 /* SpatialInputHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 748149FDA211D1B05A7D22ED /* SpatialInputHandler.swift */; };
 		DE8E12A879EC29E57D360BE2 /* SceneRecallButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = F43270D560C1B1CD820C485C /* SceneRecallButton.swift */; };
 		E022D466C4C4BF2014F6D6D8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C3773D6FD40A1D0C05AB37AA /* Assets.xcassets */; };
 		E2BD477639C1EA188179A645 /* ViewAttachmentComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FBE4ED0D7F289735CA52155 /* ViewAttachmentComponents.swift */; };
 		E3A0D9831BB808C6CB4B3C52 /* QuaternionAttributeTransformer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D342A7DCA82DC0F175310AAD /* QuaternionAttributeTransformer.swift */; };
 		E4B5C6D7E8F9A0B1C2D3E4F5 /* ECDSASignatureValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6C7D8E9F0A1B2C3D4E5F6A7 /* ECDSASignatureValidator.swift */; };
+		E78445C8AEE355897F2FD37C /* MatterLightController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 621E437EA7690144C3F54C4E /* MatterLightController.swift */; };
+		E8A243EEA515D6C9CDD755F9 /* KeychainCalibrationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF1943829FDA421A53C16611 /* KeychainCalibrationStore.swift */; };
 		F4CCEC981BB611E0E3D7812D /* HueEventStreamActor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A3088B6BD175CE1AE5D13D /* HueEventStreamActor.swift */; };
 		F897E4F964A89C76FB832BAD /* HUDOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08E7992EF63FE19E26EE84A9 /* HUDOverlay.swift */; };
 		FEA584A66F891C2B0F182DEE /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F9DCCC892C073529129A8F7 /* Extensions.swift */; };
-		A8413737CF974EAC832F59807427206B /* HueDiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D157B71FB99429D860AC749CC433F05 /* HueDiscoveryService.swift */; };
-		4CA486D86DFB4B2F94020CE5314EA28C /* HueSpatialService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409760E1ED34400A85795D8E6212A466 /* HueSpatialService.swift */; };
-
+		FFAD42D0B059D3A7EFC0E1A8 /* MatterDiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC7496FA9633EFCAB5867C2 /* MatterDiscoveryService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -68,58 +101,74 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		"'E5NC1PROT01'" = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueNetworkClientProtocol.swift; sourceTree = "<group>"; };
 		0038078F889E45E668262CA4 /* ARSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARSessionManager.swift; sourceTree = "<group>"; };
+		0178429CAC775E2C8C7A0B95 /* SpatialSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SpatialSyncService.swift; path = VisionLinkHue/Services/SpatialSyncService.swift; sourceTree = SOURCE_ROOT; };
+		01F143B19299DD8EDCAB9442 /* MatterBridgeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MatterBridgeService.swift; path = VisionLinkHue/Engines/MatterBridgeService.swift; sourceTree = SOURCE_ROOT; };
+		034F42239FDD3C5093E0FA42 /* SpatialCalibrationPersistenceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SpatialCalibrationPersistenceStore.swift; path = VisionLinkHue/Engines/SpatialCalibrationPersistenceStore.swift; sourceTree = SOURCE_ROOT; };
 		08E7992EF63FE19E26EE84A9 /* HUDOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HUDOverlay.swift; sourceTree = "<group>"; };
 		097909EFE4C98C127134A567 /* VisionLinkHue.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VisionLinkHue.entitlements; sourceTree = "<group>"; };
 		1421575C5E9232F749767E85 /* CalibrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibrationTests.swift; sourceTree = "<group>"; };
+		14854422B037C9371E92956F /* ClusterReticle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ClusterReticle.swift; path = VisionLinkHue/Views/ClusterReticle.swift; sourceTree = SOURCE_ROOT; };
 		20229124698A9076EB0AC0B5 /* LiquidGlassHUD.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidGlassHUD.swift; sourceTree = "<group>"; };
 		20436443E97ED90C6AA2852D /* MockHueClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockHueClient.swift; sourceTree = "<group>"; };
 		265706314D8CA066D282077E /* HueModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueModels.swift; sourceTree = "<group>"; };
 		27CF45B419A50697200CF344 /* SpatialProjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialProjector.swift; sourceTree = "<group>"; };
+		2D324D5694CD24A23E08B78A /* MatterModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MatterModels.swift; path = VisionLinkHue/Models/MatterModels.swift; sourceTree = SOURCE_ROOT; };
 		2FEED54E9BED2EDF0DDAF8EE /* ScenePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenePickerView.swift; sourceTree = "<group>"; };
 		38F7EE4EE247B64F3F5EA4A9 /* HueClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueClient.swift; sourceTree = "<group>"; };
 		3AFA647508BF564F9F9FA5F6 /* classification_rules.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = classification_rules.json; sourceTree = "<group>"; };
 		3F9DCCC892C073529129A8F7 /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
-		4D157B71FB99429D860AC749CC433F05 /* HueDiscoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueDiscoveryService.swift; sourceTree = "<group>"; };
 		409760E1ED34400A85795D8E6212A466 /* HueSpatialService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueSpatialService.swift; sourceTree = "<group>"; };
-
+		40C7424C9BA82F41360A00A0 /* HueNetworkClientProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HueNetworkClientProtocol.swift; path = VisionLinkHue/Protocols/HueNetworkClientProtocol.swift; sourceTree = SOURCE_ROOT; };
+		423340619734605E2C27377E /* SpatialClusterEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SpatialClusterEngine.swift; path = VisionLinkHue/Engines/SpatialClusterEngine.swift; sourceTree = SOURCE_ROOT; };
 		42E513DE585187B5BC0098AA /* VisionLinkHueApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisionLinkHueApp.swift; sourceTree = "<group>"; };
 		49DA178056BF1F365DB4D2C5 /* DetectionEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectionEngineTests.swift; sourceTree = "<group>"; };
+		4D157B71FB99429D860AC749CC433F05 /* HueDiscoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueDiscoveryService.swift; sourceTree = "<group>"; };
+		57DF40C3B954A38AF5B4ED02 /* ManualPlacementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ManualPlacementView.swift; path = VisionLinkHue/Views/ManualPlacementView.swift; sourceTree = SOURCE_ROOT; };
+		621E437EA7690144C3F54C4E /* MatterLightController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MatterLightController.swift; path = VisionLinkHue/Engines/MatterLightController.swift; sourceTree = SOURCE_ROOT; };
 		63D52FBF9BEA54F3BB00A0A2 /* ARViewContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARViewContainer.swift; sourceTree = "<group>"; };
+		6AE827F3F80A4A03AC7CD7CF99B2A900 /* CameraConfigurationProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraConfigurationProvider.swift; sourceTree = "<group>"; };
 		6B4136600B738D9973D35B21 /* Constants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Constants.swift; sourceTree = "<group>"; };
 		6E443EB84995113663DCA191 /* BridgeDiscoveryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeDiscoveryView.swift; sourceTree = "<group>"; };
 		6F602CDBD2A936AAA555F9B8 /* FixtureHeuristicClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureHeuristicClassifier.swift; sourceTree = "<group>"; };
 		6FBE4ED0D7F289735CA52155 /* ViewAttachmentComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewAttachmentComponents.swift; sourceTree = "<group>"; };
 		705489F3F2BF68688FA1975B /* SpatialProjectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialProjectorTests.swift; sourceTree = "<group>"; };
+		748149FDA211D1B05A7D22ED /* SpatialInputHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SpatialInputHandler.swift; path = VisionLinkHue/Managers/SpatialInputHandler.swift; sourceTree = SOURCE_ROOT; };
 		77C3C0947E5619E680836273 /* HueControlPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueControlPanel.swift; sourceTree = "<group>"; };
 		788CFC6CAFD604FC2DE4DF7A /* FixtureHeuristicClassifierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureHeuristicClassifierTests.swift; sourceTree = "<group>"; };
 		7BD4020BBE9F66E6C7A12BF4 /* HueStateStream.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueStateStream.swift; sourceTree = "<group>"; };
 		8C7CFE88E1083C9D9ADC6DE6 /* KeychainManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainManager.swift; sourceTree = "<group>"; };
+		8DC7496FA9633EFCAB5867C2 /* MatterDiscoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MatterDiscoveryService.swift; path = VisionLinkHue/Engines/MatterDiscoveryService.swift; sourceTree = SOURCE_ROOT; };
 		98E97358C8FE198BCF090646 /* FixtureReticle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureReticle.swift; sourceTree = "<group>"; };
-		6AE827F3F80A4A03AC7CD7CF99B2A900 /* CameraConfigurationProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraConfigurationProvider.swift; sourceTree = "<group>"; };
 		9A04FE47AED193FE58A7AC30 /* SpatialMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialMath.swift; sourceTree = "<group>"; };
 		9E5E8EEB1B69F992D330E955 /* FixtureMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureMapping.swift; sourceTree = "<group>"; };
 		A3F2E1D0C9B8A7F6E5D4C3B2 /* NeuralSurfaceMaterialClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NeuralSurfaceMaterialClassifier.swift; sourceTree = "<group>"; };
 		A58A999810DADAC4665355D9 /* CertificatePinningDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertificatePinningDelegate.swift; sourceTree = "<group>"; };
+		AC454CA7B6A5149A7B89D531 /* RelocalizationGuide.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RelocalizationGuide.swift; path = VisionLinkHue/Services/RelocalizationGuide.swift; sourceTree = SOURCE_ROOT; };
+		B1A3088B6BD175CE1AE5D13D /* HueEventStreamActor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueEventStreamActor.swift; sourceTree = "<group>"; };
 		B4A3F2E1D0C9B8A7F6E5D4C3 /* ThermalMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThermalMonitor.swift; sourceTree = "<group>"; };
 		B5A4F3E2D1C0B9A8F7E6D5C4 /* ThermalPredictiveModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThermalPredictiveModel.swift; sourceTree = "<group>"; };
-		B1A3088B6BD175CE1AE5D13D /* HueEventStreamActor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueEventStreamActor.swift; sourceTree = "<group>"; };
+		B6C7D8E9F0A1B2C3D4E5F6A7 /* ECDSASignatureValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ECDSASignatureValidator.swift; sourceTree = "<group>"; };
 		B6CC7C6072CFA6D940C3DBA3 /* VisionLinkHueTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VisionLinkHueTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C3773D6FD40A1D0C05AB37AA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		CD744276AB1CB23053A319EA /* GestureManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = GestureManager.swift; path = VisionLinkHue/Managers/GestureManager.swift; sourceTree = SOURCE_ROOT; };
 		CE3AF9C2519C92FD05483887 /* FixtureModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureModels.swift; sourceTree = "<group>"; };
 		D2EB75B6F6438D47B0DC3518 /* DetectionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectionEngine.swift; sourceTree = "<group>"; };
 		D342A7DCA82DC0F175310AAD /* QuaternionAttributeTransformer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuaternionAttributeTransformer.swift; sourceTree = "<group>"; };
-		B6C7D8E9F0A1B2C3D4E5F6A7 /* ECDSASignatureValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ECDSASignatureValidator.swift; sourceTree = "<group>"; };
 		D7A6864D4800313E5E637629 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		DA6444F486089D99817ACF5B /* FixtureIntentClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = FixtureIntentClassifier.swift; path = VisionLinkHue/Engines/FixtureIntentClassifier.swift; sourceTree = SOURCE_ROOT; };
 		DA918F1B394BBC49BD3E7292 /* HueClientProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueClientProtocol.swift; sourceTree = "<group>"; };
-		E5NC1PROT01 /* HueNetworkClientProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueNetworkClientProtocol.swift; sourceTree = "<group>"; };
 		DAFFF1902C936FFC20B66AAD /* VisionLinkHue.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VisionLinkHue.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DCCF3CBE0E6613D3E9DF0DFB /* FixturePersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixturePersistence.swift; sourceTree = "<group>"; };
 		DF9FF5ED8521E57492B18C2B /* SpatialMathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialMathTests.swift; sourceTree = "<group>"; };
 		E47BA61F9090C83D7B16D92D /* SpatialCalibrationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialCalibrationEngine.swift; sourceTree = "<group>"; };
 		F0B2F9CD762C0B9580DDD3AD /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		F2E1D0C9B8A7F6E5D4C3B2A1 /* AppContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppContainer.swift; sourceTree = "<group>"; };
+		F4194FABB4F5BA74AF732B29 /* ObjectAnchorPersistenceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ObjectAnchorPersistenceService.swift; path = VisionLinkHue/Services/ObjectAnchorPersistenceService.swift; sourceTree = SOURCE_ROOT; };
 		F43270D560C1B1CD820C485C /* SceneRecallButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneRecallButton.swift; sourceTree = "<group>"; };
+		F75E4830A079BC549E341A69 /* DetectionSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DetectionSettings.swift; path = VisionLinkHue/Models/DetectionSettings.swift; sourceTree = SOURCE_ROOT; };
+		FF1943829FDA421A53C16611 /* KeychainCalibrationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = KeychainCalibrationStore.swift; path = VisionLinkHue/Engines/KeychainCalibrationStore.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -242,6 +291,23 @@
 				D7A6864D4800313E5E637629 /* Info.plist */,
 				097909EFE4C98C127134A567 /* VisionLinkHue.entitlements */,
 				35BEC28BAA1762B791F5B167 /* Products */,
+				DA6444F486089D99817ACF5B /* FixtureIntentClassifier.swift */,
+				F75E4830A079BC549E341A69 /* DetectionSettings.swift */,
+				2D324D5694CD24A23E08B78A /* MatterModels.swift */,
+				423340619734605E2C27377E /* SpatialClusterEngine.swift */,
+				621E437EA7690144C3F54C4E /* MatterLightController.swift */,
+				FF1943829FDA421A53C16611 /* KeychainCalibrationStore.swift */,
+				034F42239FDD3C5093E0FA42 /* SpatialCalibrationPersistenceStore.swift */,
+				8DC7496FA9633EFCAB5867C2 /* MatterDiscoveryService.swift */,
+				01F143B19299DD8EDCAB9442 /* MatterBridgeService.swift */,
+				14854422B037C9371E92956F /* ClusterReticle.swift */,
+				57DF40C3B954A38AF5B4ED02 /* ManualPlacementView.swift */,
+				AC454CA7B6A5149A7B89D531 /* RelocalizationGuide.swift */,
+				F4194FABB4F5BA74AF732B29 /* ObjectAnchorPersistenceService.swift */,
+				0178429CAC775E2C8C7A0B95 /* SpatialSyncService.swift */,
+				748149FDA211D1B05A7D22ED /* SpatialInputHandler.swift */,
+				CD744276AB1CB23053A319EA /* GestureManager.swift */,
+				40C7424C9BA82F41360A00A0 /* HueNetworkClientProtocol.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -257,7 +323,7 @@
 			isa = PBXGroup;
 			children = (
 				DA918F1B394BBC49BD3E7292 /* HueClientProtocol.swift */,
-				E5NC1PROT01 /* HueNetworkClientProtocol.swift */,
+				E5NC1PROT01,
 			);
 			path = Protocols;
 			sourceTree = "<group>";
@@ -368,6 +434,23 @@
 				BD1754EB51AAA94D737475F2 /* MockHueClient.swift in Sources */,
 				C35A9803FA2101A929F1E93E /* SpatialMathTests.swift in Sources */,
 				29BA3BD4BA9E48D3E85CF905 /* SpatialProjectorTests.swift in Sources */,
+				9070455D92D0D1B1AE99CA09 /* FixtureIntentClassifier.swift in Sources */,
+				9AB7433D8A5FB6C121C24D6A /* DetectionSettings.swift in Sources */,
+				3F934154B5E11232742C1626 /* MatterModels.swift in Sources */,
+				CFEA486F88944105BDF727D6 /* SpatialClusterEngine.swift in Sources */,
+				E78445C8AEE355897F2FD37C /* MatterLightController.swift in Sources */,
+				E8A243EEA515D6C9CDD755F9 /* KeychainCalibrationStore.swift in Sources */,
+				CF7441A2B9172BF6B1585DD3 /* SpatialCalibrationPersistenceStore.swift in Sources */,
+				C6114449B6BAFFCDB771CE4C /* MatterDiscoveryService.swift in Sources */,
+				2D87475F882021338E6F4A44 /* MatterBridgeService.swift in Sources */,
+				5630423E9CF4C60890FE6B79 /* ClusterReticle.swift in Sources */,
+				89B54C03ACAD1A8CEA6C83CE /* ManualPlacementView.swift in Sources */,
+				27454846B6DE46187C30A1D5 /* RelocalizationGuide.swift in Sources */,
+				12D34CD4AFC3BEBF529B494D /* ObjectAnchorPersistenceService.swift in Sources */,
+				260B4759A2BD587307767D2D /* SpatialSyncService.swift in Sources */,
+				15AD48E4AD7D45123A2B5266 /* SpatialInputHandler.swift in Sources */,
+				AD71452DBFAD67C213A916C5 /* GestureManager.swift in Sources */,
+				34BA463DA59CB9A273717CE6 /* HueNetworkClientProtocol.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -393,7 +476,7 @@
 				F897E4F964A89C76FB832BAD /* HUDOverlay.swift in Sources */,
 				6007944BF9ABED62B06E5F4F /* HueClient.swift in Sources */,
 				C3F32E9354AB32F1879F2789 /* HueClientProtocol.swift in Sources */,
-				C3NC1PROT01 /* HueNetworkClientProtocol.swift in Sources */,
+				C3NC1PROT01,
 				3765CCE937030AAF783682C8 /* HueControlPanel.swift in Sources */,
 				F4CCEC981BB611E0E3D7812D /* HueEventStreamActor.swift in Sources */,
 				CD92A32B79565AAB54CD28C7 /* HueModels.swift in Sources */,
@@ -414,6 +497,23 @@
 				641D1BC8A6308149CC1A7ACC /* VisionLinkHueApp.swift in Sources */,
 				A8413737CF974EAC832F59807427206B /* HueDiscoveryService.swift in Sources */,
 				4CA486D86DFB4B2F94020CE5314EA28C /* HueSpatialService.swift in Sources */,
+				83324065B794D916FF50E48B /* FixtureIntentClassifier.swift in Sources */,
+				3B9E42A9A75506BE25018B4B /* DetectionSettings.swift in Sources */,
+				ABB8496E96456BBFD7B9AFB8 /* MatterModels.swift in Sources */,
+				A0D1470E8942C0E25084AF85 /* SpatialClusterEngine.swift in Sources */,
+				973646CF9B651FB2F659DA7F /* MatterLightController.swift in Sources */,
+				C48343A280E3C9B065BD5B27 /* KeychainCalibrationStore.swift in Sources */,
+				8A6F428FABC5440FA01805E6 /* SpatialCalibrationPersistenceStore.swift in Sources */,
+				FFAD42D0B059D3A7EFC0E1A8 /* MatterDiscoveryService.swift in Sources */,
+				41D448968ADF7514CD77C62A /* MatterBridgeService.swift in Sources */,
+				610A4ED5B826513FE6F94352 /* ClusterReticle.swift in Sources */,
+				4F4F4F288400C0FC0EBC6FF5 /* ManualPlacementView.swift in Sources */,
+				58AC40DCA4F95E08C6C43F06 /* RelocalizationGuide.swift in Sources */,
+				8C3E459DBA68F2EEA0AD7A1B /* ObjectAnchorPersistenceService.swift in Sources */,
+				69184BFCAE467E6CECFE4EE5 /* SpatialSyncService.swift in Sources */,
+				D3404EC0ADAE0CFB076EB871 /* SpatialInputHandler.swift in Sources */,
+				A7BB4C25AA7F0FE7B3DE2526 /* GestureManager.swift in Sources */,
+				6C684CEBAC979E9740152E02 /* HueNetworkClientProtocol.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -79,8 +79,6 @@ enum DetectionConstants {
     public static let defaultFallbackDistanceMeters: Float = 2.0
     public static let defaultFallbackConfidence: Double = 0.5
     
-    private static var _spatialConfig: SpatialConfigData?
-    
     public struct SpatialConfigData: Sendable {
         public let raycastProjectionConfidence: Double
         public let depthProjectionConfidence: Double
@@ -89,16 +87,22 @@ enum DetectionConstants {
         public let fallbackConfidence: Double
     }
     
+    private final class SpatialConfigHolder: @unchecked Sendable {
+        var config: SpatialConfigData? = nil
+    }
+    
+    private static let spatialConfigHolder = SpatialConfigHolder()
+
     public static func setSpatialConfig(_ config: SpatialConfigData) {
-        _spatialConfig = config
+        spatialConfigHolder.config = config
     }
     
     public static func clearSpatialConfig() {
-        _spatialConfig = nil
+        spatialConfigHolder.config = nil
     }
     
     public static func projectedSpatialConfig() -> SpatialConfigData {
-        _spatialConfig ?? SpatialConfigData(
+        spatialConfigHolder.config ?? SpatialConfigData(
             raycastProjectionConfidence: defaultRaycastProjectionConfidence,
             depthProjectionConfidence: defaultDepthProjectionConfidence,
             meshResultConfidence: defaultMeshResultConfidence,

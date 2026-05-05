@@ -40,7 +40,7 @@ final class HueSpatialService {
     }
     
     /// The current manual placement mode state.
-    enum ManualPlacementMode: Sendable {
+    enum ManualPlacementMode: Sendable, Equatable {
         /// Spatial features are available and functioning normally.
         case inactive
         /// User is manually assigning room/zone to a fixture.
@@ -179,7 +179,7 @@ final class HueSpatialService {
         let roomId: String?
         let areaId: String?
         if isManualPlacementActive {
-            let manual = manualRoomAssignments[context.lightId.map { UUID(uuidString: $0) } ?? UUID()]
+            let manual = manualRoomAssignments[UUID(uuidString: context.lightId) ?? UUID()]
             roomId = manual?.roomId
             areaId = manual?.areaId
         } else {

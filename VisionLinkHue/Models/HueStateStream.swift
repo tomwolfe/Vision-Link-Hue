@@ -263,7 +263,7 @@ final class HueStateStream {
     
     /// Spatial clusters of nearby fixtures computed by the clustering engine.
     /// Used to reduce HUD clutter in dense lighting environments.
-    private(set) var clusters: [SpatialCluster] = []
+    var clusters: [SpatialCluster] = []
     
     /// Dedicated actor for error notification handling.
     /// Prevents main-thread hangs during SSE reconnection bursts.

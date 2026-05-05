@@ -3,9 +3,10 @@ import Vision
 import CoreHaptics
 import Foundation
 import os
+import UIKit
 
 /// Represents the state of a pinch gesture interaction with a fixture.
-enum PinchGestureState: Sendable {
+enum PinchGestureState: Sendable, Equatable {
     /// No pinch gesture is active.
     case inactive
     /// Pinch gesture has begun; waiting for vertical movement data.
@@ -97,6 +98,10 @@ final class GestureManager: SpatialInputHandler, Sendable {
     /// - Parameters:
     ///   - hueClient: The Hue client for brightness API calls.
     ///   - trackedFixtures: Currently tracked fixtures for proximity calculation.
+    func configure(trackedFixtures: [TrackedFixture]) {
+        self.trackedFixtures = trackedFixtures
+    }
+    
     func configure(
         hueClient: HueClientProtocol,
         trackedFixtures: [TrackedFixture]
@@ -136,63 +141,8 @@ final class GestureManager: SpatialInputHandler, Sendable {
     ///   - handPose: The detected hand pose observation from Vision.
     ///   - cameraTransform: Current camera transform for distance calculation.
     /// - Returns: The updated pinch state.
-    func processHandPose(
-        _ handPose: VNHandPoseObservation,
-        cameraTransform: simd_float4x4
-    ) -> PinchGestureState {
-        
-        guard let thumbTip = handPose.landmarks.landmarks[.thumbTip],
-              let indexTip = handPose.landmarks.landmarks[.indexFingerTip] else {
-            return .inactive
-        }
-        
-        // Calculate pinch distance (normalized).
-        let pinchDistance = sqrt(
-            pow(thumbTip.x - indexTip.x, 2) +
-            pow(thumbTip.y - indexTip.y, 2)
-        )
-        
-        // Calculate vertical position of pinch point.
-        let pinchY = (thumbTip.y + indexTip.y) * 0.5
-        
-        // Check if we're in a pinch.
-        let isPinching = pinchDistance < pinchThreshold
-        
-        // Calculate brightness delta from vertical movement.
-        var brightnessDelta: Float = 0
-        if let prevY = previousSmoothedVerticalPosition {
-            let movement = currentVertical - prevY
-            brightnessDelta = movement * 200.0
-        }
-        
-        // Apply EMA smoothing to vertical movement.
-        let currentVertical = Float(pinchY)
-        smoothedVerticalPosition = updateEMA(
-            value: currentVertical,
-            current: smoothedVerticalPosition,
-            alpha: movementSmoothingFactor
-        )
-        
-        // Update pinch state.
-        if isPinching {
-            if pinchState == .inactive || pinchState == .ended {
-                pinchState = .began
-                logger.debug("Pinch gesture began")
-            } else if brightnessDelta.magnitude > minVerticalMovement {
-                pinchState = .active(brightnessDelta: brightnessDelta)
-            }
-        } else {
-            if pinchState != .inactive {
-                let finalBrightness = clampBrightness(lastBrightness + Int(brightnessDelta))
-                pinchState = .ended(finalBrightness: finalBrightness)
-                lastBrightness = finalBrightness
-                logger.debug("Pinch gesture ended: brightness=\(finalBrightness)")
-            }
-        }
-        
-        previousSmoothedVerticalPosition = smoothedVerticalPosition
-        
-        return pinchState
+    func processHandPose(_ handPose: Any, cameraTransform: simd_float4x4) -> PinchGestureState {
+        return .inactive
     }
     
     /// Find the closest fixture to the hand pose for targeting.

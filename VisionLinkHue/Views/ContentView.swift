@@ -17,6 +17,9 @@ struct ContentView: View {
     @State private var showBridgeDiscovery: Bool = false
     @State private var dismissedErrorId: UUID?
     
+    @State private var batterySaverMode: Bool = false
+    @State private var extendedRelocalizationMode: Bool = false
+    
     var body: some View {
         GeometryReader { geometry in
                 let sessionManager = arSessionManager
@@ -28,16 +31,10 @@ struct ContentView: View {
                     // AR session view
                     ARViewContainer(
                         sessionManager: sessionManager,
-                        onFrameUpdate: { frame in
-                            Task {
-                                await sessionManager.didUpdateFrame(frame)
-                            }
-                        },
-                        onARViewReady: { arView in
-                            Task {
-                                await sessionManager.configureAndStart(in: arView)
-                            }
-                        }
+                        detectionEngine: detector,
+                        hueClient: client,
+                        stateStream: stream,
+                        spatialProjector: projector
                     )
                     .ignoresSafeArea()
                     
@@ -122,6 +119,9 @@ struct SettingsView: View {
     let hueClient: HueClient
     let stateStream: HueStateStream
     @Environment(\.dismiss) private var dismiss
+    @Environment(DetectionSettings.self) private var detectionSettings
+    @State private var batterySaverMode: Bool = false
+    @State private var extendedRelocalizationMode: Bool = false
     
     var body: some View {
         NavigationStack {
@@ -234,7 +234,7 @@ struct SettingsView: View {
                     HStack {
                         Text("Battery Saver")
                         Spacer()
-                        Toggle("", isOn: $detectionSettings.batterySaverMode)
+                        Toggle("", isOn: $batterySaverMode)
                             .labelsHidden()
                     }
                     Text("Disables Neural Surface Synthesis material classification to reduce battery usage")
@@ -244,7 +244,7 @@ struct SettingsView: View {
                     HStack {
                         Text("Extended Relocalization")
                         Spacer()
-                        Toggle("", isOn: $detectionSettings.extendedRelocalizationMode)
+                        Toggle("", isOn: $extendedRelocalizationMode)
                             .labelsHidden()
                     }
                     Text("Anchors all fixture types for better relocalization in feature-sparse environments")
@@ -274,6 +274,16 @@ struct SettingsView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
                 }
+            }
+            .task {
+                batterySaverMode = detectionSettings.batterySaverMode
+                extendedRelocalizationMode = detectionSettings.extendedRelocalizationMode
+            }
+            .onChange(of: batterySaverMode) { _, newValue in
+                detectionSettings.batterySaverMode = newValue
+            }
+            .onChange(of: extendedRelocalizationMode) { _, newValue in
+                detectionSettings.extendedRelocalizationMode = newValue
             }
         }
     }

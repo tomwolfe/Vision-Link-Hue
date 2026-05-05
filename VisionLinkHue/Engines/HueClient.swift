@@ -362,28 +362,28 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
         guard let matterService else {
             throw MatterError.homeKitNotAvailable
         }
-        try await matterService.setPower(deviceId: deviceId, on: on)
+        try await matterService.toggle(deviceId: deviceId, on: on)
     }
     
     func setMatterBrightness(deviceId: String, brightness: Int, transitionDuration: Int = 4) async throws {
         guard let matterService else {
             throw MatterError.homeKitNotAvailable
         }
-        try await matterService.setBrightness(deviceId: deviceId, brightness: brightness, transitionDuration: transitionDuration)
+        try await matterService.setBrightness(Double(brightness), deviceId: deviceId, transitionDuration: TimeInterval(transitionDuration))
     }
     
     func setMatterColorTemperature(deviceId: String, mireds: Int, transitionDuration: Int = 4) async throws {
         guard let matterService else {
             throw MatterError.homeKitNotAvailable
         }
-        try await matterService.setColorTemperature(deviceId: deviceId, mireds: mireds, transitionDuration: transitionDuration)
+        try await matterService.setColorTemperature(Double(mireds), deviceId: deviceId, transitionDuration: TimeInterval(transitionDuration))
     }
     
     func setMatterColorXY(deviceId: String, x: Double, y: Double, transitionDuration: Int = 4) async throws {
         guard let matterService else {
             throw MatterError.homeKitNotAvailable
         }
-        try await matterService.setColorXY(deviceId: deviceId, x: x, y: y, transitionDuration: transitionDuration)
+        try await matterService.setColorX(x, y, deviceId: deviceId, transitionDuration: TimeInterval(transitionDuration))
     }
     
     func patchMatterLight(deviceId: String, patch: MatterLightStatePatch) async throws {

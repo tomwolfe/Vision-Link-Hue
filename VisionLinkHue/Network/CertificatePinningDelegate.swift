@@ -206,9 +206,7 @@ final class CertificatePinningDelegate: NSObject, URLSessionDelegate, @unchecked
                 // Ensure completionHandler is always called even if Task is cancelled
                 // to prevent permanently hanging the URLSession.
                 if !handlerCalled && !Task.isCancelled {
-                    await MainActor.run {
-                        box.call(.cancelAuthenticationChallenge, nil)
-                    }
+                    box.call(.cancelAuthenticationChallenge, nil)
                 }
             }
             

@@ -1,6 +1,7 @@
 import Foundation
 import CryptoKit
 import Security
+import CommonCrypto
 import os
 
 /// Cryptographic signature validator for OTA configuration files.
@@ -24,21 +25,13 @@ enum ECDSASignatureValidator {
     private static let signatureKeychainPrefix = "com.tomwolfe.visionlinkhue.ecdsa.pub."
     
     /// The minimum acceptable schema version for OTA configuration files.
-    /// Bumping this prevents version rollback attacks where a malicious actor
-    /// provides an older, signed, but vulnerable ruleset.
-    /// The minimum version must be <= the current version in classification_rules.json.
     private static let minimumSchemaVersion = "1.1.0"
     
     /// Default ECDSA P-256 public key for OTA config verification, embedded at compile time.
-    /// Replace this with your actual public key before shipping.
-    /// The key is stored as DER-encoded SubjectPublicKeyInfo (SPKI) format.
     private static let defaultPublicKeyData: Data? = {
         #if DEBUG
-        // Development placeholder — replace with actual key before shipping.
         return nil
         #else
-        // Production key embedded at compile time via build settings.
-        // Set ECDSA_DEFAULT_PUBLIC_KEY in your Build Configuration.
         guard let keyString = ProcessInfo.processInfo.environment["ECDSA_DEFAULT_PUBLIC_KEY"] else {
             return nil
         }
@@ -47,7 +40,6 @@ enum ECDSASignatureValidator {
     }()
     
     /// The elliptic curve used for signature verification.
-    /// P-256 provides 128-bit security and is supported by CryptoKit.
     enum Curve: String {
         case p256 = "P-256"
     }
@@ -95,11 +87,6 @@ enum ECDSASignatureValidator {
     }
     
     /// Verify an ECDSA signature against a payload using a stored public key.
-    /// - Parameters:
-    ///   - payload: The raw configuration data that was signed.
-    ///   - signature: The ECDSA signature to verify.
-    ///   - keyID: Optional key identifier for multi-key rotation support.
-    /// - Throws: `SignatureError` if verification fails.
     static func verifySignature(
         payload: Data,
         signature: Data,
@@ -113,15 +100,23 @@ enum ECDSASignatureValidator {
             throw SignatureError.publicKeyNotFound
         }
         
-        guard let signatureComponents = parseSignature(signature) else {
-            throw SignatureError.invalidSignatureFormat
+        var messageHash = [UInt8](repeating: 0, count: Int(CC_SHA1_DIGEST_LENGTH))
+        payload.withUnsafeBytes { ptr in
+            CC_SHA1(ptr.baseAddress, UInt32(ptr.count), &messageHash)
         }
+        let messageHashData = Data(messageHash)
         
-        let signatureData = try createSignatureData(components: signatureComponents)
-        let messageHash = Insecure.SHA1.hash(payload)
+        var error: Unmanaged<CFError>?
+        let verified = SecKeyVerifySignature(
+            publicKey,
+            .ecdsaSignatureMessageX962SHA1,
+            messageHashData as CFData,
+            signature as CFData,
+            &error
+        )
         
-        guard publicKey.verifySignature(signatureData, for: messageHash) else {
-            logger.warning("ECDSA signature verification failed for OTA config")
+        guard verified else {
+            logger.warning("ECDSA signature verification failed for OTA config: \(error?.takeRetainedValue().localizedDescription ?? "unknown")")
             throw SignatureError.signatureVerificationFailed
         }
         
@@ -129,26 +124,17 @@ enum ECDSASignatureValidator {
     }
     
     /// Verify a signature and decode JSON in a single safe operation.
-    /// - Parameters:
-    ///   - data: The raw JSON data with an attached signature.
-    ///   - signature: The ECDSA signature to verify.
-    ///   - keyID: Optional key identifier for multi-key rotation support.
-    ///   - decoder: JSONDecoder to use for decoding.
-    /// - Returns: The decoded configuration object.
-    /// - Throws: `SignatureError` if verification fails, or any decoding error.
     static func verifyAndDecode<T: Decodable>(
         data: Data,
         signature: Data,
         keyID: String? = nil,
         using decoder: JSONDecoder = JSONDecoder()
-    ) throws -> T {
+    ) async throws -> T {
         try verifySignature(payload: data, signature: signature, keyID: keyID)
         return try decoder.decode(T.self, from: data)
     }
     
     /// Extract the schema version from a JSON payload.
-    /// - Parameter payload: The raw JSON data.
-    /// - Returns: The schema version string, or nil if missing/invalid.
     static func extractSchemaVersion(from payload: Data) -> String? {
         do {
             let json = try JSONSerialization.jsonObject(with: payload, options: []) as? [String: Any]
@@ -160,10 +146,6 @@ enum ECDSASignatureValidator {
     }
     
     /// Verify that the schema version in the payload meets the minimum required version.
-    /// This prevents version rollback attacks where a malicious actor provides an older,
-    /// signed, but vulnerable ruleset.
-    /// - Parameter payload: The raw JSON configuration data.
-    /// - Throws: `SignatureError.schemaVersionTooLow` or `SignatureError.schemaVersionMissing`.
     static func verifySchemaVersion(payload: Data) throws {
         guard let versionString = extractSchemaVersion(from: payload) else {
             throw SignatureError.schemaVersionMissing
@@ -183,8 +165,6 @@ enum ECDSASignatureValidator {
     }
     
     /// Parse a semantic version string into comparable components.
-    /// - Parameter versionString: A version string in "major.minor.patch" format.
-    /// - Returns: A tuple of (major, minor, patch) integers, or nil if parsing fails.
     static func parseVersion(_ versionString: String) -> (major: Int, minor: Int, patch: Int)? {
         let components = versionString.split(separator: ".")
         guard components.count == 3,
@@ -197,25 +177,16 @@ enum ECDSASignatureValidator {
     }
     
     /// Verify an ECDSA signature and schema version in a single safe operation.
-    /// Combines cryptographic verification with schema version validation to protect
-    /// against both tampering and version rollback attacks.
-    /// - Parameters:
-    ///   - payload: The raw configuration data that was signed.
-    ///   - signature: The ECDSA signature to verify.
-    ///   - keyID: Optional key identifier for multi-key rotation support.
-    /// - Throws: `SignatureError` if verification or schema validation fails.
     static func verifySignatureAndSchema(
         payload: Data,
         signature: Data,
         keyID: String? = nil
-    ) throws {
+    ) async throws {
         try verifySignature(payload: payload, signature: signature, keyID: keyID)
         try verifySchemaVersion(payload: payload)
     }
     
     /// Seed the default public key into the Keychain if none exists yet.
-    /// Call this during app initialization to ensure the first OTA update
-    /// has a valid public key for verification on fresh installs.
     static func seedDefaultPublicKeyIfNeeded() throws {
         guard let defaultKeyData = defaultPublicKeyData else {
             logger.warning("No default public key configured — OTA signature verification will fail on fresh install")
@@ -224,7 +195,6 @@ enum ECDSASignatureValidator {
         
         let keychainKey = signatureKeychainPrefix + "default"
         
-        // Check if a key already exists in the Keychain.
         guard try KeychainManager.shared.loadECDSAPublicKey(forKey: keychainKey) == nil else {
             logger.info("ECDSA public key already exists in Keychain, skipping seed")
             return
@@ -235,13 +205,10 @@ enum ECDSASignatureValidator {
     }
     
     /// Store a public key in the Keychain for future signature verification.
-    /// - Parameters:
-    ///   - publicKey: The ECDSA public key to store.
-    ///   - keyID: Optional key identifier. Defaults to "default".
-    static func storePublicKey(_ publicKey: P256.ECDSAA.signature.VerificationKey, keyID: String = "default") throws {
+    static func storePublicKey(_ publicKey: SecKey, keyID: String = "default") throws {
         let keychainKey = signatureKeychainPrefix + keyID
         
-        guard let publicKeyData = try? publicKey.rawRepresentation else {
+        guard let publicKeyData = SecKeyCopyExternalRepresentation(publicKey, nil) as Data? else {
             throw SignatureError.publicKeyNotFound
         }
         
@@ -250,29 +217,32 @@ enum ECDSASignatureValidator {
     }
     
     /// Load a stored public key from the Keychain.
-    /// - Parameter keyID: Optional key identifier. Defaults to "default".
-    /// - Returns: The verification key, or nil if not found.
-    static func loadPublicKey(for keyID: String? = nil) throws -> P256.ECDSAA.signature.VerificationKey? {
+    static func loadPublicKey(for keyID: String? = nil) throws -> SecKey? {
         let keychainKey = signatureKeychainPrefix + (keyID ?? "default")
         
-        guard let publicKeyData = try? KeychainManager.shared.loadECDSAPublicKey(forKey: keychainKey) else {
+        guard let publicKeyData = try KeychainManager.shared.loadECDSAPublicKey(forKey: keychainKey) else {
             return nil
         }
         
-        return try P256.ECDSAA.signature.VerificationKey(rawRepresentation: publicKeyData)
+        let attributes: [String: Any] = [
+            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
+            kSecAttrKeySizeInBits as String: 256,
+        ]
+        
+        guard let secKey = SecKeyCreateWithData(publicKeyData as CFData, attributes as CFDictionary, nil) else {
+            throw SignatureError.publicKeyNotFound
+        }
+        
+        return secKey
     }
     
     /// Generate a new ECDSA key pair for signing OTA configs.
-    /// Returns the private key (for signing) and public key (for verification).
-    /// The public key is automatically stored in the Keychain.
-    /// - Parameter keyID: Optional key identifier. Defaults to "default".
-    /// - Returns: A tuple of (privateKey, publicKey).
     static func generateKeyPair(keyID: String = "default") throws -> (
-        privateKey: P256.ECDSAA.signature.SigningPrivateKey,
-        publicKey: P256.ECDSAA.signature.VerificationKey
+        privateKey: SecKey,
+        publicKey: SecKey
     ) {
-        let privateKey = P256.ECDSAA.signature.SigningPrivateKey.random()
-        let publicKey = privateKey.publicKey
+        let privateKey = try generatePrivateKey()
+        let publicKey = try extractPublicKey(from: privateKey)
         
         try storePublicKey(publicKey, keyID: keyID)
         
@@ -281,52 +251,44 @@ enum ECDSASignatureValidator {
     }
     
     /// Sign a payload using an ECDSA private key.
-    /// - Parameters:
-    ///   - payload: The data to sign.
-    ///   - privateKey: The private key for signing.
-    /// - Returns: The raw signature bytes.
-    static func sign(payload: Data, privateKey: P256.ECDSAA.signature.SigningPrivateKey) -> Data {
-        let messageHash = Insecure.SHA1.hash(payload)
-        let signature = privateKey.signature(for: messageHash)
-        return signature.rawSignature
-    }
-    
-    private static func parseSignature(_ signature: Data) -> (r: Scalar, s: Scalar)? {
-        guard signature.count == 128 else { return nil }
+    static func sign(payload: Data, privateKey: SecKey) throws -> Data {
+        var messageHash = [UInt8](repeating: 0, count: Int(CC_SHA1_DIGEST_LENGTH))
+        payload.withUnsafeBytes { ptr in
+            CC_SHA1(ptr.baseAddress, UInt32(ptr.count), &messageHash)
+        }
+        let messageHashData = Data(messageHash)
+        var error: Unmanaged<CFError>?
         
-        let rBytes = signature[0..<64]
-        let sBytes = signature[64..<128]
-        
-        guard let rData = Data(rBytes), let sData = Data(sBytes) else { return nil }
-        
-        let r: P256.ECDSAA.signature.SigningScalar.Scalar
-        let s: P256.ECDSAA.signature.SigningScalar.Scalar
-        
-        do {
-            r = try .init(representation: rData)
-        } catch {
-            return nil
+        guard let signature = SecKeyCreateSignature(privateKey, .ecdsaSignatureMessageX962SHA1, messageHashData as CFData, &error) else {
+            throw SignatureError.signatureVerificationFailed
         }
         
-        do {
-            s = try .init(representation: sData)
-        } catch {
-            return nil
-        }
-        
-        return (r, s)
+        return signature as Data
     }
     
-    private static func createSignatureData(components: (r: Scalar, s: Scalar)) throws -> Signature {
-        let signature = P256.ECDSAA.signature.SigningSignature(r: components.r, s: components.s)
-        return signature.rawSignature
+    // MARK: - Private Helpers
+    
+    private static func generatePrivateKey() throws -> SecKey {
+        let privateKey = P256.Signing.PrivateKey()
+        
+        let data = try privateKey.rawRepresentation
+        let attributes: [String: Any] = [
+            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
+            kSecAttrKeySizeInBits as String: 256,
+        ]
+        
+        guard let secKey = SecKeyCreateWithData(data as CFData, attributes as CFDictionary, nil) else {
+            throw SignatureError.publicKeyNotFound
+        }
+        
+        return secKey
     }
     
-    private enum Scalar {
-        case p256(P256.ECDSAA.signature.SigningScalar.Scalar)
-        
-        init(_ scalar: P256.ECDSAA.signature.SigningScalar.Scalar) {
-            self = .p256(scalar)
+    private static func extractPublicKey(from privateKey: SecKey) throws -> SecKey {
+        guard let publicKey = SecKeyCopyPublicKey(privateKey) else {
+            throw SignatureError.publicKeyNotFound
         }
+        
+        return publicKey
     }
 }

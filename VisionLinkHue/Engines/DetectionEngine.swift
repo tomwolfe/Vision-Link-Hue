@@ -57,7 +57,8 @@ final class DetectionEngine {
     
     /// Intent-based classifier using CoreML for architectural archetype recognition.
     /// Overrides heuristic classification when CoreML confidence exceeds threshold.
-    private var intentClassifier = CoreMLIntentClassifier()
+    @ObservationIgnored
+    private var intentClassifier: FixtureIntentClassifier = CoreMLIntentClassifier()
     
     /// Neural surface material classifier for ARKit 2026 material detection.
     private let materialClassifier: NeuralSurfaceMaterialClassifier
@@ -228,8 +229,7 @@ final class DetectionEngine {
         modelLoadingProgress = 0.0
         onModelLoadingProgress?(0.0)
         
-        guard let modelURL = Bundle.main.url(forResource: "LightingArchetype", withExtension: "mlmodel"),
-              let compiledModelURL = try? MLModel.compile(modelAt: modelURL) else {
+        guard let modelURL = Bundle.main.url(forResource: "LightingArchetype", withExtension: "mlmodel") else {
             logger.warning("CoreML lighting archetype model not found, falling back to rectangle detection")
             isCoreMLAvailable = false
             isObjectModelLoaded = false
@@ -247,9 +247,7 @@ final class DetectionEngine {
             baseConfig.computeUnits = .all
             
             #if targetEnvironment(simulator)
-            objectDetectionModel = try await Task.detached(priority: .userInitiated) {
-                try MLModel(contentsOf: compiledModelURL, configuration: baseConfig)
-            }.value
+            objectDetectionModel = try MLModel(contentsOf: modelURL, configuration: baseConfig)
             isCoreMLAvailable = true
             isObjectModelLoaded = true
             isModelQuantized = false
@@ -262,9 +260,7 @@ final class DetectionEngine {
             var quantizationApplied = false
             
             do {
-                loadedModel = try await Task.detached(priority: .userInitiated) {
-                    try MLModel(contentsOf: compiledModelURL, configuration: quantizedConfig)
-                }.value
+                loadedModel = try MLModel(contentsOf: modelURL, configuration: quantizedConfig)
                 quantizationApplied = true
             } catch {
                 logger.debug("4-bit quantization not available for model, falling back to unquantized: \(error.localizedDescription)")
@@ -281,9 +277,7 @@ final class DetectionEngine {
                     stateStream.reportError(fallbackError, severity: .warning, source: "DetectionEngine.quantization_fallback")
                 }
                 
-                loadedModel = try await Task.detached(priority: .userInitiated) {
-                    try MLModel(contentsOf: compiledModelURL, configuration: baseConfig)
-                }.value
+                loadedModel = try MLModel(contentsOf: modelURL, configuration: baseConfig)
                 quantizationApplied = false
             }
             
@@ -303,7 +297,7 @@ final class DetectionEngine {
             guard let model = objectDetectionModel else {
                 throw NSError(domain: "DetectionEngine", code: 1, userInfo: [NSLocalizedDescriptionKey: "Model was nil after loading"])
             }
-            objectDetectionRequest = VNCoreMLRequest(model: model) { [weak self] request, error in
+            objectDetectionRequest = VNCoreMLRequest(model: try VNCoreMLModel(for: model)) { [weak self] request, error in
                 if let error {
                     Logger(subsystem: "com.tomwolfe.visionlinkhue", category: "DetectionEngine")
                         .warning("CoreML object detection failed: \(error.localizedDescription)")

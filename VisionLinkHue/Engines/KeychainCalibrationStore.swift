@@ -28,21 +28,27 @@ final class KeychainCalibrationStore: SpatialCalibrationPersistenceStore {
     }
     
     func loadCalibration() async -> CalibrationData? {
+        let rotationData: Data?
+        let translationData: Data?
         do {
-            let rotationData = try keychainManager.getItem(forKey: Self.rotationKey)
-            let translationData = try keychainManager.getItem(forKey: Self.translationKey)
-            
-            return CalibrationData(rotationData: rotationData, translationData: translationData)
+            rotationData = try await keychainManager.getItem(forKey: Self.rotationKey)
+            translationData = try await keychainManager.getItem(forKey: Self.translationKey)
         } catch {
-            logger.debug("No persisted calibration found in keychain")
+            logger.error("Failed to load calibration from keychain: \(error.localizedDescription)")
             return nil
         }
+        
+        guard let rotationData, let translationData else {
+            return nil
+        }
+        
+        return CalibrationData(rotationData: rotationData, translationData: translationData)
     }
     
     func saveCalibration(rotationData: Data, translationData: Data) async {
         do {
-            try keychainManager.setItem(rotationData, forKey: Self.rotationKey)
-            try keychainManager.setItem(translationData, forKey: Self.translationKey)
+            try await keychainManager.setItem(rotationData, forKey: Self.rotationKey)
+            try await keychainManager.setItem(translationData, forKey: Self.translationKey)
             logger.info("Calibration saved to keychain")
         } catch {
             logger.error("Failed to save calibration to keychain: \(error.localizedDescription)")
@@ -50,12 +56,8 @@ final class KeychainCalibrationStore: SpatialCalibrationPersistenceStore {
     }
     
     func clearCalibration() async {
-        do {
-            try keychainManager.removeItem(forKey: Self.rotationKey)
-            try keychainManager.removeItem(forKey: Self.translationKey)
-            logger.debug("Calibration cleared from keychain")
-        } catch {
-            logger.warning("Failed to clear calibration from keychain: \(error.localizedDescription)")
-        }
+        await keychainManager.removeItem(forKey: Self.rotationKey)
+        await keychainManager.removeItem(forKey: Self.translationKey)
+        logger.debug("Calibration cleared from keychain")
     }
 }

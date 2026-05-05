@@ -6,7 +6,7 @@ import os
 /// Represents an archetypal fixture that ARKit can recognize and anchor
 /// using Object Anchor tracking. Each archetype corresponds to a known
 /// fixture type with characteristic geometric properties.
-struct FixtureArchetype: Identifiable, Codable, Sendable {
+struct FixtureArchetype: Identifiable, Sendable, Codable {
     /// Unique identifier for this archetype instance.
     let id: UUID
     
@@ -49,6 +49,53 @@ struct FixtureArchetype: Identifiable, Codable, Sendable {
         self.orientation = orientation
         self.confidence = confidence
         self.createdAt = Date()
+    }
+    
+    private enum CodingKeys: String, CodingKey {
+        case id, fixtureType, objectAnchorName
+        case positionX, positionY, positionZ
+        case orientationX, orientationY, orientationZ, orientationW
+        case confidence, createdAt
+        case isMatched, matchedAnchorID
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(fixtureType, forKey: .fixtureType)
+        try container.encode(objectAnchorName, forKey: .objectAnchorName)
+        try container.encode(position.x, forKey: .positionX)
+        try container.encode(position.y, forKey: .positionY)
+        try container.encode(position.z, forKey: .positionZ)
+        try container.encode(orientation.vector.x, forKey: .orientationX)
+        try container.encode(orientation.vector.y, forKey: .orientationY)
+        try container.encode(orientation.vector.z, forKey: .orientationZ)
+        try container.encode(orientation.real, forKey: .orientationW)
+        try container.encode(confidence, forKey: .confidence)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(isMatched, forKey: .isMatched)
+        try container.encode(matchedAnchorID, forKey: .matchedAnchorID)
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        fixtureType = try container.decode(FixtureType.self, forKey: .fixtureType)
+        objectAnchorName = try container.decode(String.self, forKey: .objectAnchorName)
+        position = SIMD3<Float>(
+            try container.decode(Float.self, forKey: .positionX),
+            try container.decode(Float.self, forKey: .positionY),
+            try container.decode(Float.self, forKey: .positionZ)
+        )
+        let oX = try container.decode(Float.self, forKey: .orientationX)
+        let oY = try container.decode(Float.self, forKey: .orientationY)
+        let oZ = try container.decode(Float.self, forKey: .orientationZ)
+        let oW = try container.decode(Float.self, forKey: .orientationW)
+        orientation = simd_quatf(real: oW, imag: SIMD3<Float>(oX, oY, oZ))
+        confidence = try container.decode(Float.self, forKey: .confidence)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        isMatched = try container.decode(Bool.self, forKey: .isMatched)
+        matchedAnchorID = try container.decodeIfPresent(String.self, forKey: .matchedAnchorID)
     }
 }
 
@@ -181,16 +228,16 @@ final class ObjectAnchorPersistenceService {
         return
         #endif
         
-        for archetype in archetypes {
+        for i in self.archetypes.indices {
             // Skip already matched archetypes.
-            guard !archetype.isMatched else { continue }
+            guard !self.archetypes[i].isMatched else { continue }
             
             // Check if ARKit found an anchor with this name.
-            if objectAnchorIDs.contains(archetype.objectAnchorName) {
-                archetype.isMatched = true
-                matchedArchetype = archetype
+            if objectAnchorIDs.contains(self.archetypes[i].objectAnchorName) {
+                self.archetypes[i].isMatched = true
+                matchedArchetype = self.archetypes[i]
                 isRelocalized = true
-                logger.info("Matched archetype: \(archetype.fixtureType.rawValue) via object anchor")
+                logger.info("Matched archetype: \(self.archetypes[i].fixtureType.rawValue) via object anchor")
                 return
             }
         }
@@ -244,7 +291,7 @@ final class ObjectAnchorPersistenceService {
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
             archetypes = try decoder.decode([FixtureArchetype].self, from: data)
-            logger.info("Loaded \(archetypes.count) persisted fixture archetype(s)")
+            logger.info("Loaded \(self.archetypes.count) persisted fixture archetype(s)")
         } catch {
             logger.error("Failed to load fixture archetypes: \(error.localizedDescription)")
         }
@@ -257,7 +304,7 @@ final class ObjectAnchorPersistenceService {
             encoder.dateEncodingStrategy = .iso8601
             let data = try encoder.encode(archetypes)
             try data.write(to: archetypesURL)
-            logger.debug("Saved \(archetypes.count) fixture archetype(s)")
+            logger.debug("Saved \(self.archetypes.count) fixture archetype(s)")
         } catch {
             logger.error("Failed to save fixture archetypes: \(error.localizedDescription)")
         }

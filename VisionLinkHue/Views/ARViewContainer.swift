@@ -1,6 +1,7 @@
 import SwiftUI
 import RealityKit
 import ARKit
+import os
 
 /// SwiftUI view that manages an ARKit session using RealityKit.
 /// Provides a single ARView with frame callbacks for the detection pipeline.
@@ -8,14 +9,18 @@ import ARKit
 struct ARViewContainer: View {
     
     @Bindable var sessionManager: ARSessionManager
-    let onFrameUpdate: (ARFrame) -> Void
-    let onARViewReady: (ARView) -> Void
+    let detectionEngine: DetectionEngine
+    let hueClient: HueClient
+    let stateStream: HueStateStream
+    let spatialProjector: SpatialProjector
     
     var body: some View {
         ARViewRepresentable(
             sessionManager: sessionManager,
-            onFrameUpdate: onFrameUpdate,
-            onARViewReady: onARViewReady
+            detectionEngine: detectionEngine,
+            hueClient: hueClient,
+            stateStream: stateStream,
+            spatialProjector: spatialProjector
         )
         .ignoresSafeArea()
     }
@@ -27,15 +32,21 @@ struct ARViewContainer: View {
 struct ARViewRepresentable: UIViewRepresentable {
     
     @Bindable var sessionManager: ARSessionManager
-    let onFrameUpdate: (ARFrame) -> Void
-    let onARViewReady: (ARView) -> Void
+    let detectionEngine: DetectionEngine
+    let hueClient: HueClient
+    let stateStream: HueStateStream
+    let spatialProjector: SpatialProjector
     
     func makeUIView(context: Context) -> ARView {
         let arView = ARView(frame: .zero)
         
         arView.session.delegate = context.coordinator
         
-        self.onARViewReady(arView)
+        context.coordinator.detectionEngine = detectionEngine
+        context.coordinator.hueClient = hueClient
+        context.coordinator.stateStream = stateStream
+        context.coordinator.spatialProjector = spatialProjector
+        context.coordinator.arView = arView
         
         return arView
     }
@@ -54,21 +65,29 @@ struct ARViewRepresentable: UIViewRepresentable {
     }
     
     func makeCoordinator() -> Coordinator {
-        Coordinator(self)
+        Coordinator()
     }
     
     final class Coordinator: NSObject, ARSessionDelegate {
-        let parent: ARViewRepresentable
         var isSessionRunning: Bool = false
-        
-        init(_ parent: ARViewRepresentable) {
-            self.parent = parent
-        }
+        var detectionEngine: DetectionEngine?
+        var hueClient: HueClient?
+        var stateStream: HueStateStream?
+        var spatialProjector: SpatialProjector?
+        var arView: ARView?
         
         func session(_ session: ARSession, didUpdate frame: ARFrame) {
-            let parentRef = parent
+            guard let detectionEngine else { return }
             DispatchQueue.main.async {
-                parentRef.onFrameUpdate(frame)
+                detectionEngine.start()
+                Task {
+                    do {
+                        _ = try await detectionEngine.processFrame(frame.capturedImage, timestamp: frame.timestamp)
+                    } catch {
+                        Logger(subsystem: "com.tomwolfe.visionlinkhue", category: "ARViewContainer")
+                            .warning("Failed to process frame: \(error.localizedDescription)")
+                    }
+                }
             }
         }
     }

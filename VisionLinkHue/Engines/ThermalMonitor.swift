@@ -91,7 +91,7 @@ final class ThermalMonitor: Sendable {
         let wasPredictiveActive = predictiveModel.isPredictiveThrottling
         if wasPredictiveActive {
             logger.debug(
-                "Predictive throttling active: EWMA=\(String(format: "%.0f", predictiveModel.ewmaLatency))ms, slope=\(String(format: "%.1f", predictiveModel.latencyTrendSlope))ms/sample"
+                "Predictive throttling active: EWMA=\(String(format: "%.0f", self.predictiveModel.ewmaLatency))ms, slope=\(String(format: "%.1f", self.predictiveModel.latencyTrendSlope))ms/sample"
             )
         }
     }

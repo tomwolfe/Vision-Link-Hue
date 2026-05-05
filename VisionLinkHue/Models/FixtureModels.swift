@@ -109,7 +109,7 @@ struct FixtureDetection: Identifiable, Sendable {
 /// A detected fixture with its resolved 3D world transform and HUD entity state.
 /// Combines detection data, spatial position, and RealityKit entity tracking
 /// into a single unified structure.
-struct TrackedFixture: Identifiable, Sendable {
+struct TrackedFixture: Identifiable, Sendable, Hashable {
     let id: UUID
     let detection: FixtureDetection
     let position: SIMD3<Float>
@@ -140,5 +140,23 @@ struct TrackedFixture: Identifiable, Sendable {
     /// Effective distance including manual depth offset.
     var effectiveDistanceMeters: Float {
         distanceMeters + depthOffsetMeters
+    }
+    
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+        hasher.combine(detection.id)
+        hasher.combine(position.x)
+        hasher.combine(position.y)
+        hasher.combine(position.z)
+        hasher.combine(orientation.vector.x)
+        hasher.combine(orientation.vector.y)
+        hasher.combine(orientation.vector.z)
+        hasher.combine(orientation.vector.w)
+        hasher.combine(distanceMeters)
+        hasher.combine(material)
+    }
+    
+    static func == (lhs: TrackedFixture, rhs: TrackedFixture) -> Bool {
+        lhs.id == rhs.id
     }
 }

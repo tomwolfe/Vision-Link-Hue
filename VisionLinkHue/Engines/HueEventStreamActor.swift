@@ -47,10 +47,10 @@ actor HueEventStreamActor {
     private var reconnectDelay: TimeInterval = 1.0
     
     /// Maximum reconnect delay.
-    private let maxReconnectDelay: TimeInterval = 30.0
+    private var maxReconnectDelay: TimeInterval = 30.0
     
     /// Minimum reconnect delay.
-    private let minReconnectDelay: TimeInterval = 1.0
+    private var minReconnectDelay: TimeInterval = 1.0
     
     /// Base reconnect delay for exponential backoff.
     private var baseReconnectDelay: TimeInterval = 1.0

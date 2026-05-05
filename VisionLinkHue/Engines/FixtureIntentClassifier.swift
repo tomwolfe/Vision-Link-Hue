@@ -35,7 +35,7 @@ protocol FixtureIntentClassifier: Sendable {
 ///
 /// Reuses a `CVPixelBufferPool` across classification calls to minimize memory
 /// churn and CPU overhead during rapid frame analysis.
-struct CoreMLIntentClassifier: FixtureIntentClassifier {
+final class CoreMLIntentClassifier: @unchecked Sendable, FixtureIntentClassifier {
     /// Mapping from CoreML model labels to `FixtureType` enum cases.
     static let labelToFixtureType: [String: FixtureType] = [
         "Chandelier": .chandelier,
@@ -57,19 +57,6 @@ struct CoreMLIntentClassifier: FixtureIntentClassifier {
     /// Whether the model has been loaded successfully.
     var isReady: Bool { model != nil }
 
-    /// Pixel buffer pool for reusing CVPixelBuffer allocations across classification calls.
-    private var pixelBufferPool: CVPixelBufferPool?
-
-    /// Initialize the classifier without loading the model.
-    /// Call `loadModel()` before using.
-    init() {}
-
-    /// Initialize with a pre-loaded model.
-    /// - Parameter model: An already-loaded CoreML model.
-    init(model: MLModel?) {
-        self.model = model
-    }
-
     /// Load the bundled LightingArchetype CoreML model asynchronously.
     /// Falls back to an unloaded state if the model is not found.
     func loadModel() async throws {
@@ -77,40 +64,9 @@ struct CoreMLIntentClassifier: FixtureIntentClassifier {
             return
         }
 
-        let compiledModelURL = try MLModel.compile(modelAt: modelURL)
         model = try await Task.detached {
-            try MLModel(contentsOf: compiledModelURL)
+            try MLModel(contentsOf: modelURL)
         }.value
-
-        createPixelBufferPool()
-    }
-
-    /// Create a pixel buffer pool for reuse across classification calls.
-    private func createPixelBufferPool() {
-        let width = 224
-        let height = 224
-        let pixelFormatType = kCVPixelFormatType_32ARGB
-
-        let attributes: [String: Any] = [
-            kCVPixelBufferPoolAllocationThresholdKey as String: 8
-        ]
-
-        var pool: CVPixelBufferPool?
-        let status = CVPixelBufferPoolCreate(
-            nil,
-            nil,
-            [
-                kCVPixelBufferPoolMinimumWidthKey as String: width,
-                kCVPixelBufferPoolMinimumHeightKey as String: height,
-                kCVPixelBufferPoolMinimumPixelFormatTypeKey as String: pixelFormatType
-            ] as CFDictionary,
-            attributes as CFDictionary,
-            &pool
-        )
-
-        if status == kCVReturnSuccess, let createdPool = pool {
-            pixelBufferPool = createdPool
-        }
     }
 
     /// Classify an observation using the CoreML model and Vision framework.
@@ -128,7 +84,7 @@ struct CoreMLIntentClassifier: FixtureIntentClassifier {
 
             let coreMLRequest = VNCoreMLRequest(
                 model: try VNCoreMLModel(for: model)
-            ) { [weak self] request, error in
+            ) { request, error in
                 if let error {
                     Logger(subsystem: "com.visionlinkhue", category: "CoreMLIntentClassifier")
                         .warning("CoreML classification failed: \(error.localizedDescription)")
@@ -148,7 +104,7 @@ struct CoreMLIntentClassifier: FixtureIntentClassifier {
                 return (FixtureType.lamp, 0.0)
             }
 
-            return (fixtureType, topLabel.confidence)
+            return (fixtureType, Double(topLabel.confidence))
         } catch {
             Logger(subsystem: "com.visionlinkhue", category: "CoreMLIntentClassifier")
                 .warning("CoreML classification error: \(error.localizedDescription)")
@@ -168,25 +124,9 @@ struct CoreMLIntentClassifier: FixtureIntentClassifier {
     static let overrideThreshold: Double = overrideConfidenceThreshold
 
     /// Create a pixel buffer for Vision framework processing.
-    /// Reuses a `CVPixelBufferPool` when available to reduce memory churn.
     private func createPixelBuffer(from box: CGRect) throws -> CVPixelBuffer {
         let width = 224
         let height = 224
-
-        if let pool = pixelBufferPool {
-            var pixelBuffer: CVPixelBuffer?
-            let status = CVPixelBufferPoolCreatePixelBuffer(nil, pool, &pixelBuffer)
-            guard status == kCVReturnSuccess, let buffer = pixelBuffer else {
-                fallback:
-                do {
-                    return try createPixelBufferDirect(width: width, height: height)
-                } catch {
-                    throw error
-                }
-            }
-            return buffer
-        }
-
         return try createPixelBufferDirect(width: width, height: height)
     }
 

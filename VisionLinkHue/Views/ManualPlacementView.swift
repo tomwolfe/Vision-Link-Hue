@@ -146,7 +146,7 @@ struct ManualPlacementView: View {
     private func loadManualAssignments() async {
         let assignments = await hueClient.spatialService?.getAllManualAssignments() ?? [:]
         await MainActor.run {
-            manualAssignments = assignments
+            manualAssignments = Dictionary(uniqueKeysWithValues: assignments.map { ($0.key.uuidString, $0.value) })
         }
     }
     

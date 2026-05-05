@@ -35,7 +35,7 @@ protocol SpatialInputHandler: AnyObject {
     func configure(trackedFixtures: [TrackedFixture])
     
     /// Process a hand pose observation for pinch detection.
-    func processHandPose(_ handPose: VNHandPoseObservation, cameraTransform: simd_float4x4) -> PinchGestureState
+    func processHandPose(_ handPose: Any, cameraTransform: simd_float4x4) -> PinchGestureState
     
     /// Update the current target based on gaze direction.
     func updateGazeTarget(gazeOrigin: SIMD3<Float>, gazeDirection: SIMD3<Float>, cameraTransform: simd_float4x4)
@@ -144,16 +144,11 @@ final class GazeTargetingSystem: SpatialInputHandler, Sendable {
         self.configuration = configuration
     }
     
-    /// Initialize with custom configuration.
-    init(configuration: GazeTargetingConfiguration) {
-        self.configuration = configuration
-    }
-    
     func configure(trackedFixtures: [TrackedFixture]) {
         self.trackedFixtures = trackedFixtures
     }
     
-    func processHandPose(_ handPose: VNHandPoseObservation, cameraTransform: simd_float4x4) -> PinchGestureState {
+    func processHandPose(_ handPose: Any, cameraTransform: simd_float4x4) -> PinchGestureState {
         // Gaze system delegates pinching to GestureManager;
         // this is a no-op stub to satisfy the protocol.
         return .inactive
@@ -170,10 +165,10 @@ final class GazeTargetingSystem: SpatialInputHandler, Sendable {
         // Check if gaze direction has changed significantly from last frame.
         if let lastDir = lastGazeDirection {
             let dotProduct = simd_dot(normalizedDirection, lastDir)
-            let angleDiff = acos(min(dotProduct, 1.0)) * 180.0 / .pi
+            let angleDiff = acos(min(dotProduct, Float(1.0))) * Float(180.0) / Float(Double.pi)
             
             // If gaze has moved beyond fixation angle, clear fixation timer.
-            if angleDiff > configuration.fixationAngleDegrees {
+            if angleDiff > Float(configuration.fixationAngleDegrees) {
                 gazeFixationStart = nil
                 isFixating = false
                 dwellProgress = 0.0
@@ -183,22 +178,22 @@ final class GazeTargetingSystem: SpatialInputHandler, Sendable {
         // Find the closest fixture within the gaze cone.
         var closestFixture: TrackedFixture?
         var closestDistance: Float = configuration.maxTargetDistance
-        var closestAngle: Double = .infinity
+        var closestAngle: Float = .infinity
         
         for fixture in trackedFixtures {
             let toFixture = fixture.position - gazeOrigin
             let distance = simd_length(toFixture)
             
             // Skip fixtures behind the camera or too far away.
-            guard distance > 0.1, distance < configuration.maxTargetDistance else { continue }
+            guard distance > Float(0.1), distance < configuration.maxTargetDistance else { continue }
             
             let fixtureDirection = simd_normalize(toFixture)
-            let angle = acos(min(simd_dot(normalizedDirection, fixtureDirection), 1.0)) * 180.0 / .pi
+            let angle = acos(min(simd_dot(normalizedDirection, fixtureDirection), Float(1.0))) * Float(180.0) / Float(Double.pi)
             
             // Skip fixtures below confidence threshold.
             guard fixture.detection.confidence >= configuration.minConfidence else { continue }
             
-            if angle < closestAngle && angle < configuration.fixationAngleDegrees {
+            if angle < closestAngle && angle < Float(configuration.fixationAngleDegrees) {
                 closestAngle = angle
                 closestFixture = fixture
                 closestDistance = distance

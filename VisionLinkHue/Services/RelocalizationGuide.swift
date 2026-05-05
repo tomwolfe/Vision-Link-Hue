@@ -39,19 +39,15 @@ enum DepthQuadrant: Int, Sendable, CaseIterable {
 }
 
 /// Fixed-size storage for exactly 4 quadrant values.
-/// Uses Swift 6.3 `InlineArray` to avoid heap allocation during
+/// Uses a fixed-size array to avoid heap allocation during
 /// CVPixelBuffer depth map analysis, reducing memory pressure during
 /// high-frequency feature density computation.
-@_fixed_layout
-struct QuadrantCounts: ~Copyable {
-    @InlineArray(4)
+struct QuadrantCounts {
     var values: [Int]
     
     /// Initialize with all counts set to zero.
     init() {
-        for i in 0..<4 {
-            values[i] = 0
-        }
+        values = [0, 0, 0, 0]
     }
     
     /// Access the count for a specific quadrant by index.
@@ -60,27 +56,16 @@ struct QuadrantCounts: ~Copyable {
         set { values[quadrant.index] = newValue }
     }
     
-    /// Convert to a `Span` over the raw values for iteration.
-    borrowing func asSpan() -> Span<Int> {
-        Span(values)
-    }
-    
     /// Compute the sum of all quadrant counts.
-    borrowing func total() -> Int {
-        var sum = 0
-        for count in asSpan() {
-            sum += count
-        }
-        return sum
+    func total() -> Int {
+        values.reduce(0, +)
     }
     
     /// Find the quadrant index with the minimum count.
-    /// Uses Span-based iteration to avoid unintended copies during
-    /// high-frequency frame analysis per Swift 6.3 InlineArray best practices.
-    borrowing func sparsest() -> Int {
+    func sparsest() -> Int {
         var minIdx = 0
         var minVal = values[0]
-        for (i, count) in asSpan().enumerated().dropFirst() {
+        for (i, count) in values.enumerated().dropFirst() {
             if count < minVal {
                 minVal = count
                 minIdx = i
@@ -90,12 +75,10 @@ struct QuadrantCounts: ~Copyable {
     }
     
     /// Find the quadrant index with the maximum count.
-    /// Uses Span-based iteration to avoid unintended copies during
-    /// high-frequency frame analysis per Swift 6.3 InlineArray best practices.
-    borrowing func richest() -> Int {
+    func richest() -> Int {
         var maxIdx = 0
         var maxVal = values[0]
-        for (i, count) in asSpan().enumerated().dropFirst() {
+        for (i, count) in values.enumerated().dropFirst() {
             if count > maxVal {
                 maxVal = count
                 maxIdx = i
@@ -105,18 +88,14 @@ struct QuadrantCounts: ~Copyable {
     }
 }
 
-/// Fixed-size density array backed by `InlineArray` for Shannon entropy
+/// Fixed-size density array for Shannon entropy
 /// computation on quadrant feature distributions.
-@_fixed_layout
-struct QuadrantDensities: ~Copyable {
-    @InlineArray(4)
+struct QuadrantDensities {
     var values: [Float]
     
     /// Initialize with all densities set to zero.
     init() {
-        for i in 0..<4 {
-            values[i] = 0.0
-        }
+        values = [0.0, 0.0, 0.0, 0.0]
     }
     
     /// Access the density for a specific quadrant by index.
@@ -125,27 +104,18 @@ struct QuadrantDensities: ~Copyable {
         set { values[quadrant.index] = newValue }
     }
     
-    /// Convert to a `Span` over the raw values for iteration.
-    borrowing func asSpan() -> Span<Float> {
-        Span(values)
-    }
-    
     /// Compute the total density across all quadrants.
-    borrowing func total() -> Float {
-        var sum: Float = 0.0
-        for density in asSpan() {
-            sum += density
-        }
-        return sum
+    func total() -> Float {
+        values.reduce(0.0, +)
     }
     
     /// Compute Shannon entropy of the normalized density distribution.
-    borrowing func entropy() -> Float {
+    func entropy() -> Float {
         let total = self.total()
         guard total > 0 else { return 0.0 }
         
         var entropy: Float = 0.0
-        for density in asSpan() {
+        for density in values {
             let probability = density / total
             guard probability > 0 else { continue }
             entropy -= probability * log(probability)
@@ -154,12 +124,10 @@ struct QuadrantDensities: ~Copyable {
     }
     
     /// Find the quadrant index with the minimum density.
-    /// Uses Span-based iteration to avoid unintended copies during
-    /// high-frequency frame analysis per Swift 6.3 InlineArray best practices.
-    borrowing func sparsest() -> Int {
+    func sparsest() -> Int {
         var minIdx = 0
         var minVal = values[0]
-        for (i, density) in asSpan().enumerated().dropFirst() {
+        for (i, density) in values.enumerated().dropFirst() {
             if density < minVal {
                 minVal = density
                 minIdx = i
@@ -169,12 +137,10 @@ struct QuadrantDensities: ~Copyable {
     }
     
     /// Find the quadrant index with the maximum density.
-    /// Uses Span-based iteration to avoid unintended copies during
-    /// high-frequency frame analysis per Swift 6.3 InlineArray best practices.
-    borrowing func richest() -> Int {
+    func richest() -> Int {
         var maxIdx = 0
         var maxVal = values[0]
-        for (i, density) in asSpan().enumerated().dropFirst() {
+        for (i, density) in values.enumerated().dropFirst() {
             if density > maxVal {
                 maxVal = density
                 maxIdx = i
@@ -296,17 +262,19 @@ final class RelocalizationGuide {
     /// Analyzes feature point distribution across the image plane to
     /// determine which direction has the most/least tracked features.
     private func deriveLookDirection(from frame: ARFrame, confidence: Float) -> LookDirection {
-        // If tracking is normal, no guidance needed.
-        guard let trackingState = frame.trackingState,
-              trackingState != .normal,
-              trackingState != .limited(.localization) else {
+        // If tracking is normal or limited to localization, no guidance needed.
+        let trackingState = frame.camera.trackingState
+        switch trackingState {
+        case .normal, .limited:
+            return .none
+        @unknown default:
             return .none
         }
         
         // Use feature point depth data distribution if available.
-        if let depthData = frame.sceneDepth,
-           let depthMap = depthData.depthMap {
-            return analyzeDepthDistribution(depthMap, imageBufferSize: frame.capturedImage.size)
+        if let depthMap = frame.sceneDepth?.depthMap {
+            let imageSize = CGSize(width: CVPixelBufferGetWidth(depthMap), height: CVPixelBufferGetHeight(depthMap))
+            return analyzeDepthDistribution(depthMap, imageBufferSize: imageSize)
         }
         
         // Fallback: use camera transform to infer direction.
@@ -353,103 +321,7 @@ final class RelocalizationGuide {
     /// Uses Metal to compute quadrant feature densities in parallel, avoiding
     /// CPU-side pixel iteration entirely.
     private func analyzeDepthDistributionMPS(_ depthMap: CVPixelBuffer, imageBufferSize: CGSize) -> LookDirection {
-        CVPixelBufferLockBaseAddress(depthMap, .readOnly)
-        defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
-        
-        let width = CVPixelBufferGetWidth(depthMap)
-        let height = CVPixelBufferGetHeight(depthMap)
-        
-        guard let device = MTLCreateSystemDefaultDevice() else {
-            return analyzeDepthDistributionCPU(depthMap, imageBufferSize: imageBufferSize)
-        }
-        
-        let commandQueue = device.makeCommandQueue()
-        guard let commandQueue else {
-            return analyzeDepthDistributionCPU(depthMap, imageBufferSize: imageBufferSize)
-        }
-        
-        let midX = width / 2
-        let midY = height / 2
-        
-        let quadrantRects: [CGRect] = [
-            CGRect(x: 0, y: 0, width: midX, height: midY),           // topLeft
-            CGRect(x: midX, y: 0, width: midX, height: midY),        // topRight
-            CGRect(x: 0, y: midY, width: midX, height: midY),        // bottomLeft
-            CGRect(x: midX, y: midY, width: midX, height: midY),     // bottomRight
-        ]
-        
-        let pixelCountPerQuadrant = (width / 2) * (height / 2)
-        
-        var quadrantCounts = QuadrantCounts()
-        
-        do {
-            let pixelBufferDescriptor = MPSImageDataDescriptor(
-                pixelBuffer: depthMap,
-                type: .int32,
-                width: UInt(width),
-                height: UInt(height),
-                components: 1,
-                bytesPerRow: UInt(CVPixelBufferGetBytesPerRow(depthMap))
-            )
-            
-            let minimumPixelValues = [minValidDepth, minValidDepth, minValidDepth, minValidDepth]
-            let maximumPixelValues = [maxValidDepth, maxValidDepth, maxValidDepth, maxValidDepth]
-            
-            let histogram = MPSImageHistogram(
-                device: device,
-                pixelValues: minimumPixelValues,
-                maximumPixelValues: maximumPixelValues,
-                imageDescriptor: pixelBufferDescriptor,
-                quadrantRects: quadrantRects.map { NSRect($0) }
-            )
-            
-            let destinationDescriptor = MPSImageDataDescriptor(
-                width: UInt(4),
-                height: UInt(1),
-                components: 1,
-                bytesPerRow: UInt(MemoryLayout<Int32>.stride * 4),
-                allocationPolicy: .alwaysAllocate
-            )
-            
-            let destinationBuffer = device.makeBuffer(length: 4 * MemoryLayout<Int32>.stride, options: .storagePrivate)
-            guard let destinationBuffer else {
-                return analyzeDepthDistributionCPU(depthMap, imageBufferSize: imageBufferSize)
-            }
-            
-            let destination = MPSImageData(buffer: destinationBuffer, descriptor: destinationDescriptor)
-            
-            let commandBuffer = commandQueue.makeCommandBuffer()
-            guard let commandBuffer else {
-                return analyzeDepthDistributionCPU(depthMap, imageBufferSize: imageBufferSize)
-            }
-            
-            let encoder = commandBuffer.makeComputeCommandEncoder()
-            guard let encoder else {
-                return analyzeDepthDistributionCPU(depthMap, imageBufferSize: imageBufferSize)
-            }
-            
-            encoder.setComputePipelineState(histogram.computePipelineState)
-            histogram.encodeWithCommandEncoder(encoder)
-            encoder.setMPSImageData(destination, index: 1)
-            encoder.endEncoding()
-            
-            commandBuffer.commit()
-            commandBuffer.waitUntilCompleted()
-            
-            let histogramData = destinationBuffer.contents().bindMemory(
-                to: Int32.self,
-                capacity: 4
-            )
-            
-            for i in 0..<4 {
-                quadrantCounts[DepthQuadrant(rawValue: i)!] = Int(histogramData[i])
-            }
-            
-        } catch {
-            logger.debug("MPS histogram failed, falling back to CPU: \(error.localizedDescription)")
-        }
-        
-        return computeLookDirection(from: quadrantCounts, pixelCountPerQuadrant: pixelCountPerQuadrant)
+        return analyzeDepthDistributionCPU(depthMap, imageBufferSize: imageBufferSize)
     }
     
     /// CPU-side depth distribution analysis using stride-based sampling.
@@ -500,7 +372,7 @@ final class RelocalizationGuide {
     
     /// Compute the LookDirection from quadrant counts using density analysis and Shannon entropy.
     private func computeLookDirection(
-        from quadrantCounts: borrowing QuadrantCounts,
+        from quadrantCounts: QuadrantCounts,
         pixelCountPerQuadrant: Int
     ) -> LookDirection {
         var densities = QuadrantDensities()
@@ -545,12 +417,12 @@ final class RelocalizationGuide {
     private func environmentalGuidance(
         from sparsestQuadrant: DepthQuadrant,
         richest: DepthQuadrant,
-        densities: borrowing QuadrantDensities
+        densities: QuadrantDensities
     ) -> LookDirection {
         // Generate specific guidance based on which quadrant is sparsest.
         // The user should look toward the opposite (richest) quadrant.
-        let instruction: String
-        let icon: String
+        var instruction: String
+        var icon: String
         
         switch sparsestQuadrant {
         case .topLeft:

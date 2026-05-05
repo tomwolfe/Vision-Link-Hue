@@ -1,5 +1,5 @@
 import Foundation
-import MultipeerConnectivity
+@preconcurrency import MultipeerConnectivity
 import os
 import UIKit
 
@@ -11,13 +11,15 @@ import UIKit
 ///
 /// Automatically suspends discovery when the app backgrounds or when a stable
 /// Hue Bridge connection is established to minimize battery drain.
-@MainActor
-final class MatterDiscoveryService {
+final class MatterDiscoveryService: NSObject, @unchecked Sendable {
     
     // MARK: - State
     
     /// Whether the service is currently active and discovering.
-    var isDiscovering: Bool { session?.state != .notConnected }
+    var isDiscovering: Bool { _isConnected }
+    
+    /// Tracks whether the MCSession is connected.
+    private var _isConnected: Bool = false
     
     /// Controls whether discovery should be suspended due to external factors
     /// (app backgrounding or stable bridge connection).
@@ -76,7 +78,7 @@ final class MatterDiscoveryService {
     
     // MARK: - Initialization
     
-    init() {
+    override init() {
         // Session created lazily when discovery starts
     }
     
@@ -209,7 +211,7 @@ final class MatterDiscoveryService {
 
 /// Internal representation of a discovered router's advertising data.
 /// Includes area metadata for Matter 1.5.1+ Thread Border Routers.
-struct RouterInfo: Sendable {
+struct RouterInfo: Sendable, Decodable {
     let advertiserName: String
     let displayName: String
     let manufacturer: String
@@ -224,7 +226,7 @@ struct RouterInfo: Sendable {
 extension MatterDiscoveryService: MCSessionDelegate {
     
     func session(_ session: MCSession, didReceive data: Data, fromPeer peerID: MCPeerID) {
-        Task { [weak self] in
+        Task { @MainActor [weak self] in
             guard let self else { return }
             
             do {
@@ -242,11 +244,12 @@ extension MatterDiscoveryService: MCSessionDelegate {
     }
     
     func session(_ session: MCSession, didChange state: MCSessionState, fromPeer peerID: MCPeerID) {
-        Task { [weak self] in
+        Task { @MainActor [weak self] in
             guard let self else { return }
             
             switch state {
             case .connected:
+                _isConnected = true
                 let info = RouterInfo(
                     advertiserName: peerID.displayName,
                     displayName: peerID.displayName,
@@ -258,6 +261,7 @@ extension MatterDiscoveryService: MCSessionDelegate {
                 )
                 await self.addOrUpdateRouter(info)
             case .notConnected:
+                _isConnected = false
                 await self.removeRouter(peerID.displayName)
             case .connecting:
                 break
@@ -269,6 +273,14 @@ extension MatterDiscoveryService: MCSessionDelegate {
     
     func session(_ session: MCSession, peer peerID: MCPeerID, didChange state: MCSessionState) {
         // Deprecated in newer iOS versions, handled by didChange(state:fromPeer:)
+    }
+    
+    func session(_ session: MCSession, didFinishReceivingResourceWithName resourceName: String, fromPeer peerID: MCPeerID, at localURL: URL?, withError error: (any Error)?) {
+        // Resource transfer not used for discovery
+    }
+    
+    func session(_ session: MCSession, didStartReceivingResourceWithName resourceName: String, fromPeer peerID: MCPeerID, with progress: Progress) {
+        // Resource transfer not used for discovery
     }
     
     func session(_ session: MCSession, didNotStartPeer peerID: MCPeerID, error: Error?) {

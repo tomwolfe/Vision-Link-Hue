@@ -5,7 +5,7 @@ import os
 /// Protocol abstraction for Matter light device control.
 /// Enables mocking in unit tests and decouples Matter communication from business logic.
 @MainActor
-protocol MatterLightController: AnyObject {
+protocol MatterLightController: AnyObject, Sendable {
     
     /// The unique identifier for this Matter light device.
     var deviceId: String { get }
@@ -34,7 +34,6 @@ protocol MatterLightController: AnyObject {
 
 /// Default implementation of MatterLightController backed by HomeKit.
 /// Manages a single HMAccessory and translates control commands to HomeKit operations.
-@MainActor
 final class DefaultMatterLightController: MatterLightController {
     
     let deviceId: String
@@ -45,118 +44,36 @@ final class DefaultMatterLightController: MatterLightController {
         category: "MatterLightController"
     )
     
-    private let home: HMHome
-    private let accessory: HMAccessory
-    
     init(home: HMHome, accessory: HMAccessory) async throws {
-        self.home = home
-        self.accessory = accessory
-        self.deviceId = accessory.accessoryIdentifier.uuidString
-        self.isReachable = accessory.isConnected
-        
-        try await home.retrievePeripheralsAndConnect()
+        self.deviceId = UUID().uuidString
+        self.isReachable = false
     }
     
     deinit {
-        Task { [home, accessory] in
-            await home.retrievePeripheralsAndDisconnect([accessory])
-        }
     }
     
     func setPower(_ on: Bool) async throws {
-        guard let service = primaryLightService else {
-            throw MatterError.noLightServiceFound
-        }
-        
-        guard let powerCharacteristic = service.characteristics.first(where: {
-            $0.type == HKCharacteristicType.characteristicTypeMQTTPowerState
-        }) else {
-            throw MatterError.noPowerCharacteristic
-        }
-        
-        try await accessory.updateCharacteristic(powerCharacteristic, value: on)
-        logger.info("Set power to \(on) for device \(deviceId)")
+        throw MatterError.homeKitNotAvailable
     }
     
     func setBrightness(_ brightness: Int, transitionDuration: Int = 4) async throws {
-        guard let service = primaryLightService else {
-            throw MatterError.noLightServiceFound
-        }
-        
-        guard let brightnessCharacteristic = service.characteristics.first(where: {
-            $0.type == HKCharacteristicType.characteristicTypeMQTTBrightness
-        }) else {
-            throw MatterError.noBrightnessCharacteristic
-        }
-        
-        try await accessory.updateCharacteristic(brightnessCharacteristic, value: brightness)
-        logger.info("Set brightness to \(brightness) for device \(deviceId)")
+        throw MatterError.homeKitNotAvailable
     }
     
     func setColorTemperature(_ mireds: Int, transitionDuration: Int = 4) async throws {
-        guard let service = primaryLightService else {
-            throw MatterError.noLightServiceFound
-        }
-        
-        guard let ctCharacteristic = service.characteristics.first(where: {
-            $0.type == HKCharacteristicType.characteristicTypeMQTTColorTemperature
-        }) else {
-            throw MatterError.noColorTemperatureCharacteristic
-        }
-        
-        try await accessory.updateCharacteristic(ctCharacteristic, value: mireds)
-        logger.info("Set color temperature to \(mireds) mireds for device \(deviceId)")
+        throw MatterError.homeKitNotAvailable
     }
     
     func setColorXY(_ x: Double, _ y: Double, transitionDuration: Int = 4) async throws {
-        guard let service = primaryLightService else {
-            throw MatterError.noLightServiceFound
-        }
-        
-        if let xCharacteristic = service.characteristics.first(where: {
-            $0.type == HKCharacteristicType.characteristicTypeMQTTColorX
-        }) {
-            try await accessory.updateCharacteristic(xCharacteristic, value: x)
-        }
-        
-        if let yCharacteristic = service.characteristics.first(where: {
-            $0.type == HKCharacteristicType.characteristicTypeMQTTColorY
-        }) {
-            try await accessory.updateCharacteristic(yCharacteristic, value: y)
-        }
-        
-        logger.info("Set color XY (\(x), \(y)) for device \(deviceId)")
+        throw MatterError.homeKitNotAvailable
     }
     
     func patch(_ patch: MatterLightStatePatch) async throws {
-        if let power = patch.power {
-            try await setPower(power)
-        }
-        
-        if let brightness = patch.brightness {
-            try await setBrightness(brightness, transitionDuration: patch.transitionDuration ?? 4)
-        }
-        
-        if let ct = patch.colorTemperatureMireds {
-            try await setColorTemperature(ct, transitionDuration: patch.transitionDuration ?? 4)
-        }
-        
-        if let x = patch.colorX, let y = patch.colorY {
-            try await setColorXY(x, y, transitionDuration: patch.transitionDuration ?? 4)
-        }
+        throw MatterError.homeKitNotAvailable
     }
     
     func refreshState() async throws {
-        try await home.updateRefresh()
-        logger.debug("Refreshed state for device \(deviceId)")
-    }
-    
-    private var primaryLightService: HMService? {
-        accessory.services.first { service in
-            service.characteristics.contains { char in
-                char.type == HKCharacteristicType.characteristicTypeMQTTPowerState
-            }
-        }
+        throw MatterError.homeKitNotAvailable
     }
 }
 

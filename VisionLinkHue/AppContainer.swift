@@ -195,6 +195,7 @@ final class AppContainer {
         
         let persistence = FixturePersistence.shared
         let detectionSettings = DetectionSettings()
+        self.detectionSettings = detectionSettings
         let objectAnchorService = ObjectAnchorPersistenceService(detectionSettings: detectionSettings)
         
         // Create dependencies through factories for testability.

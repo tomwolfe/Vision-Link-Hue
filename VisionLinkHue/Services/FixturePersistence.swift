@@ -27,7 +27,8 @@ enum SchemaMigration {
     /// in `ModelContainer` initialization, this function is dead code and is never
     /// called. If you switch to a custom migration strategy in the future, ensure
     /// you delete old models after migrating to avoid duplicate records.
-    static func migrate(from oldContainer: ModelContainer, to newContainer: ModelContainer) async throws {
+    @MainActor
+    static func migrate(from oldContainer: ModelContainer, to newContainer: ModelContainer) throws {
         let oldContext = oldContainer.mainContext
         let newContext = newContainer.mainContext
         
@@ -94,14 +95,15 @@ enum SchemaMigration {
 /// and spatial coordinates. Provides atomic transactions for all
 /// persistence operations with background isolation to prevent
 /// main-thread blocking as the fixture count grows.
-@ModelActor
 actor FixturePersistence {
     
-    let modelContainer: ModelContainer
     private let logger = Logger(
         subsystem: "com.tomwolfe.visionlinkhue",
         category: "FixturePersistence"
     )
+    
+    private let modelContainer: ModelContainer
+    var modelContext: ModelContext
     
     /// Whether the persistence layer is using in-memory storage instead of
     /// persistent disk storage. When `true`, all fixture mappings will be
@@ -109,44 +111,42 @@ actor FixturePersistence {
     var isUsingInMemoryStorage: Bool = false
     
     /// Shared singleton instance for app-wide persistence.
-    static let shared = FixturePersistence()
-    
-    /// Create a new ModelContainer with the FixtureMapping schema.
-    /// Falls back to an in-memory container if persistent storage fails.
-    /// Supports incremental schema migration for future model changes.
-    private init() {
+    static let shared: FixturePersistence = {
         let schema = Schema([FixtureMapping.self, SpatialSyncRecord.self])
+        let modelConfiguration = ModelConfiguration(schema: schema)
         
-        // Define the migration map for schema evolution.
-        // Currently only supports migration from v1 to v2 (identity migration).
-        // Add new version pairs here as the schema evolves:
-        //   Schema([FixtureMapping.self, SpatialSyncRecord.self], migrations: [
-        //       MigrationPhase.v1 -> MigrationPhase.v2 { /* migration logic */ }
-        //   ])
-        let migrationConfiguration = ModelConfiguration(
-            schema: schema,
-            migrationStrategy: .inline
-        )
+        var isUsingInMemoryStorage: Bool = false
+        var modelContainer: ModelContainer
         
         do {
-            modelContainer = try ModelContainer(for: schema, configurations: [migrationConfiguration])
-            logger.info("FixturePersistence initialized with SwiftData (schema v\(SchemaVersion.currentVersion.rawValue))")
+            modelContainer = try ModelContainer(for: schema, configurations: [modelConfiguration])
+            isUsingInMemoryStorage = false
         } catch {
-            logger.warning("Failed to create persistent SwiftData container, falling back to in-memory: \(error.localizedDescription)")
             isUsingInMemoryStorage = true
-            do {
-                modelContainer = try ModelContainer(for: schema, configurations: [ModelConfiguration(isStoredInMemoryOnly: true)])
-                logger.info("Fallback to in-memory SwiftData succeeded")
-            } catch {
-                logger.error("In-memory fallback also failed: \(error.localizedDescription)")
-                modelContainer = try! ModelContainer(for: schema, configurations: [ModelConfiguration(isStoredInMemoryOnly: true)])
-            }
+            modelContainer = try! ModelContainer(
+                for: schema,
+                configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]
+            )
         }
+        
+        let persistence = FixturePersistence(modelContainer: modelContainer, isUsingInMemoryStorage: isUsingInMemoryStorage)
+        return persistence
+    }()
+    
+    /// Create a new FixturePersistence with a ModelContainer.
+    /// Falls back to an in-memory container if persistent storage fails.
+    /// Supports incremental schema migration for future model changes.
+    private init(modelContainer: ModelContainer, isUsingInMemoryStorage: Bool = false) {
+        self.modelContainer = modelContainer
+        self.modelContext = ModelContext(modelContainer)
+        self.isUsingInMemoryStorage = isUsingInMemoryStorage
     }
     
     /// Initialize with a custom ModelContainer (for testing).
     init(container: ModelContainer) {
         self.modelContainer = container
+        self.modelContext = ModelContext(modelContainer)
+        self.isUsingInMemoryStorage = false
     }
     
     /// Load all persisted fixture mappings from SwiftData.
@@ -431,7 +431,7 @@ actor FixturePersistence {
     }
     
     /// Get the model container for external access (e.g., SwiftUI modelContainer).
-    var container: ModelContainer {
+    nonisolated var container: ModelContainer {
         modelContainer
     }
     
@@ -453,41 +453,37 @@ actor FixturePersistence {
                 withRootObject: worldMap,
                 requiringSecureCoding: true
             )
-            try data.write(to: worldMapURL)
-            try setExcludeFromICloudBackup(url: worldMapURL)
-            logger.info("ARWorldMap saved to \(worldMapURL.path)")
+            try data.write(to: self.worldMapURL)
+            try setExcludeFromICloudBackup(url: self.worldMapURL)
+            logger.info("ARWorldMap saved to \(self.worldMapURL.path)")
         } catch {
             logger.error("Failed to save ARWorldMap: \(error.localizedDescription)")
         }
     }
     
-    /// Load a previously saved ARWorldMap from the Documents directory.
-    /// Returns nil if no map exists or deserialization fails.
+    /// Load a previously saved ARWorldMap data from the Documents directory.
+    /// Returns nil if no map exists or reading fails.
     /// Ensures the file is marked for iCloud backup exclusion on load
     /// to handle files saved before this privacy compliance was added.
-    func loadWorldMap() -> ARWorldMap? {
+    func loadWorldMapData() -> Data? {
         guard FileManager.default.fileExists(atPath: worldMapURL.path) else {
             return nil
         }
         
         do {
             let data = try Data(contentsOf: worldMapURL)
-            let worldMap = try NSKeyedUnarchiver.unarchivedObject(
-                ofClass: ARWorldMap.self,
-                from: data
-            )
             try setExcludeFromICloudBackup(url: worldMapURL)
-            logger.info("ARWorldMap loaded from \(worldMapURL.path)")
-            return worldMap
+            logger.info("ARWorldMap data loaded from \(self.worldMapURL.path)")
+            return data
         } catch {
-            logger.error("Failed to load ARWorldMap: \(error.localizedDescription)")
+            logger.error("Failed to load ARWorldMap data: \(error.localizedDescription)")
             return nil
         }
     }
     
     /// Check whether a persisted ARWorldMap exists.
     func hasWorldMap() -> Bool {
-        FileManager.default.fileExists(atPath: worldMapURL.path)
+        FileManager.default.fileExists(atPath: self.worldMapURL.path)
     }
     
     /// Delete the persisted ARWorldMap.

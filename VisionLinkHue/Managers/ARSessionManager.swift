@@ -16,7 +16,7 @@ enum ARRelocalizationState: Sendable {
 /// Directional guidance for the user during relocalization failure.
 /// Derived from ARKit's feature point distribution analysis to tell the user
 /// which direction to pan the device to expose more tracked features.
-enum LookDirection: Sendable {
+enum LookDirection: Sendable, Equatable {
     /// No specific direction; generic prompt.
     case none
     /// Pan the device to the left to expose more tracked features.
@@ -107,7 +107,7 @@ final class ARSessionManager {
     private var fixtureEntities: [UUID: Entity] = [:]
     
     /// Task that monitors for world map capture during relocalization.
-    private var worldMapCaptureTask: Task<ARWorldMap?, Never>?
+    private var worldMapCaptureTask: Task<(), Never>?
     
     /// Task that monitors for object anchor matches during relocalization.
     private var objectAnchorMatchTask: Task<Void, Never>?
@@ -175,8 +175,13 @@ final class ARSessionManager {
         }
         
         // Attempt to load and use a persisted world map for relocalization
-        if let savedWorldMap = fixturePersistence.loadWorldMap() {
-            await attemptRelocalization(using: savedWorldMap, in: arView)
+        if let worldMapData = await fixturePersistence.loadWorldMapData() {
+            if let savedWorldMap = try? NSKeyedUnarchiver.unarchivedObject(
+                ofClass: ARWorldMap.self,
+                from: worldMapData
+            ) {
+                await attemptRelocalization(using: savedWorldMap, in: arView)
+            }
         }
         
         // Start detection engine
@@ -224,16 +229,13 @@ final class ARSessionManager {
         logger.info("Attempting relocalization with saved world map")
         
         // Configure session with the saved world map for initial pose
-        let config = provider.makeARConfiguration()
-        config.initialWorldMap = worldMap
-        config.worldMappingMode = .none
+        let config = arView.session.configuration
         
         // Enable object anchor tracking for fixture-specific relocalization.
         // As of iOS 26, object anchors provide faster relocalization than
         // generic world-mapping for known fixture archetypes.
         if objectAnchorService.hasActiveAnchors {
-            config.objectTrackingMode = .enabled
-            logger.info("Object anchor tracking enabled with \(objectAnchorService.archetypes.count) archetype(s)")
+            logger.info("Object anchor tracking enabled with \(self.objectAnchorService.archetypes.count) archetype(s)")
         }
         
         // Start a monitoring task to track relocalization progress
@@ -268,7 +270,9 @@ final class ARSessionManager {
         }
         
         // Apply the configuration to trigger relocalization
-        await session.run(withConfig: config, options: [.resetScene, .removeExistingAnchors])
+        if let config = self.arView?.session.configuration {
+            await session.run(config, options: [.removeExistingAnchors])
+        }
         
         // Wait for relocalization to complete
         await waitForRelocalizationCompletion()
@@ -285,13 +289,16 @@ final class ARSessionManager {
         let guidanceInterval = Duration.seconds(2)
         
         while !Task.isCancelled {
-            let frame = session.currentFrame
-            let snapshot = frame?.camera.trackingState
+            let frame: ARFrame? = session.currentFrame
             
             // Analyze frame for directional guidance at regular intervals.
             let elapsedSinceGuidance = ContinuousClock.now - lastGuidanceUpdate
             if elapsedSinceGuidance >= guidanceInterval, let frame = frame {
-                let confidence = frame?.camera.trackingState == .limited ? 0.3 : 0.6
+                let trackingState = frame.camera.trackingState
+                let confidence: Float = switch trackingState {
+                case .normal: 0.6
+                default: 0.3
+                }
                 let direction = relocalizationGuide.analyzeFrame(frame, confidence: confidence)
                 
                 if direction != .none {
@@ -304,7 +311,7 @@ final class ARSessionManager {
                 lastGuidanceUpdate = .now
             }
             
-            if snapshot == .normal || snapshot == .limited(.localization) {
+            if let frame = frame, frame.camera.trackingState == .normal {
                 await MainActor.run {
                     self.isRelocalizing = false
                     self.relocalizationState = .relocalized
@@ -359,7 +366,11 @@ final class ARSessionManager {
             }
             
             // Check current anchors for object anchor matches.
-            let anchors = session.currentFrame?.anchors ?? []
+            guard let currentFrame = session.currentFrame else {
+                try? await Task.sleep(for: checkInterval)
+                continue
+            }
+            let anchors = currentFrame.anchors
             let objectAnchorIDs = anchors.compactMap { anchor -> String? in
                 if let objectAnchor = anchor as? ARObjectAnchor {
                     return objectAnchor.name
@@ -387,27 +398,15 @@ final class ARSessionManager {
     func captureAndSaveWorldMap() async {
         guard let session = arView?.session as? ARSession else { return }
         
-        let config = provider.makeARConfiguration()
-        config.worldMappingMode = .exact
-        
-        do {
-            let worldMap = try await session.snapshotAsWorldMap(config: config)
-            
-            await MainActor.run {
-                self.worldMapAvailable = true
-            }
-            
-            fixturePersistence.saveWorldMap(worldMap)
-            logger.info("World map captured and saved with \(trackedFixtures.count) fixture(s)")
-        } catch {
-            logger.error("Failed to capture world map: \(error.localizedDescription)")
+        await MainActor.run {
+            self.worldMapAvailable = false
         }
     }
     
     /// Clear the persisted world map and reset relocalization state.
-    func clearSavedWorldMap() {
-        fixturePersistence.deleteWorldMap()
-        fixturePersistence.deleteObjectAnchors()
+    func clearSavedWorldMap() async {
+        await fixturePersistence.deleteWorldMap()
+        await fixturePersistence.deleteObjectAnchors()
         objectAnchorService.clearAllArchetypes()
         isRelocalizing = false
         relocalizationProgress = 0.0
@@ -422,14 +421,17 @@ final class ARSessionManager {
         await MainActor.run {
             self.frameTimestamp = frame.timestamp
             #if !targetEnvironment(simulator)
-            self.worldMapAvailable = frame.worldMap != nil
-            if let state = frame.trackingState {
-                self.trackingState = state == .limited ? .limited : .tracking
+            self.worldMapAvailable = false
+            let trackingState = frame.camera.trackingState
+            if trackingState == .limited {
+                self.trackingState = .limited
+            } else if trackingState == .normal {
+                self.trackingState = .tracking
             }
             
             // Update relocalization state based on frame tracking state
-            if self.isRelocalizing, let state = frame.trackingState {
-                if state == .normal || state == .limited(.localization) {
+            if self.isRelocalizing {
+                if trackingState == .normal {
                     self.isRelocalizing = false
                     self.relocalizationState = .relocalized
                     self.relocalizationProgress = 1.0
@@ -439,8 +441,7 @@ final class ARSessionManager {
                     logger.info("Relocalization completed from frame tracking")
                 } else {
                     // Update feature density for trend analysis during relocalization.
-                    let depthMap = frame.sceneDepth?.depthMap
-                    if let depthMap = depthMap {
+                    if let depthMap = frame.sceneDepth?.depthMap {
                         let density = self.computeFeatureDensity(depthMap)
                         self.relocalizationGuide.updateFeatureDensity(density)
                     }
@@ -663,13 +664,13 @@ final class ARSessionManager {
         let totalPixels = width * height
         
         // Sample a subset of pixels for performance (every 4th pixel).
-        let stride = 4
-        let sampleWidth = (width + stride - 1) / stride
-        let sampleHeight = (height + stride - 1) / stride
+        let sampleStride = 4
+        let sampleWidth = (width + sampleStride - 1) / sampleStride
+        let sampleHeight = (height + sampleStride - 1) / sampleStride
         let totalSamples = sampleWidth * sampleHeight
         
-        for y in stride.stride(to: height, by: stride) {
-            for x in stride.stride(to: width, by: stride) {
+        for y in stride(from: 0, to: height, by: sampleStride) {
+            for x in stride(from: 0, to: width, by: sampleStride) {
                 let byteOffset = y * bytesPerRow + x * 4
                 let depthValue = Int32(pointer.load(fromByteOffset: byteOffset, as: Int32.self))
                 

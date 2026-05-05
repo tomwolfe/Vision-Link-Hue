@@ -194,17 +194,19 @@ final class SpatialCalibrationEngine {
             return false
         }
         
-        do {
-            let rotation = try simd_float3x3(data: rotationData)
-            let translation = try SIMD3<Float>(data: translationData)
-            
-            transformation = Transformation(rotation: rotation, translation: translation)
-            logger.info("Loaded persisted calibration: rotation=[\(String(format: "%.3f", rotation.columns.0.x)), ...], translation=[\(String(format: "%.3f", translation.x)), \(String(format: "%.3f", translation.y)), \(String(format: "%.3f", translation.z))])")
-            return true
-        } catch {
-            logger.warning("Failed to load persisted calibration: \(error.localizedDescription)")
-            return false
+        let rotationCols: [simd_float3] = rotationData.withUnsafeBytes { ptr in
+            ptr.bindMemory(to: simd_float3.self).map { $0 }
         }
+        let rotation = simd_float3x3(rotationCols)
+        
+        let translationFloats = translationData.withUnsafeBytes { ptr in
+            ptr.bindMemory(to: Float.self).map { $0 }
+        }
+        let translation = simd_float3(translationFloats[0], translationFloats[1], translationFloats[2])
+        
+        transformation = Transformation(rotation: rotation, translation: translation)
+        logger.info("Loaded persisted calibration: rotation=[\(String(format: "%.3f", rotation.columns.0.x)), ...], translation=[\(String(format: "%.3f", translation.x)), \(String(format: "%.3f", translation.y)), \(String(format: "%.3f", translation.z))])")
+        return true
     }
     
     /// Save the current transformation to the persistence store.
@@ -212,7 +214,11 @@ final class SpatialCalibrationEngine {
         guard let store = persistenceStore,
               let transform = transformation else { return }
         
-        Task { [rotationData = transform.rotation.data, translationData = transform.translation.data] in
+        Task { [transform] in
+            var rotation = transform.rotation
+            let rotationData = Data(bytes: &rotation, count: MemoryLayout<simd_float3x3>.stride)
+            var translation = transform.translation
+            let translationData = Data(bytes: &translation, count: MemoryLayout<simd_float3>.stride)
             await store.saveCalibration(rotationData: rotationData, translationData: translationData)
             logger.debug("Saved calibration transformation to persistence store")
         }
@@ -575,7 +581,7 @@ final class SpatialCalibrationEngine {
     /// - Parameter M: A 3×3 matrix with approximately orthogonal columns.
     /// - Returns: A strictly orthogonal 3×3 rotation matrix.
     private func orthogonalize(_ M: simd_float3x3) -> simd_float3x3 {
-        var c0 = normalize(M.columns.0)
+        let c0 = normalize(M.columns.0)
         var c1 = M.columns.1 - c0 * dot(c0, M.columns.1)
         c1 = normalize(c1)
         var c2 = cross(M.columns.0, M.columns.1)

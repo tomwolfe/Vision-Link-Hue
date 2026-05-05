@@ -165,7 +165,7 @@ struct FixtureReticle: View {
 // MARK: - Sub-Views
 
 /// Extracted sub-view for the connecting ring animation during relocalization.
-private struct ConnectingRingView: View {
+internal struct ConnectingRingView: View {
     let progress: Float
     
     var body: some View {
@@ -180,19 +180,19 @@ private struct ConnectingRingView: View {
                 style: StrokeStyle(lineWidth: 3, lineCap: .round)
             )
             .frame(width: 80, height: 80)
-            .rotationEffect(.degrees(progress * 360.0))
+            .rotationEffect(.degrees(Double(progress) * 360.0))
             .opacity(0.8)
     }
 }
 
 /// Extracted sub-view for the gaze dwell ring animation on Vision Pro.
-private struct GazeDwellRingView: View {
+internal struct GazeDwellRingView: View {
     let progress: Float
     let isActive: Bool
     
     var body: some View {
         Circle()
-            .trim(from: 0, to: progress)
+            .trim(from: 0.0, to: Double(progress))
             .stroke(
                 LinearGradient(
                     colors: [.purple.opacity(0.8), .purple.opacity(0.3)],
@@ -202,13 +202,13 @@ private struct GazeDwellRingView: View {
                 style: StrokeStyle(lineWidth: 3, lineCap: .round)
             )
             .frame(width: 80, height: 80)
-            .rotationEffect(.degrees(progress * 360.0))
+            .rotationEffect(.degrees(Double(progress) * 360.0))
             .opacity(isActive ? 0.8 : 0.0)
     }
 }
 
 /// Extracted sub-view for the crosshair overlay at the reticle center.
-private struct CrosshairView: View {
+internal struct CrosshairView: View {
     var body: some View {
         ZStack {
             // Vertical crosshair
@@ -265,7 +265,7 @@ private struct CrosshairView: View {
 }
 
 /// Extracted sub-view for the confidence arc indicator.
-private struct ConfidenceArcView: View {
+internal struct ConfidenceArcView: View {
     let confidence: Double
     
     var body: some View {
@@ -286,7 +286,7 @@ private struct ConfidenceArcView: View {
 }
 
 /// Extracted sub-view for the brightness indicator during pinch gesture.
-private struct BrightnessIndicatorView: View {
+internal struct BrightnessIndicatorView: View {
     let brightness: Int
     
     var body: some View {

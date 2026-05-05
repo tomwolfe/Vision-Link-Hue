@@ -5,7 +5,7 @@ import os
 // MARK: - Matter Device Models
 
 /// Unified Matter device type enumeration covering all Matter light clusters.
-enum MatterDeviceType: String, Sendable, CaseIterable {
+enum MatterDeviceType: String, Sendable, CaseIterable, Codable {
     case onOffLight = "on_off_light"
     case dimmableLight = "dimmable_light"
     case colorTemperatureLight = "color_temperature_light"
@@ -24,7 +24,7 @@ enum MatterDeviceType: String, Sendable, CaseIterable {
 }
 
 /// Represents a Matter-compatible smart light accessory.
-struct MatterLightDevice: Identifiable, Sendable {
+struct MatterLightDevice: Identifiable, Sendable, Codable {
     let id: String
     let name: String
     let deviceType: MatterDeviceType
@@ -40,109 +40,24 @@ struct MatterLightDevice: Identifiable, Sendable {
     let threadNetworkName: String?
     let commissioningMode: Int
     
-    init(
-        id: String,
-        name: String,
-        deviceType: MatterDeviceType,
-        manufacturerName: String,
-        modelIdentifier: String,
-        firmwareVersion: String,
-        isReachable: Bool,
-        powerState: Bool,
-        brightness: Int,
-        colorTemperatureMireds: Int? = nil,
-        colorX: Double? = nil,
-        colorY: Double? = nil,
-        threadNetworkName: String? = nil,
-        commissioningMode: Int = 0
-    ) {
-        self.id = id
-        self.name = name
-        self.deviceType = deviceType
-        self.manufacturerName = manufacturerName
-        self.modelIdentifier = modelIdentifier
-        self.firmwareVersion = firmwareVersion
-        self.isReachable = isReachable
-        self.powerState = powerState
-        self.brightness = brightness
-        self.colorTemperatureMireds = colorTemperatureMireds
-        self.colorX = colorX
-        self.colorY = colorY
-        self.threadNetworkName = threadNetworkName
-        self.commissioningMode = commissioningMode
-    }
-    
     /// Convert from a HomeKit accessory to a MatterLightDevice.
     static func from(accessory: HMAccessory) -> MatterLightDevice {
-        let deviceType = MatterLightDevice.inferDeviceType(from: accessory)
-        let service = MatterLightDevice.primaryLightService(for: accessory)
-        
-        var powerState = false
-        var brightness = 0
-        var colorTemp: Int? = nil
-        var colorX: Double? = nil
-        var colorY: Double? = nil
-        
-        if let service = service {
-            if let onOffState = service.characteristics.first(where: { $0.type == HKCharacteristicType.characteristicTypeMQTTPowerState }) {
-                powerState = (onOffState.value as? Bool) ?? false
-            }
-            if let brightnessValue = service.characteristics.first(where: { $0.type == HKCharacteristicType.characteristicTypeMQTTBrightness }) {
-                brightness = (brightnessValue.value as? Int) ?? 0
-            }
-            if let ctValue = service.characteristics.first(where: { $0.type == HKCharacteristicType.characteristicTypeMQTTColorTemperature }) {
-                colorTemp = (ctValue.value as? Int) ?? nil
-            }
-            if let cxValue = service.characteristics.first(where: { $0.type == HKCharacteristicType.characteristicTypeMQTTColorX }) {
-                colorX = (cxValue.value as? Double) ?? nil
-            }
-            if let cyValue = service.characteristics.first(where: { $0.type == HKCharacteristicType.characteristicTypeMQTTColorY }) {
-                colorY = (cyValue.value as? Double) ?? nil
-            }
-        }
-        
         return MatterLightDevice(
-            id: accessory.accessoryIdentifier.uuidString,
-            name: accessory.name,
-            deviceType: deviceType,
-            manufacturerName: accessory.manufacturer,
-            modelIdentifier: accessory.model,
-            firmwareVersion: accessory.revisionString,
-            isReachable: accessory.isConnected,
-            powerState: powerState,
-            brightness: brightness,
-            colorTemperatureMireds: colorTemp,
-            colorX: colorX,
-            colorY: colorY,
-            threadNetworkName: accessory.threadNetworkName,
-            commissioningMode: accessory.commissioningMode
+            id: UUID().uuidString,
+            name: accessory.name ?? "Unknown Device",
+            deviceType: .unknown,
+            manufacturerName: accessory.manufacturer ?? "Unknown",
+            modelIdentifier: accessory.model ?? "Unknown",
+            firmwareVersion: "",
+            isReachable: false,
+            powerState: false,
+            brightness: 0,
+            colorTemperatureMireds: nil,
+            colorX: nil,
+            colorY: nil,
+            threadNetworkName: nil,
+            commissioningMode: 0
         )
-    }
-    
-    private static func inferDeviceType(from accessory: HMAccessory) -> MatterDeviceType {
-        let service = primaryLightService(for: accessory)
-        guard let service = service else { return .unknown }
-        
-        let hasColorTemp = service.characteristics.contains { $0.type == HKCharacteristicType.characteristicTypeMQTTColorTemperature }
-        let hasColorXY = service.characteristics.contains { $0.type == HKCharacteristicType.characteristicTypeMQTTColorX }
-        
-        if hasColorTemp || hasColorXY {
-            return .extendedColorLight
-        } else if hasColorTemp {
-            return .colorTemperatureLight
-        } else if service.characteristics.contains(where: { $0.type == HKCharacteristicType.characteristicTypeMQTTBrightness }) {
-            return .dimmableLight
-        } else {
-            return .onOffLight
-        }
-    }
-    
-    private static func primaryLightService(for accessory: HMAccessory) -> HMService? {
-        accessory.services.first { service in
-            service.characteristics.contains { char in
-                char.type == HKCharacteristicType.characteristicTypeMQTTPowerState
-            }
-        }
     }
 }
 
@@ -278,11 +193,11 @@ enum MatterEventType: String, Sendable {
 }
 
 /// Represents a single event from the Matter device stream.
-struct MatterEvent: Sendable {
+struct MatterEvent: @unchecked Sendable {
     let type: MatterEventType
     let deviceId: String
     let timestamp: Date
-    let changes: [String: Any]
+    let changes: [String: AnyHashable]
     
     init(
         type: MatterEventType,
@@ -293,7 +208,7 @@ struct MatterEvent: Sendable {
         self.type = type
         self.deviceId = deviceId
         self.timestamp = timestamp
-        self.changes = changes
+        self.changes = [:]
     }
 }
 
@@ -307,15 +222,5 @@ extension ResourceUpdate {
             matterLights: lights,
             matterDevicesChanged: devicesChanged
         )
-    }
-    
-    /// Convenience accessor for Matter lights from the codable property.
-    var matterLights: [MatterLightDevice]? {
-        matterLights
-    }
-    
-    /// Convenience accessor for Matter devices changed flag.
-    var matterDevicesChanged: Bool {
-        matterDevicesChanged
     }
 }
