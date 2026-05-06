@@ -13,10 +13,11 @@ public enum QuaternionTransform {
         var bytes = Data(count: 16)
         bytes.withUnsafeMutableBytes { mutableBytes in
             let ptr = mutableBytes.baseAddress!
-            ptr.assumingMemoryBound(to: Float.self).pointee = value.x
-            ptr.advanced(by: 4).assumingMemoryBound(to: Float.self).pointee = value.y
-            ptr.advanced(by: 8).assumingMemoryBound(to: Float.self).pointee = value.z
-            ptr.advanced(by: 12).assumingMemoryBound(to: Float.self).pointee = value.w
+            let vec = value.vector
+            ptr.assumingMemoryBound(to: Float.self).pointee = vec.x
+            ptr.advanced(by: 4).assumingMemoryBound(to: Float.self).pointee = vec.y
+            ptr.advanced(by: 8).assumingMemoryBound(to: Float.self).pointee = vec.z
+            ptr.advanced(by: 12).assumingMemoryBound(to: Float.self).pointee = vec.w
         }
         return bytes
     }
@@ -35,6 +36,6 @@ public enum QuaternionTransform {
             z = ptr.advanced(by: 2).pointee
             w = ptr.advanced(by: 3).pointee
         }
-        return simd_quatf(x: x, y: y, z: z, w: w)
+        return simd_quatf(ix: x, iy: y, iz: z, r: w)
     }
 }

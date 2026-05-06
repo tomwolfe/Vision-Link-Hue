@@ -117,7 +117,7 @@ final class GazeTargetingSystem: SpatialInputHandler, Sendable {
     private var currentGazeTarget: TrackedFixture?
     
     /// Time when gaze fixation began on the current target.
-    private var gazeFixationStart: ContinuousClock.Instant?
+    fileprivate var gazeFixationStart: ContinuousClock.Instant?
     
     /// Last gaze direction vector (normalized).
     private var lastGazeDirection: SIMD3<Float>?
@@ -133,6 +133,12 @@ final class GazeTargetingSystem: SpatialInputHandler, Sendable {
     
     /// Whether the user is currently fixating (within fixation angle).
     var isFixating: Bool = false
+    
+    /// Last timestamp when UI feedback properties were updated.
+    /// Throttles @Observable mutations to the feedbackInterval rate
+    /// to prevent excessive SwiftUI view invalidations during high-frequency
+    /// AR frame processing (typically 60-120fps).
+    private var lastFeedbackTime: ContinuousClock.Instant?
     
     private let logger = Logger(
         subsystem: "com.tomwolfe.visionlinkhue",
@@ -169,6 +175,7 @@ final class GazeTargetingSystem: SpatialInputHandler, Sendable {
             let angleDiff = acos(clampedDot) * Float(180.0) / Float(Double.pi)
             
             // If gaze has moved beyond fixation angle, clear fixation timer.
+            // This is a state change that must be reflected immediately in UI.
             if angleDiff > Float(configuration.fixationAngleDegrees) {
                 gazeFixationStart = nil
                 isFixating = false
@@ -222,16 +229,55 @@ final class GazeTargetingSystem: SpatialInputHandler, Sendable {
             }
         }
         
-        // Update dwell progress if fixating on the same target.
+        // Compute dwell progress internally each frame for state tracking,
+        // but only update the @Observable properties at the feedbackInterval
+        // rate to prevent excessive SwiftUI view invalidations.
+        let now = ContinuousClock.now
+        
         if let _ = closestFixture, gazeFixationStart != nil {
-            isFixating = true
-            let elapsed = ContinuousClock.now - gazeFixationStart!
+            let elapsed = now - gazeFixationStart!
             let elapsedSeconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
-            dwellProgress = min(Float(elapsedSeconds / configuration.dwellDuration), 1.0)
+            let computedProgress = min(Float(elapsedSeconds / configuration.dwellDuration), 1.0)
+            
+            // Throttle UI updates to feedbackInterval rate.
+            let shouldUpdateUI = shouldUpdateUIFeedback(now: now)
+            
+            if shouldUpdateUI {
+                isFixating = true
+                dwellProgress = computedProgress
+                lastFeedbackTime = now
+            }
+            // Store computed progress without triggering @Observable mutation
+            // when throttled - the next UI update will use the latest value.
+            if !shouldUpdateUI {
+                // Only update if the value would actually change when we next refresh
+                let progressDiff = abs(computedProgress - dwellProgress)
+                if progressDiff >= 0.01 {
+                    // Queue an immediate update if progress changed meaningfully
+                    dwellProgress = computedProgress
+                    lastFeedbackTime = now
+                }
+            }
         } else {
-            isFixating = false
-            dwellProgress = 0.0
+            // Only update UI when transitioning out of fixation
+            if isFixating {
+                isFixating = false
+                dwellProgress = 0.0
+            }
         }
+    }
+    
+    /// Determine whether UI feedback properties should be updated.
+    /// Respects the feedbackInterval to throttle @Observable mutations
+    /// during high-frequency AR frame processing.
+    private func shouldUpdateUIFeedback(now: ContinuousClock.Instant) -> Bool {
+        guard let lastTime = lastFeedbackTime else {
+            return true
+        }
+        
+        let elapsed = now - lastTime
+        let elapsedSeconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
+        return elapsedSeconds >= configuration.feedbackInterval
     }
     
     func beginSelection() {
@@ -290,6 +336,7 @@ final class GazeTargetingSystem: SpatialInputHandler, Sendable {
         lastGazeOrigin = nil
         dwellProgress = 0.0
         isFixating = false
+        lastFeedbackTime = nil
     }
     
     /// Check if the current dwell selection has completed.

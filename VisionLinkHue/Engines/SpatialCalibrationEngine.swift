@@ -46,7 +46,9 @@ import os
 /// - **Numerical stability**: The Newton-Raphson method avoids the numerical
 ///   instability of direct SVD on ill-conditioned covariance matrices. A
 ///   determinant check (`det(HTH) > 1e-6`) guards against singular matrices
-///   caused by collinear calibration points.
+///   caused by collinear calibration points. When the determinant falls below
+///   this threshold, calibration **fails** rather than silently returning an
+///   identity transform, preventing corrupted spatial mappings.
 ///
 /// - **Reflection handling**: After computing `R`, the determinant is checked.
 ///   If `det(R) < 0`, the matrix represents a reflection rather than a rotation.
@@ -88,14 +90,41 @@ import os
 @MainActor
 final class SpatialCalibrationEngine {
     
+    // MARK: - Calibration Result Types
+    
+    /// Represents the outcome of a Kabsch calibration computation.
+    enum CalibrationResult: Sendable {
+        /// Calibration succeeded with the computed transformation.
+        case success(Transformation)
+        /// Calibration failed due to degenerate input (collinear or identical points).
+        /// The AR mapping cannot be computed and the user should provide new calibration points.
+        case failed(CalibrationFailure)
+    }
+    
+    /// Describes why a calibration computation failed.
+    enum CalibrationFailure: Sendable {
+        /// The covariance matrix was near-singular (`det(HTH) < 1e-6`),
+        /// typically caused by collinear or identical calibration points.
+        case illConditionedCovariance
+    }
+    
     // MARK: - Public State
     
-    /// Whether a valid 3+ point calibration has been established.
-    var isCalibrated: Bool { calibrationPoints.count >= 3 }
+    /// Whether a valid calibration has been established.
+    /// Returns `false` if calibration failed due to degenerate input points,
+    /// even if 3+ points were provided.
+    var isCalibrated: Bool { transformation != nil }
     
     /// Computed transformation matrix (rotation + translation).
-    /// `nil` until at least 3 calibration points are available.
+    /// `nil` until at least 3 non-degenerate calibration points are available.
+    /// When calibration fails (e.g., collinear points), this is set to `nil`
+    /// to prevent silently applying a corrupted identity transform.
     var transformation: Transformation?
+    
+    /// The reason calibration failed, if `transformation` is `nil` despite
+    /// having enough calibration points. `nil` when calibration has not yet
+    /// been attempted or succeeded.
+    var calibrationFailure: CalibrationFailure?
     
     // MARK: - Persistence
     
@@ -108,7 +137,7 @@ final class SpatialCalibrationEngine {
     private static let maxCalibrationPoints = 6
     
     /// Minimum number of calibration points required for a valid transform.
-    private static let minCalibrationPoints = 3
+    static let minCalibrationPoints = 3
     
     // MARK: - Private State
     
@@ -319,13 +348,19 @@ final class SpatialCalibrationEngine {
             covMatrix.columns.2 += dt * ds.z
         }
         
-        // Compute optimal rotation
-        let rotation = kabschRotation(from: covMatrix)
+        // Compute optimal rotation, bubbling up failure for degenerate inputs.
+        guard let result = kabschRotation(from: covMatrix) else {
+            calibrationFailure = .illConditionedCovariance
+            transformation = nil
+            logger.warning("Kabsch calibration failed: covariance matrix is ill-conditioned. Det(HTH) was below threshold. User should provide non-collinear calibration points.")
+            return
+        }
         
         // Compute translation: t = target_centroid - R * source_centroid
-        let translation = targetCentroid - rotation * sourceCentroid
+        let translation = targetCentroid - result * sourceCentroid
         
-        transformation = Transformation(rotation: rotation, translation: translation)
+        transformation = Transformation(rotation: result, translation: translation)
+        calibrationFailure = nil
         
         logger.debug(
             "Kabsch transformation computed from \(n) points. Translation: (\(String(format: "%.3f", translation.x)), \(String(format: "%.3f", translation.y)), \(String(format: "%.3f", translation.z)))"
@@ -381,19 +416,16 @@ final class SpatialCalibrationEngine {
     /// ```
     ///
     /// - Parameter covMatrix: The 3×3 covariance matrix `H` between centered point sets.
-    /// - Returns: A 3×3 orthogonal rotation matrix with `det(R) = +1`.
-    private func kabschRotation(from covMatrix: simd_float3x3) -> simd_float3x3 {
+    /// - Returns: A 3×3 orthogonal rotation matrix with `det(R) = +1`, or `nil` if the
+    ///   covariance matrix is ill-conditioned (indicating collinear or degenerate calibration points).
+    private func kabschRotation(from covMatrix: simd_float3x3) -> simd_float3x3? {
         let H = covMatrix
         let HTH = H.transpose * H
         let detHTH = determinant(HTH)
         
         if detHTH < 1e-6 {
-            logger.warning("Kabsch algorithm: det(HTH) = \(detHTH) < 1e-6, falling back to identity transformation. Covariance matrix may be ill-conditioned due to collinear or insufficient calibration points.")
-            return simd_float3x3(
-                SIMD3<Float>(1, 0, 0),
-                SIMD3<Float>(0, 1, 0),
-                SIMD3<Float>(0, 0, 1)
-            )
+            logger.warning("Kabsch algorithm: det(HTH) = \(detHTH) < 1e-6, calibration failed. Covariance matrix is ill-conditioned due to collinear or degenerate calibration points. Returning nil to prevent silently applying a corrupted identity transform.")
+            return nil
         }
         
         let HTHInvSqrt = inverseSqrtMatrix(HTH)

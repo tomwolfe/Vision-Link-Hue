@@ -271,11 +271,11 @@ struct FixtureHeuristicClassifier {
         for jsonRule in configFile.rules {
             guard let type = FixtureType(from: jsonRule.type) else { continue }
             
-            let aspectRange = jsonRule.aspectRange.map { safeClosedRange($0) }
+            let aspectRange = jsonRule.aspectRange.flatMap { safeClosedRange($0) }
             
-            let yRange = jsonRule.yRange.map { safeClosedRange($0) }
+            let yRange = jsonRule.yRange.flatMap { safeClosedRange($0) }
             
-            let areaRange = jsonRule.areaRange.map { safeClosedRange($0) }
+            let areaRange = jsonRule.areaRange.flatMap { safeClosedRange($0) }
             
             loadedRules.append(ScoringRule(
                 type: type,

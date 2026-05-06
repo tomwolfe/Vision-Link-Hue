@@ -401,13 +401,13 @@ final actor SpatialSyncService {
             for remoteRecord in remoteRecords {
                 // Merge the remote vector clock into our local clock.
                 if let remoteClock = deserializeVectorClock(from: remoteRecord.vectorClockJSON) {
-                    let fixtureKey = remoteRecord.fixtureId
+                    let fixtureKey = remoteRecord.fixtureId.uuidString
                     let localClock = vectorClocks[fixtureKey] ?? [:]
                     vectorClocks[fixtureKey] = CRDTConflictResolver.mergeClocks(localClock, remoteClock)
                 }
                 
                 // Check if local record exists and is newer.
-                let localVersion = await getLocalVersion(for: remoteRecord.fixtureId)
+                let localVersion = await getLocalVersion(for: remoteRecord.fixtureId.uuidString)
                 
                 if localVersion >= remoteRecord.version {
                     // Local version is up-to-date or newer, skip.
@@ -437,7 +437,7 @@ final actor SpatialSyncService {
         let pendingRecords = await loadPendingSyncRecords()
         
         for record in pendingRecords {
-            let fixtureKey = record.fixtureId
+            let fixtureKey = record.fixtureId.uuidString
             let localClock = vectorClocks[fixtureKey] ?? [:]
             let remoteVersion = await getRemoteVersion(for: fixtureKey)
             let localVersion = await getLocalVersion(for: fixtureKey)
@@ -733,7 +733,7 @@ final actor SpatialSyncService {
     
     /// Load local fixture mappings that need syncing.
     /// Delegates to FixturePersistence which manages the FixtureMapping context.
-    private func loadLocalMappingsNeedingSync() async -> [FixtureMapping] {
+    private func loadLocalMappingsNeedingSync() async -> [FixtureMappingUploadData] {
         await persistence.loadMappingsNeedingSync()
     }
     

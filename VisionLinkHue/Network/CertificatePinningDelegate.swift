@@ -73,7 +73,7 @@ actor CertificatePinStore {
             if allPinnedHashes.contains(publicKeyHash) {
                 return (.useCredential, nil)
             } else {
-                logger.error("Certificate pin mismatch - expected one of \(allPinnedHashes.count) pinned hash(es), got \(publicKeyHash.count) bytes")
+                logger.error("Certificate pin mismatch - expected one of \(self.allPinnedHashes.count) pinned hash(es), got \(publicKeyHash.count) bytes")
                 return (.cancelAuthenticationChallenge, nil)
             }
         } else {
@@ -148,13 +148,13 @@ actor CertificatePinStore {
             return
         }
         secondaryPins.append(hash)
-        logger.info("Added secondary pin for certificate rotation (total: \(secondaryPins.count))")
+        logger.info("Added secondary pin for certificate rotation (total: \(self.secondaryPins.count))")
     }
     
     /// Remove a secondary pin. Useful after rotation is complete.
     func removeSecondaryPin(_ hash: Data) async {
         secondaryPins.removeAll { $0 == hash }
-        logger.info("Removed secondary pin (remaining: \(secondaryPins.count))")
+        logger.info("Removed secondary pin (remaining: \(self.secondaryPins.count))")
     }
     
     /// Clear all secondary pins. Call after rotation is complete and

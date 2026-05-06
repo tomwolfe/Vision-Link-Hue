@@ -110,12 +110,24 @@ final class MatterBridgeService: NSObject, @unchecked Sendable {
                 for accessory in home.accessories {
                     guard accessory.isReachable else { continue }
                     
-                    guard let lightbulbService = accessory.services.first(where: { $0.serviceType == .lightbulb }) else {
+                    // Check for lightbulb service by class name (HomeKit API compatibility)
+                    let isLightService: (HMService) -> Bool = { service in
+                        let className = String(describing: type(of: service))
+                        return className.contains("Light") || className.contains("OnOff")
+                    }
+                    guard let lightbulbService = accessory.services.first(where: isLightService) else {
                         continue
                     }
                     
-                    let isOn = lightbulbService.characteristics.first(where: { $0.characteristicType == .on })?.int_value == 1
-                    let brightness = lightbulbService.characteristics.first(where: { $0.characteristicType == .brightness })?.int_value ?? 0
+                    // Get characteristic values by class name
+                    let onCharacteristic = lightbulbService.characteristics.first { char in
+                        String(describing: type(of: char)).contains("On")
+                    }
+                    let isOn = onCharacteristic?.value as? Bool == true
+                    let brightnessCharacteristic = lightbulbService.characteristics.first { char in
+                        String(describing: type(of: char)).contains("Brightness")
+                    }
+                    let brightness = Int(brightnessCharacteristic?.value as? Double ?? 0)
                     
                     let device = MatterLightDevice(
                         id: accessory.identifier.uuidString,
@@ -195,7 +207,7 @@ final class MatterBridgeService: NSObject, @unchecked Sendable {
             try await controller.setBrightness(Int(brightness * 255), transitionDuration: Int(transitionDuration * 10))
             logger.debug("Set brightness of Matter light \(deviceId) to \(brightness)")
         } catch {
-            logger.debug("Matter brightness control failed for \(deviceId}, falling back to Hue Bridge: \(error.localizedDescription)")
+            logger.debug("Matter brightness control failed for \(deviceId), falling back to Hue Bridge: \(error.localizedDescription)")
             guard let hueClient else {
                 throw MatterError.noLightServiceFound
             }
@@ -212,7 +224,7 @@ final class MatterBridgeService: NSObject, @unchecked Sendable {
             try await controller.setColorTemperature(Int(temperature), transitionDuration: Int(transitionDuration * 10))
             logger.debug("Set color temperature of Matter light \(deviceId) to \(temperature)")
         } catch {
-            logger.debug("Matter color temperature control failed for \(deviceId}, falling back to Hue Bridge: \(error.localizedDescription)")
+            logger.debug("Matter color temperature control failed for \(deviceId), falling back to Hue Bridge: \(error.localizedDescription)")
             guard let hueClient else {
                 throw MatterError.noLightServiceFound
             }
@@ -229,7 +241,7 @@ final class MatterBridgeService: NSObject, @unchecked Sendable {
             try await controller.setColorXY(x, y, transitionDuration: Int(transitionDuration * 10))
             logger.debug("Set color XY of Matter light \(deviceId) to (\(x), \(y))")
         } catch {
-            logger.debug("Matter color control failed for \(deviceId}, falling back to Hue Bridge: \(error.localizedDescription)")
+            logger.debug("Matter color control failed for \(deviceId), falling back to Hue Bridge: \(error.localizedDescription)")
             guard let hueClient else {
                 throw MatterError.noLightServiceFound
             }
@@ -246,7 +258,7 @@ final class MatterBridgeService: NSObject, @unchecked Sendable {
             try await controller.patch(patch)
             logger.debug("Patched Matter light \(deviceId)")
         } catch {
-            logger.debug("Matter patch control failed for \(deviceId}, falling back to Hue Bridge: \(error.localizedDescription)")
+            logger.debug("Matter patch control failed for \(deviceId), falling back to Hue Bridge: \(error.localizedDescription)")
             guard let hueClient else {
                 throw MatterError.noLightServiceFound
             }
@@ -254,7 +266,7 @@ final class MatterBridgeService: NSObject, @unchecked Sendable {
                 on: patch.power,
                 brightness: patch.brightness,
                 ct: patch.colorTemperatureMireds,
-                xy: (patch.colorX, patch.colorY)
+                xy: (patch.colorX ?? 0.0, patch.colorY ?? 0.0)
             )
             try await hueClient.patchLightState(resourceId: deviceId, state: huePatch)
         }
@@ -268,7 +280,7 @@ final class MatterBridgeService: NSObject, @unchecked Sendable {
             }
             try await controller.refreshState()
         } catch {
-            logger.debug("Matter refresh failed for \(deviceId}, falling back to Hue Bridge: \(error.localizedDescription)")
+            logger.debug("Matter refresh failed for \(deviceId), falling back to Hue Bridge: \(error.localizedDescription)")
             guard let hueClient else {
                 throw MatterError.noLightServiceFound
             }

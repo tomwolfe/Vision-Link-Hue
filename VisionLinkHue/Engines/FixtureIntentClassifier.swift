@@ -179,7 +179,7 @@ final class CoreMLIntentClassifier: @unchecked Sendable, FixtureIntentClassifier
         let width = 224
         let height = 224
         let poolAttributes: [String: Any] = [
-            kCVPixelBufferPoolAllocationLimitKey as String: 8
+            "CVPixelBufferPoolAllocationLimit": 8
         ]
         let pixelBufferAttributes: [String: Any] = [
             kCVPixelBufferCGBitmapContextCompatibilityKey as String: true,

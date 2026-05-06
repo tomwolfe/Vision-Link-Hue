@@ -29,32 +29,36 @@ extension ARFrame {
 // MARK: - Date/Time Formatting
 
 extension Date {
-    /// Format as ISO 8601 string using native format style.
+    /// Format as ISO 8601 string.
     var formatString: String {
-        self.format(.iso8601)
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.string(from: self)
     }
     
     /// Format as ISO 8601 string.
     func toISO8601() -> String {
-        self.format(.iso8601)
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.string(from: self)
     }
 }
 
 // MARK: - JSON Utilities
 
 extension JSONDecoder {
-    /// Create a decoder with ISO 8601 date decoding strategy using native
-    /// Date.ISO8601FormatStyle for optimal performance under high SSE event loads.
+    /// Create a decoder with ISO 8601 date decoding strategy for
+    /// optimal performance under high SSE event loads.
     static var hueDecoder: JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
             let dateString = try container.decode(String.self)
-            
-            if let date = try? Date(dateString, formatStyle: .iso8601) {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let date = formatter.date(from: dateString) {
                 return date
             }
-            
             throw DecodingError.dataCorruptedError(
                 in: container,
                 debugDescription: "Unable to decode date string: \(dateString)"

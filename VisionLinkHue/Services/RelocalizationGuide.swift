@@ -354,8 +354,10 @@ final class RelocalizationGuide {
         encoder.setComputePipelineState(computePipeline)
         encoder.setTexture(texture, index: 0)
         encoder.setBuffer(outputBuffer, offset: 0, index: 1)
-        encoder.setBytes(&Float32(width), length: MemoryLayout<Float32>.stride, index: 2)
-        encoder.setBytes(&Float32(height), length: MemoryLayout<Float32>.stride, index: 3)
+        var widthValue = Float32(width)
+        var heightValue = Float32(height)
+        encoder.setBytes(&widthValue, length: MemoryLayout<Float32>.stride, index: 2)
+        encoder.setBytes(&heightValue, length: MemoryLayout<Float32>.stride, index: 3)
         
         let threadsPerGrid = MTLSize(width: (width + 15) / 16, height: (height + 15) / 16, depth: 1)
         let threadsPerThreadgroup = MTLSize(width: 16, height: 16, depth: 1)
@@ -395,6 +397,10 @@ final class RelocalizationGuide {
         textureDescriptor.usage = .shaderRead
         
         guard let texture = device.makeTexture(descriptor: textureDescriptor) else {
+            return nil
+        }
+        
+        guard let baseAddress else {
             return nil
         }
         

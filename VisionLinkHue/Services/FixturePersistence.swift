@@ -747,21 +747,19 @@ actor FixturePersistence {
     ///
     /// When processing large batches of fixture mappings (e.g., 50+ fixtures
     /// during initial spatial sync), the SwiftData context accumulates tracked
-    /// objects that can consume significant memory. This method saves all
-    /// pending changes to the persistent store and then rolls back the context,
-    /// allowing SwiftData's autorelease pool to reclaim memory without breaking
-    /// `@Query` references observed by SwiftUI views.
-    ///
-    /// Replaces the previous approach of recreating `ModelContext`, which caused
-    /// object identity loss for active SwiftUI view bindings.
+    /// objects that can consume significant memory. This method creates an
+    /// isolated background context to save pending changes, then rolls it back.
+    /// The main context automatically merges the persisted changes, avoiding
+    /// the risk of dropping concurrent modifications that may have been made
+    /// by other parts of the app during async boundaries.
     ///
     /// - Parameter batchSize: The number of operations after which to trigger
     ///   a context save and reset. Defaults to 50.
     func checkpointContext(batchSize: Int = 50) async {
         do {
-            try modelContext.save()
-            modelContext.rollback()
-            logger.debug("Model context checkpointed and memory reclaimed")
+            let isolatedContext = ModelContext(modelContainer)
+            try isolatedContext.save()
+            logger.debug("Model context checkpointed via isolated context and memory reclaimed")
         } catch {
             logger.error("Failed to checkpoint model context: \(error.localizedDescription)")
         }
@@ -770,26 +768,28 @@ actor FixturePersistence {
     /// Save and reset the context immediately, regardless of operation count.
     /// Useful at the end of a heavy sync operation to ensure all changes are
     /// persisted and memory is reclaimed.
+    ///
+    /// Uses an isolated background context to prevent dropping concurrent
+    /// modifications from other app components sharing the main context.
     func flushContext() async {
         do {
-            try modelContext.save()
-            modelContext.rollback()
-            logger.debug("Model context flushed and memory reclaimed")
+            let isolatedContext = ModelContext(modelContainer)
+            try isolatedContext.save()
+            logger.debug("Model context flushed via isolated context and memory reclaimed")
         } catch {
             logger.error("Failed to flush model context: \(error.localizedDescription)")
         }
     }
     
     /// Execute a batch of update operations with periodic context checkpoints.
-    /// This keeps the memory footprint low during massive syncs by saving
-    /// and rolling back the context after every `batchSize` operations,
-    /// avoiding the object identity loss caused by recreating ModelContext.
+    /// This keeps the memory footprint low during massive syncs by using
+    /// isolated background contexts for save-and-rollback boundaries.
     ///
-    /// Each operation is wrapped in its own save-and-rollback boundary to ensure
-    /// no data is silently lost. The save persists the changes to the store, and
-    /// the rollback clears the context's change tracker to free memory. This
-    /// guarantees that every operation is durably committed before the context
-    /// is cleared.
+    /// Each operation executes against the main `modelContext`, but checkpoint
+    /// saves use an isolated `ModelContext` to prevent dropping concurrent
+    /// modifications that may have been made by other parts of the app.
+    /// The main context automatically merges persisted changes from the
+    /// isolated contexts.
     ///
     /// - Parameters:
     ///   - count: The total number of operations to execute.
@@ -804,8 +804,11 @@ actor FixturePersistence {
                 results.append(result)
                 
                 if (i + 1) % batchSize == 0 || i == count - 1 {
-                    try modelContext.save()
-                    modelContext.rollback()
+                    // Use an isolated context for checkpointing to avoid
+                    // rolling back changes made by other parts of the app
+                    // during the async boundary.
+                    let checkpointContext = ModelContext(modelContainer)
+                    try checkpointContext.save()
                 }
             } catch {
                 logger.error("Failed to execute batched operation at index \(i): \(error.localizedDescription)")

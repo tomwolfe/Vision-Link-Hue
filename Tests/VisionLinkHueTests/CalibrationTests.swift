@@ -247,46 +247,58 @@ final class CalibrationTests: XCTestCase {
         XCTAssertEqual(output, input, "Uncalibrated engine should return identity mapping")
     }
     
-    // MARK: - Kabsch Algorithm Stability Tests
-    
-    func testKabschHandlesNearCollinearPoints() {
-        // Near-collinear points should still produce a valid transformation
-        // (though with lower accuracy, which is expected)
+    func testDegenerateCalibrationSetsFailureState() {
+        // Near-collinear points should fail calibration rather than
+        // silently returning an identity transform that corrupts spatial mapping.
         engine.addCalibrationPoint(arKit: SIMD3<Float>(0, 0, 0), bridge: SIMD3<Float>(0, 0, 0))
         engine.addCalibrationPoint(arKit: SIMD3<Float>(1, 0.001, 0), bridge: SIMD3<Float>(1, 0.001, 0))
         engine.addCalibrationPoint(arKit: SIMD3<Float>(2, 0.002, 0), bridge: SIMD3<Float>(2, 0.002, 0))
         
-        // Should still compute a transformation (not crash)
-        XCTAssertTrue(engine.isCalibrated)
-        XCTAssertNotNil(engine.transformation)
+        // Should report failure state rather than silently applying identity
+        XCTAssertFalse(engine.isCalibrated)
+        XCTAssertNil(engine.transformation)
+        XCTAssertEqual(engine.calibrationFailure, .illConditionedCovariance)
         
-        // The transformation should be reasonable (not NaN or infinity)
+        // mapToBridgeSpace should return input unchanged (identity fallback)
         let mapped = engine.mapToBridgeSpace(SIMD3<Float>(1, 0, 0))
-        XCTAssertFalse(mapped.x.isNaN)
-        XCTAssertFalse(mapped.y.isNaN)
-        XCTAssertFalse(mapped.z.isNaN)
-        XCTAssertFalse(mapped.x.isInfinite)
-        XCTAssertFalse(mapped.y.isInfinite)
-        XCTAssertFalse(mapped.z.isInfinite)
+        XCTAssertEqual(mapped, SIMD3<Float>(1, 0, 0))
     }
     
-    func testKabschHandlesZeroPoints() {
-        // All-zero calibration points should not cause division by zero
+    func testIdenticalPointsFailsCalibration() {
+        // All-identical calibration points should fail calibration
+        // rather than silently returning an identity transform.
         engine.addCalibrationPoint(arKit: SIMD3<Float>(0, 0, 0), bridge: SIMD3<Float>(0, 0, 0))
         engine.addCalibrationPoint(arKit: SIMD3<Float>(0, 0, 0), bridge: SIMD3<Float>(0, 0, 0))
         engine.addCalibrationPoint(arKit: SIMD3<Float>(0, 0, 0), bridge: SIMD3<Float>(0, 0, 0))
         
-        // Should handle gracefully - produces identity as fallback
+        // Should report failure state
+        XCTAssertFalse(engine.isCalibrated)
+        XCTAssertNil(engine.transformation)
+        XCTAssertEqual(engine.calibrationFailure, .illConditionedCovariance)
+        
+        // mapToBridgeSpace should return input unchanged
+        let mapped = engine.mapToBridgeSpace(SIMD3<Float>(1, 0, 0))
+        XCTAssertEqual(mapped, SIMD3<Float>(1, 0, 0))
+    }
+    
+    func testCalibrationFailureClearedOnSuccessfulCalibration() {
+        // After a failed calibration, adding proper points should clear the failure state
+        engine.addCalibrationPoint(arKit: SIMD3<Float>(0, 0, 0), bridge: SIMD3<Float>(0, 0, 0))
+        engine.addCalibrationPoint(arKit: SIMD3<Float>(1, 0.001, 0), bridge: SIMD3<Float>(1, 0.001, 0))
+        engine.addCalibrationPoint(arKit: SIMD3<Float>(2, 0.002, 0), bridge: SIMD3<Float>(2, 0.002, 0))
+        
+        XCTAssertFalse(engine.isCalibrated)
+        XCTAssertNotNil(engine.calibrationFailure)
+        
+        // Reset and add valid points
+        engine.clearCalibration()
+        engine.addCalibrationPoint(arKit: SIMD3<Float>(0, 0, 0), bridge: SIMD3<Float>(0, 0, 0))
+        engine.addCalibrationPoint(arKit: SIMD3<Float>(1, 0, 0), bridge: SIMD3<Float>(1, 0, 0))
+        engine.addCalibrationPoint(arKit: SIMD3<Float>(0, 1, 0), bridge: SIMD3<Float>(0, 1, 0))
+        
         XCTAssertTrue(engine.isCalibrated)
         XCTAssertNotNil(engine.transformation)
-        
-        let mapped = engine.mapToBridgeSpace(SIMD3<Float>(1, 0, 0))
-        XCTAssertFalse(mapped.x.isNaN)
-        XCTAssertFalse(mapped.y.isNaN)
-        XCTAssertFalse(mapped.z.isNaN)
-        XCTAssertFalse(mapped.x.isInfinite)
-        XCTAssertFalse(mapped.y.isInfinite)
-        XCTAssertFalse(mapped.z.isInfinite)
+        XCTAssertNil(engine.calibrationFailure)
     }
     
     func testKabschHandlesMultipleCalibrationPoints() {

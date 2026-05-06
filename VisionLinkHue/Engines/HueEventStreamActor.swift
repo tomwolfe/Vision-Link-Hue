@@ -294,8 +294,8 @@ actor HueEventStreamActor {
                     sseDataBuffer += extracted + "\n"
                     
                     // Enforce buffer size limit to prevent OOM from unbounded growth
-                    if sseDataBuffer.utf8.count > maxSSEBufferLength {
-                        logger.warning("SSE data buffer exceeded \(maxSSEBufferLength) bytes, discarding buffer and entering degraded mode")
+                    if sseDataBuffer.utf8.count > self.maxSSEBufferLength {
+                        logger.warning("SSE data buffer exceeded \(self.maxSSEBufferLength) bytes, discarding buffer and entering degraded mode")
                         sseDataBuffer = ""
                         parseFailures = maxParseFailures
                         state = .degraded
