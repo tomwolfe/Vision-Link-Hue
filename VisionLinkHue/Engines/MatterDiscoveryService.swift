@@ -1,13 +1,14 @@
 import Foundation
-@preconcurrency import MultipeerConnectivity
 import os
 import UIKit
 
 /// Service for discovering Matter-compatible Thread border routers and accessories
-/// using MultipeerConnectivity as a local network discovery fallback.
+/// using mDNS (Bonjour) discovery on the local network.
 ///
-/// Works alongside HomeKit's native accessory discovery to provide additional
-/// discovery surface for Matter devices on the Thread network.
+/// Thread Border Routers (Apple TV, HomePod, Nest Hub, etc.) advertise themselves
+/// via standard mDNS service types: `_matter._tcp.` and `_meshcop._udp.`.
+/// This service actively browses for these services instead of relying on
+/// peer-to-peer MultipeerConnectivity, which Thread Border Routers do not support.
 ///
 /// Automatically suspends discovery when the app backgrounds or when a stable
 /// Hue Bridge connection is established to minimize battery drain.
@@ -16,17 +17,15 @@ final class MatterDiscoveryService: NSObject, @unchecked Sendable {
     // MARK: - State
     
     /// Whether the service is currently active and discovering.
-    var isDiscovering: Bool { _isConnected }
-    
-    /// Tracks whether the MCSession is connected.
-    private var _isConnected: Bool = false
+    var isDiscovering: Bool { _isDiscovering }
+    private var _isDiscovering: Bool = false
     
     /// Controls whether discovery should be suspended due to external factors
     /// (app backgrounding or stable bridge connection).
     private var isSuspended: Bool = false
     
     /// Whether a stable Hue Bridge connection is established.
-    /// When true, aggressively suspends Multipeer discovery to conserve battery.
+    /// When true, aggressively suspends mDNS discovery to conserve battery.
     var isBridgeConnected: Bool {
         get { _isBridgeConnected }
         set {
@@ -42,11 +41,11 @@ final class MatterDiscoveryService: NSObject, @unchecked Sendable {
     var discoveredBorderRouters: [MatterBorderRouter] {
         _discoveredRouters.values.map { routerInfo in
             MatterBorderRouter(
-                id: routerInfo.advertiserName,
+                id: routerInfo.name,
                 name: routerInfo.displayName,
                 manufacturer: routerInfo.manufacturer,
                 model: routerInfo.model,
-                isOnline: routerInfo.isConnected,
+                isOnline: true,
                 threadNetworkName: routerInfo.threadNetworkName,
                 rssi: nil,
                 areaMetadata: routerInfo.areaMetadata
@@ -61,38 +60,17 @@ final class MatterDiscoveryService: NSObject, @unchecked Sendable {
         category: "MatterDiscovery"
     )
     
-    private let serviceType = "visionlinkhue-matter-discovery"
+    /// mDNS service types used by Matter 1.5 Thread Border Routers.
+    private let matterServiceType = "_matter._tcp."
+    private let meshcopServiceType = "_meshcop._udp."
     
-    private static let peerIDKey = "com.tomwolfe.visionlinkhue.matter-peer-id"
+    /// Browser for discovering Matter services on the local network.
+    private var browser: NetServiceBrowser?
     
-    private var cachedPeerID: MCPeerID?
+    /// Resolved services being actively monitored.
+    private var services: [NetService] = []
     
-    private func persistentPeerID() -> MCPeerID {
-        if let cachedPeerID {
-            return cachedPeerID
-        }
-        
-        let defaults = UserDefaults.standard
-        if let storedDisplayName = defaults.string(forKey: Self.peerIDKey),
-           !storedDisplayName.isEmpty {
-            let storedPeerID = MCPeerID(displayName: storedDisplayName)
-            cachedPeerID = storedPeerID
-            return storedPeerID
-        }
-        
-        let newUUID = UUID().uuidString
-        let newDisplayName = "Vision-Link-Hue-\(newUUID.prefix(8))"
-        defaults.set(newDisplayName, forKey: Self.peerIDKey)
-        let newPeerID = MCPeerID(displayName: newDisplayName)
-        cachedPeerID = newPeerID
-        return newPeerID
-    }
-    
-    private var session: MCSession?
-    private var browser: MCBrowserViewController?
-    private var advertiser: MCAdvertiserAssistant?
-    
-    /// Discovered router information keyed by advertiser name.
+    /// Discovered router information keyed by service name.
     private var _discoveredRouters: [String: RouterInfo] = [:]
     
     /// Callback for discovered border routers.
@@ -104,53 +82,45 @@ final class MatterDiscoveryService: NSObject, @unchecked Sendable {
     // MARK: - Initialization
     
     override init() {
-        // Session created lazily when discovery starts
+        super.init()
     }
     
     // MARK: - Discovery
     
-    /// Start discovering Matter Thread border routers on the local network.
+    /// Start discovering Matter Thread border routers on the local network
+    /// via mDNS (Bonjour) browsing.
     func startDiscovery() {
         guard !isDiscovering else {
             logger.debug("Matter discovery already active")
             return
         }
         
-        let peerID = persistentPeerID()
-        let session = MCSession(peer: peerID)
-        session.delegate = self as? MCSessionDelegate
-        self.session = session
+        browser = NetServiceBrowser()
+        browser?.delegate = self
         
-        let advertiser = MCAdvertiserAssistant(
-            serviceType: serviceType,
-            discoveryInfo: ["version": "1.0", "type": "matter-fallback"],
-            session: session
-        )
-        advertiser.start()
-        self.advertiser = advertiser
-        
-        logger.info("Started Matter border router discovery")
+        _isDiscovering = true
+        logger.info("Started Matter border router mDNS discovery")
     }
     
     /// Stop discovering Matter Thread border routers.
     func stopDiscovery() {
-        advertiser?.stop()
-        self.advertiser = nil
-        session?.disconnect()
-        self.session = nil
+        browser?.stop()
+        browser = nil
+        
+        services.removeAll()
+        
         _discoveredRouters.removeAll()
+        _isDiscovering = false
         isSuspended = false
         logger.info("Stopped Matter border router discovery")
     }
     
     /// Suspend discovery due to app backgrounding or stable bridge connection.
-    /// This aggressively conserves battery by stopping the advertiser without
-    /// fully disconnecting the session.
+    /// This conserves battery by stopping the browser without fully disconnecting.
     func suspendDiscovery() {
         guard isDiscovering && !isSuspended else { return }
         isSuspended = true
-        advertiser?.stop()
-        self.advertiser = nil
+        browser?.stop()
         logger.debug("Matter discovery suspended for battery conservation")
     }
     
@@ -210,14 +180,14 @@ final class MatterDiscoveryService: NSObject, @unchecked Sendable {
     // MARK: - Private
     
     private func addOrUpdateRouter(_ info: RouterInfo) {
-        _discoveredRouters[info.advertiserName] = info
+        _discoveredRouters[info.name] = info
         
         let router = MatterBorderRouter(
-            id: info.advertiserName,
+            id: info.name,
             name: info.displayName,
             manufacturer: info.manufacturer,
             model: info.model,
-            isOnline: info.isConnected,
+            isOnline: true,
             threadNetworkName: info.threadNetworkName,
             rssi: nil,
             areaMetadata: info.areaMetadata
@@ -226,9 +196,9 @@ final class MatterDiscoveryService: NSObject, @unchecked Sendable {
         onBorderRouterDiscovered?(router)
     }
     
-    private func removeRouter(_ advertiserName: String) {
-        _discoveredRouters.removeValue(forKey: advertiserName)
-        onBorderRouterLost?(advertiserName)
+    private func removeRouter(_ name: String) {
+        _discoveredRouters.removeValue(forKey: name)
+        onBorderRouterLost?(name)
     }
 }
 
@@ -236,79 +206,109 @@ final class MatterDiscoveryService: NSObject, @unchecked Sendable {
 
 /// Internal representation of a discovered router's advertising data.
 /// Includes area metadata for Matter 1.5.1+ Thread Border Routers.
-struct RouterInfo: Sendable, Decodable {
-    let advertiserName: String
+struct RouterInfo: Sendable {
+    let name: String
     let displayName: String
     let manufacturer: String
     let model: String
-    let isConnected: Bool
     let threadNetworkName: String?
     let areaMetadata: MatterAreaMetadata?
 }
 
-// MARK: - MCSessionDelegate Conformance
+// MARK: - NetServiceBrowserDelegate
 
-extension MatterDiscoveryService: MCSessionDelegate {
+extension MatterDiscoveryService: NetServiceBrowserDelegate {
     
-    func session(_ session: MCSession, didReceive data: Data, fromPeer peerID: MCPeerID) {
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            
-            do {
-                let decoder = JSONDecoder()
-                let info = try decoder.decode(RouterInfo.self, from: data)
-                await self.addOrUpdateRouter(info)
-            } catch {
-                self.logger.error("Failed to decode router info from peer \(peerID.displayName): \(error.localizedDescription)")
-            }
+    func netServiceBrowser(_ browser: NetServiceBrowser, didFind service: NetService, moreComing: Bool) {
+        logger.debug("Found mDNS service: \(service.name) (\(service.type))")
+        
+        // Resolve the service to get its TXT record and port
+        service.delegate = self
+        service.resolve(withTimeout: 5.0)
+        
+        // Track the service for cleanup
+        services.append(service)
+    }
+    
+    func netServiceBrowser(_ browser: NetServiceBrowser, didRemove service: NetService, moreComing: Bool) {
+        logger.debug("Removed mDNS service: \(service.name)")
+        
+        // Remove from tracked services
+        services.removeAll { $0 == service }
+        
+        // Remove from discovered routers
+        Task { @MainActor [name = service.name] in
+            self.removeRouter(name)
         }
     }
     
-    func session(_ session: MCSession, didReceive stream: InputStream, withName streamName: String, fromPeer peerID: MCPeerID) {
-        // Stream-based data transfer not used for discovery
+    func netServiceBrowserDidStopSearch(_ browser: NetServiceBrowser) {
+        logger.debug("mDNS search stopped")
+        _isDiscovering = false
     }
+}
+
+// MARK: - NetServiceDelegate
+
+extension MatterDiscoveryService: NetServiceDelegate {
     
-    func session(_ session: MCSession, didChange state: MCSessionState, fromPeer peerID: MCPeerID) {
+    func netService(_ sender: NetService, didResolve _: NetService) {
+        // Extract needed data before entering async context to avoid data races
+        let name = sender.name
+        let port = sender.port
+        let type = sender.type
+        let addresses = sender.addresses
+        
         Task { @MainActor [weak self] in
             guard let self else { return }
             
-            switch state {
-            case .connected:
-                _isConnected = true
-                let info = RouterInfo(
-                    advertiserName: peerID.displayName,
-                    displayName: peerID.displayName,
-                    manufacturer: "Unknown",
-                    model: "Unknown",
-                    isConnected: true,
-                    threadNetworkName: nil,
-                    areaMetadata: nil
-                )
-                await self.addOrUpdateRouter(info)
-            case .notConnected:
-                _isConnected = false
-                await self.removeRouter(peerID.displayName)
-            case .connecting:
-                break
-            @unknown default:
-                break
+            var displayName = String(name.dropLast(type.count + 1)) ?? "Unknown Device"
+            var manufacturer: String?
+            var model: String?
+            var threadNetworkName: String?
+            var areaMetadata: MatterAreaMetadata?
+            
+            if let addresses, !addresses.isEmpty {
+                if let addrData = addresses.first {
+                    var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+                    addrData.withUnsafeBytes { ptr in
+                        let addrPtr = ptr.baseAddress?.assumingMemoryBound(to: sockaddr.self)
+                        if let addrPtr {
+                            let result = getnameinfo(
+                                addrPtr,
+                                socklen_t(addrData.count),
+                                &hostname,
+                                socklen_t(hostname.count),
+                                nil,
+                                0,
+                                NI_NUMERICHOST
+                            )
+                            if result == 0 {
+                                displayName = String(cString: hostname)
+                            }
+                        }
+                    }
+                }
             }
+            
+            let info = RouterInfo(
+                name: name,
+                displayName: displayName,
+                manufacturer: manufacturer ?? "Unknown",
+                model: model ?? "Unknown",
+                threadNetworkName: threadNetworkName,
+                areaMetadata: areaMetadata
+            )
+            
+            await self.addOrUpdateRouter(info)
         }
     }
     
-    func session(_ session: MCSession, peer peerID: MCPeerID, didChange state: MCSessionState) {
-        // Deprecated in newer iOS versions, handled by didChange(state:fromPeer:)
+    func netServiceDidStop(_ sender: NetService) {
+        logger.debug("mDNS service stopped: \(sender.name)")
     }
     
-    func session(_ session: MCSession, didFinishReceivingResourceWithName resourceName: String, fromPeer peerID: MCPeerID, at localURL: URL?, withError error: (any Error)?) {
-        // Resource transfer not used for discovery
-    }
-    
-    func session(_ session: MCSession, didStartReceivingResourceWithName resourceName: String, fromPeer peerID: MCPeerID, with progress: Progress) {
-        // Resource transfer not used for discovery
-    }
-    
-    func session(_ session: MCSession, didNotStartPeer peerID: MCPeerID, error: Error?) {
-        logger.debug("Failed to connect to peer \(peerID.displayName): \(error?.localizedDescription ?? "unknown error")")
+    func netService(_ sender: NetService, didNotResolve _: NetService) {
+        logger.debug("Failed to resolve mDNS service: \(sender.name)")
     }
 }

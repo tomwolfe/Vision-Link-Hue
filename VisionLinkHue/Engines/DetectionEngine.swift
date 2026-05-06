@@ -405,7 +405,7 @@ final class DetectionEngine {
                     return [ObservationData]()
                 }
                 return results.map { observation in
-                    ObservationData(boundingBox: observation.boundingBox)
+                    ObservationData(boundingBox: observation.boundingBox, worldSpaceHeightMeters: nil)
                 }
             }
         }
@@ -443,7 +443,7 @@ final class DetectionEngine {
                 guard let results = request.results as? [VNRectangleObservation] else {
                     return [ObservationData]()
                 }
-                return results.map { ObservationData(boundingBox: $0.boundingBox) }
+                return results.map { ObservationData(boundingBox: $0.boundingBox, worldSpaceHeightMeters: nil) }
             }
         }
         

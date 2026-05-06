@@ -6,6 +6,11 @@ import Foundation
 /// Sendable observation data extracted from VNRectangleObservation for cross-queue classification.
 struct ObservationData: Sendable {
     let boundingBox: CGRect
+    
+    /// Optional world-space height in meters above the floor. When available,
+    /// the classifier uses physical height instead of 2D normalized Y position
+    /// to avoid errors when the camera points straight up at ceiling fixtures.
+    let worldSpaceHeightMeters: Float?
 }
 
 // MARK: - Scoring Rules
@@ -26,6 +31,11 @@ struct ScoringRule: Sendable {
     
     /// Bounding box area range that triggers this rule. `nil` matches any area.
     let areaRange: ClosedRange<Double>?
+    
+    /// Physical height range in meters above the floor that triggers this rule.
+    /// Only used when `worldSpaceHeightMeters` is available on the observation.
+    /// `nil` matches any physical height.
+    let heightRange: ClosedRange<Double>?
     
     /// Weight to add to the fixture type's score when all active ranges match.
     let weight: Double
@@ -49,6 +59,26 @@ struct ScoringConfig {
         static let ceilingRange = 0.0...0.25
         static let midCeilingRange = 0.25...0.5
         static let midRange = 0.5...0.75
+    }
+    
+    // MARK: - Physical Height Ranges (meters above floor)
+    
+    /// World-space height ranges for fixture classification.
+    /// These ranges are used when `worldSpaceHeightMeters` is available,
+    /// providing camera-angle-independent classification.
+    struct Height {
+        /// Ceiling-mounted fixtures: flush with or near the ceiling (2.4m+)
+        static let ceilingRange = 2.1...Double.greatestFiniteMagnitude
+        /// Pendant lights: hanging from ceiling at mid-height (0.9m-2.4m)
+        static let pendantRange = 0.9...2.1
+        /// Wall sconces: mounted on walls at eye level or above (1.5m-2.4m)
+        static let sconceRange = 1.5...2.4
+        /// Floor/table lamps: on the floor or a low surface (0.0...1.5m)
+        static let lampRange = 0.0...1.5
+        /// Desk lamps: on a desk surface (0.4...0.8m)
+        static let deskLampRange = 0.4...0.8
+        /// Recessed lights: flush with ceiling (2.4m+)
+        static let recessedRange = 2.1...Double.greatestFiniteMagnitude
     }
     
     // MARK: - Area Ranges
@@ -83,6 +113,7 @@ struct JSONScoringRule: Sendable, Codable {
     let aspectRange: [Double]?
     let yRange: [Double]?
     let areaRange: [Double]?
+    let heightRange: [Double]?
     let weight: Double
 }
 
@@ -124,67 +155,82 @@ struct ClassificationConfigFile: Codable {
 /// `FixtureHeuristicClassifier.loadRules(from:)` to load from a JSON config.
 let classificationRules: [ScoringRule] = [
     // Square aspect ratio (0.2-0.8)
-    ScoringRule(type: .ceiling, aspectRange: ScoringConfig.AspectRatio.squareRange, yRange: nil, areaRange: nil, weight: 3.0),
-    ScoringRule(type: .recessed, aspectRange: ScoringConfig.AspectRatio.squareRange, yRange: nil, areaRange: nil, weight: 2.5),
-    ScoringRule(type: .pendant, aspectRange: ScoringConfig.AspectRatio.squareRange, yRange: nil, areaRange: nil, weight: 1.0),
-    ScoringRule(type: .chandelier, aspectRange: ScoringConfig.AspectRatio.squareRange, yRange: nil, areaRange: nil, weight: 2.0),
+    ScoringRule(type: .ceiling, aspectRange: ScoringConfig.AspectRatio.squareRange, yRange: nil, areaRange: nil, heightRange: nil, weight: 3.0),
+    ScoringRule(type: .recessed, aspectRange: ScoringConfig.AspectRatio.squareRange, yRange: nil, areaRange: nil, heightRange: nil, weight: 2.5),
+    ScoringRule(type: .pendant, aspectRange: ScoringConfig.AspectRatio.squareRange, yRange: nil, areaRange: nil, heightRange: nil, weight: 1.0),
+    ScoringRule(type: .chandelier, aspectRange: ScoringConfig.AspectRatio.squareRange, yRange: nil, areaRange: nil, heightRange: nil, weight: 2.0),
     
     // Moderate aspect ratio (0.5-1.5)
-    ScoringRule(type: .pendant, aspectRange: ScoringConfig.AspectRatio.moderateRange, yRange: nil, areaRange: nil, weight: 3.0),
-    ScoringRule(type: .lamp, aspectRange: ScoringConfig.AspectRatio.moderateRange, yRange: nil, areaRange: nil, weight: 2.5),
-    ScoringRule(type: .ceiling, aspectRange: ScoringConfig.AspectRatio.moderateRange, yRange: nil, areaRange: nil, weight: 1.0),
-    ScoringRule(type: .deskLamp, aspectRange: ScoringConfig.AspectRatio.moderateRange, yRange: nil, areaRange: nil, weight: 2.0),
+    ScoringRule(type: .pendant, aspectRange: ScoringConfig.AspectRatio.moderateRange, yRange: nil, areaRange: nil, heightRange: nil, weight: 3.0),
+    ScoringRule(type: .lamp, aspectRange: ScoringConfig.AspectRatio.moderateRange, yRange: nil, areaRange: nil, heightRange: nil, weight: 2.5),
+    ScoringRule(type: .ceiling, aspectRange: ScoringConfig.AspectRatio.moderateRange, yRange: nil, areaRange: nil, heightRange: nil, weight: 1.0),
+    ScoringRule(type: .deskLamp, aspectRange: ScoringConfig.AspectRatio.moderateRange, yRange: nil, areaRange: nil, heightRange: nil, weight: 2.0),
     
     // Wide aspect ratio (1.2-3.0)
-    ScoringRule(type: .lamp, aspectRange: ScoringConfig.AspectRatio.wideRange, yRange: nil, areaRange: nil, weight: 2.0),
-    ScoringRule(type: .pendant, aspectRange: ScoringConfig.AspectRatio.wideRange, yRange: nil, areaRange: nil, weight: 1.5),
-    ScoringRule(type: .sconce, aspectRange: ScoringConfig.AspectRatio.wideRange, yRange: nil, areaRange: nil, weight: 1.5),
+    ScoringRule(type: .lamp, aspectRange: ScoringConfig.AspectRatio.wideRange, yRange: nil, areaRange: nil, heightRange: nil, weight: 2.0),
+    ScoringRule(type: .pendant, aspectRange: ScoringConfig.AspectRatio.wideRange, yRange: nil, areaRange: nil, heightRange: nil, weight: 1.5),
+    ScoringRule(type: .sconce, aspectRange: ScoringConfig.AspectRatio.wideRange, yRange: nil, areaRange: nil, heightRange: nil, weight: 1.5),
     
     // Strip aspect ratio (2.0-8.0)
-    ScoringRule(type: .strip, aspectRange: ScoringConfig.AspectRatio.stripRange, yRange: nil, areaRange: nil, weight: 4.0),
-    ScoringRule(type: .lamp, aspectRange: ScoringConfig.AspectRatio.stripRange, yRange: nil, areaRange: nil, weight: 0.5),
+    ScoringRule(type: .strip, aspectRange: ScoringConfig.AspectRatio.stripRange, yRange: nil, areaRange: nil, heightRange: nil, weight: 4.0),
+    ScoringRule(type: .lamp, aspectRange: ScoringConfig.AspectRatio.stripRange, yRange: nil, areaRange: nil, heightRange: nil, weight: 0.5),
     
     // Default lamp weight for unmatched aspect ratios
-    ScoringRule(type: .lamp, aspectRange: nil, yRange: nil, areaRange: nil, weight: 1.0),
+    ScoringRule(type: .lamp, aspectRange: nil, yRange: nil, areaRange: nil, heightRange: nil, weight: 1.0),
     
     // Vertical position: ceiling (top of frame, 0.0-0.25)
-    ScoringRule(type: .ceiling, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.ceilingRange, areaRange: nil, weight: 3.0),
-    ScoringRule(type: .pendant, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.ceilingRange, areaRange: nil, weight: 2.0),
-    ScoringRule(type: .recessed, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.ceilingRange, areaRange: nil, weight: 1.5),
-    ScoringRule(type: .chandelier, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.ceilingRange, areaRange: nil, weight: 3.0),
+    ScoringRule(type: .ceiling, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.ceilingRange, areaRange: nil, heightRange: nil, weight: 3.0),
+    ScoringRule(type: .pendant, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.ceilingRange, areaRange: nil, heightRange: nil, weight: 2.0),
+    ScoringRule(type: .recessed, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.ceilingRange, areaRange: nil, heightRange: nil, weight: 1.5),
+    ScoringRule(type: .chandelier, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.ceilingRange, areaRange: nil, heightRange: nil, weight: 3.0),
     
     // Vertical position: mid-ceiling (0.25-0.5)
-    ScoringRule(type: .pendant, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.midCeilingRange, areaRange: nil, weight: 2.0),
-    ScoringRule(type: .recessed, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.midCeilingRange, areaRange: nil, weight: 2.0),
-    ScoringRule(type: .lamp, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.midCeilingRange, areaRange: nil, weight: 1.0),
-    ScoringRule(type: .sconce, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.midCeilingRange, areaRange: nil, weight: 2.5),
+    ScoringRule(type: .pendant, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.midCeilingRange, areaRange: nil, heightRange: nil, weight: 2.0),
+    ScoringRule(type: .recessed, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.midCeilingRange, areaRange: nil, heightRange: nil, weight: 2.0),
+    ScoringRule(type: .lamp, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.midCeilingRange, areaRange: nil, heightRange: nil, weight: 1.0),
+    ScoringRule(type: .sconce, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.midCeilingRange, areaRange: nil, heightRange: nil, weight: 2.5),
     
     // Vertical position: mid (0.5-0.75)
-    ScoringRule(type: .lamp, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.midRange, areaRange: nil, weight: 2.5),
-    ScoringRule(type: .recessed, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.midRange, areaRange: nil, weight: 2.0),
-    ScoringRule(type: .strip, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.midRange, areaRange: nil, weight: 0.5),
-    ScoringRule(type: .deskLamp, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.midRange, areaRange: nil, weight: 2.0),
+    ScoringRule(type: .lamp, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.midRange, areaRange: nil, heightRange: nil, weight: 2.5),
+    ScoringRule(type: .recessed, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.midRange, areaRange: nil, heightRange: nil, weight: 2.0),
+    ScoringRule(type: .strip, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.midRange, areaRange: nil, heightRange: nil, weight: 0.5),
+    ScoringRule(type: .deskLamp, aspectRange: nil, yRange: ScoringConfig.VerticalPosition.midRange, areaRange: nil, heightRange: nil, weight: 2.0),
     
     // Default weights for bottom-of-frame (y > 0.75)
-    ScoringRule(type: .lamp, aspectRange: nil, yRange: 0.75...1.0, areaRange: nil, weight: 3.0),
-    ScoringRule(type: .strip, aspectRange: nil, yRange: 0.75...1.0, areaRange: nil, weight: 1.5),
-    ScoringRule(type: .deskLamp, aspectRange: nil, yRange: 0.75...1.0, areaRange: nil, weight: 2.5),
+    ScoringRule(type: .lamp, aspectRange: nil, yRange: 0.75...1.0, areaRange: nil, heightRange: nil, weight: 3.0),
+    ScoringRule(type: .strip, aspectRange: nil, yRange: 0.75...1.0, areaRange: nil, heightRange: nil, weight: 1.5),
+    ScoringRule(type: .deskLamp, aspectRange: nil, yRange: 0.75...1.0, areaRange: nil, heightRange: nil, weight: 2.5),
     
     // Area: large (> 0.15)
-    ScoringRule(type: .ceiling, aspectRange: nil, yRange: nil, areaRange: ScoringConfig.Area.largeAreaRange, weight: 1.5),
-    ScoringRule(type: .strip, aspectRange: nil, yRange: nil, areaRange: ScoringConfig.Area.largeAreaRange, weight: 1.0),
-    ScoringRule(type: .chandelier, aspectRange: nil, yRange: nil, areaRange: ScoringConfig.Area.largeAreaRange, weight: 2.0),
+    ScoringRule(type: .ceiling, aspectRange: nil, yRange: nil, areaRange: ScoringConfig.Area.largeAreaRange, heightRange: nil, weight: 1.5),
+    ScoringRule(type: .strip, aspectRange: nil, yRange: nil, areaRange: ScoringConfig.Area.largeAreaRange, heightRange: nil, weight: 1.0),
+    ScoringRule(type: .chandelier, aspectRange: nil, yRange: nil, areaRange: ScoringConfig.Area.largeAreaRange, heightRange: nil, weight: 2.0),
     
     // Area: medium (0.05-0.15)
-    ScoringRule(type: .pendant, aspectRange: nil, yRange: nil, areaRange: ScoringConfig.Area.mediumAreaRange, weight: 1.0),
-    ScoringRule(type: .lamp, aspectRange: nil, yRange: nil, areaRange: ScoringConfig.Area.mediumAreaRange, weight: 1.0),
-    ScoringRule(type: .recessed, aspectRange: nil, yRange: nil, areaRange: ScoringConfig.Area.mediumAreaRange, weight: 1.0),
-    ScoringRule(type: .sconce, aspectRange: nil, yRange: nil, areaRange: ScoringConfig.Area.mediumAreaRange, weight: 1.5),
+    ScoringRule(type: .pendant, aspectRange: nil, yRange: nil, areaRange: ScoringConfig.Area.mediumAreaRange, heightRange: nil, weight: 1.0),
+    ScoringRule(type: .lamp, aspectRange: nil, yRange: nil, areaRange: ScoringConfig.Area.mediumAreaRange, heightRange: nil, weight: 1.0),
+    ScoringRule(type: .recessed, aspectRange: nil, yRange: nil, areaRange: ScoringConfig.Area.mediumAreaRange, heightRange: nil, weight: 1.0),
+    ScoringRule(type: .sconce, aspectRange: nil, yRange: nil, areaRange: ScoringConfig.Area.mediumAreaRange, heightRange: nil, weight: 1.5),
     
     // Area: small (< 0.05)
-    ScoringRule(type: .recessed, aspectRange: nil, yRange: nil, areaRange: ScoringConfig.Area.smallAreaRange, weight: 1.5),
-    ScoringRule(type: .lamp, aspectRange: nil, yRange: nil, areaRange: ScoringConfig.Area.smallAreaRange, weight: 0.5),
-    ScoringRule(type: .sconce, aspectRange: nil, yRange: nil, areaRange: ScoringConfig.Area.smallAreaRange, weight: 1.0),
+    ScoringRule(type: .recessed, aspectRange: nil, yRange: nil, areaRange: ScoringConfig.Area.smallAreaRange, heightRange: nil, weight: 1.5),
+    ScoringRule(type: .lamp, aspectRange: nil, yRange: nil, areaRange: ScoringConfig.Area.smallAreaRange, heightRange: nil, weight: 0.5),
+    ScoringRule(type: .sconce, aspectRange: nil, yRange: nil, areaRange: ScoringConfig.Area.smallAreaRange, heightRange: nil, weight: 1.0),
+    
+    // World-space height rules: ceiling fixtures (2.1m+) - camera-angle independent
+    ScoringRule(type: .ceiling, aspectRange: nil, yRange: nil, areaRange: nil, heightRange: ScoringConfig.Height.ceilingRange, weight: 4.0),
+    ScoringRule(type: .recessed, aspectRange: nil, yRange: nil, areaRange: nil, heightRange: ScoringConfig.Height.recessedRange, weight: 4.0),
+    ScoringRule(type: .chandelier, aspectRange: nil, yRange: nil, areaRange: nil, heightRange: ScoringConfig.Height.ceilingRange, weight: 3.0),
+    
+    // World-space height rules: pendant lights (0.9m-2.1m)
+    ScoringRule(type: .pendant, aspectRange: nil, yRange: nil, areaRange: nil, heightRange: ScoringConfig.Height.pendantRange, weight: 4.0),
+    
+    // World-space height rules: wall sconces (1.5m-2.4m)
+    ScoringRule(type: .sconce, aspectRange: nil, yRange: nil, areaRange: nil, heightRange: ScoringConfig.Height.sconceRange, weight: 3.5),
+    
+    // World-space height rules: floor/table lamps (0.0m-1.5m)
+    ScoringRule(type: .lamp, aspectRange: nil, yRange: nil, areaRange: nil, heightRange: ScoringConfig.Height.lampRange, weight: 3.5),
+    ScoringRule(type: .deskLamp, aspectRange: nil, yRange: nil, areaRange: nil, heightRange: ScoringConfig.Height.deskLampRange, weight: 4.0),
 ]
 
 /// Safely creates a `ClosedRange<Double>` from a two-element array,
@@ -277,11 +323,14 @@ struct FixtureHeuristicClassifier {
             
             let areaRange = jsonRule.areaRange.flatMap { safeClosedRange($0) }
             
+            let heightRange = jsonRule.heightRange.flatMap { safeClosedRange($0) }
+            
             loadedRules.append(ScoringRule(
                 type: type,
                 aspectRange: aspectRange,
                 yRange: yRange,
                 areaRange: areaRange,
+                heightRange: heightRange,
                 weight: jsonRule.weight
             ))
         }
@@ -325,16 +374,18 @@ struct FixtureHeuristicClassifier {
         let normalizedY = observation.boundingBox.midY
         let area = observation.boundingBox.width * observation.boundingBox.height
         
-        return scoreObservation(aspectRatio: aspectRatio, normalizedY: normalizedY, area: area)
+        return scoreObservation(aspectRatio: aspectRatio, normalizedY: normalizedY, area: area, worldSpaceHeightMeters: nil)
     }
     
     /// Classify observation data into a fixture type using weighted scoring.
+    /// When `worldSpaceHeightMeters` is available, uses physical height instead
+    /// of 2D normalized Y position for camera-angle-independent classification.
     func classify(typeFrom data: ObservationData) -> FixtureType {
         let aspectRatio = data.boundingBox.width / max(data.boundingBox.height, 0.001)
         let normalizedY = data.boundingBox.midY
         let area = data.boundingBox.width * data.boundingBox.height
         
-        return scoreObservation(aspectRatio: aspectRatio, normalizedY: normalizedY, area: area)
+        return scoreObservation(aspectRatio: aspectRatio, normalizedY: normalizedY, area: area, worldSpaceHeightMeters: data.worldSpaceHeightMeters)
     }
     
     /// Calculate detection confidence from observation quality metrics.
@@ -355,7 +406,7 @@ struct FixtureHeuristicClassifier {
         return computeConfidence(area: area, centerX: centerX, centerY: centerY)
     }
     
-    private func scoreObservation(aspectRatio: Double, normalizedY: Double, area: Double) -> FixtureType {
+    private func scoreObservation(aspectRatio: Double, normalizedY: Double, area: Double, worldSpaceHeightMeters: Float?) -> FixtureType {
         var scores: [FixtureType: Double] = [:]
         for fixture in FixtureType.allCases {
             scores[fixture] = 0.0
@@ -370,6 +421,15 @@ struct FixtureHeuristicClassifier {
             
             if matches, let yRange = rule.yRange {
                 guard yRange.contains(normalizedY) else { matches = false; continue }
+            }
+            
+            if matches, let heightRange = rule.heightRange {
+                guard let worldHeight = worldSpaceHeightMeters,
+                      heightRange.contains(Double(worldHeight)) else {
+                    // If the rule specifies a height range but we don't have world-space height,
+                    // skip this rule to avoid incorrect 2D-based scoring
+                    matches = false; continue
+                }
             }
             
             if matches, let areaRange = rule.areaRange {

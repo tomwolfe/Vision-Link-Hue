@@ -322,6 +322,78 @@ final class CalibrationTests: XCTestCase {
         XCTAssertEqual(mapped.y, expectedBridge.y, accuracy: 0.1)
     }
     
+    // MARK: - Coplanar Points Fallback Tests
+    
+    func testCoplanarCeilingLightsSucceedViaFallback() {
+        // All ceiling lights at same Y height (2.5m in ARKit, 2.5m in Bridge)
+        // This would normally fail Kabsch due to coplanarity, but the fallback
+        // should handle it correctly.
+        engine.addCalibrationPoint(arKit: SIMD3<Float>(0, 2.5, 0), bridge: SIMD3<Float>(0, 2.5, 0))
+        engine.addCalibrationPoint(arKit: SIMD3<Float>(2, 2.5, 0), bridge: SIMD3<Float>(2, 2.5, 0))
+        engine.addCalibrationPoint(arKit: SIMD3<Float>(0, 2.5, 2), bridge: SIMD3<Float>(0, 2.5, 2))
+        
+        XCTAssertTrue(engine.isCalibrated, "Coplanar ceiling lights should succeed via fallback")
+        XCTAssertNotNil(engine.transformation)
+        XCTAssertEqual(engine.calibrationFailure, .coplanarPoints, "Should report coplanar points failure type")
+    }
+    
+    func testCoplanarFallbackPreservesXZRotation() {
+        // All points coplanar at Y=2.5, but with a 45-degree rotation in XZ plane
+        let angle: Float = .pi / 4
+        let cosA = cos(angle)
+        let sinA = sin(angle)
+        
+        engine.addCalibrationPoint(arKit: SIMD3<Float>(0, 2.5, 0), bridge: SIMD3<Float>(0, 2.5, 0))
+        engine.addCalibrationPoint(arKit: SIMD3<Float>(1, 2.5, 0), bridge: SIMD3<Float>(cosA, 2.5, sinA))
+        engine.addCalibrationPoint(arKit: SIMD3<Float>(0, 2.5, 1), bridge: SIMD3<Float>(-sinA, 2.5, cosA))
+        
+        XCTAssertTrue(engine.isCalibrated)
+        XCTAssertNotNil(engine.transformation)
+        
+        // Verify the rotation correctly maps (1, 0, 0) in XZ plane
+        let result = engine.mapToBridgeSpace(SIMD3<Float>(1, 2.5, 0))
+        XCTAssertEqual(result.x, cosA, accuracy: 0.05)
+        XCTAssertEqual(result.y, 2.5, accuracy: 0.05)
+        XCTAssertEqual(result.z, sinA, accuracy: 0.05)
+    }
+    
+    func testCoplanarFallbackWithYOffset() {
+        // All source points at Y=2.5, all target points at Y=3.0 (0.5m offset)
+        engine.addCalibrationPoint(arKit: SIMD3<Float>(0, 2.5, 0), bridge: SIMD3<Float>(0, 3.0, 0))
+        engine.addCalibrationPoint(arKit: SIMD3<Float>(1, 2.5, 0), bridge: SIMD3<Float>(1, 3.0, 0))
+        engine.addCalibrationPoint(arKit: SIMD3<Float>(0, 2.5, 1), bridge: SIMD3<Float>(0, 3.0, 1))
+        
+        XCTAssertTrue(engine.isCalibrated)
+        XCTAssertNotNil(engine.transformation)
+        
+        // Y offset should be 0.5m
+        let mapped = engine.mapToBridgeSpace(SIMD3<Float>(0.5, 2.5, 0.5))
+        XCTAssertEqual(mapped.y, 3.0, accuracy: 0.05, "Y offset should be 0.5m")
+    }
+    
+    func testNonCoplanarPointsUseStandardKabsch() {
+        // Points with different Y values should use standard Kabsch, not fallback
+        engine.addCalibrationPoint(arKit: SIMD3<Float>(0, 0, 0), bridge: SIMD3<Float>(0, 0, 0))
+        engine.addCalibrationPoint(arKit: SIMD3<Float>(1, 0, 0), bridge: SIMD3<Float>(1, 0, 0))
+        engine.addCalibrationPoint(arKit: SIMD3<Float>(0, 1, 0), bridge: SIMD3<Float>(0, 1, 0))
+        
+        XCTAssertTrue(engine.isCalibrated)
+        XCTAssertNotNil(engine.transformation)
+        XCTAssertNil(engine.calibrationFailure, "Non-coplanar points should not set coplanar failure")
+    }
+    
+    func testCollinearInXZPlaneStillFails() {
+        // All points coplanar AND collinear in XZ plane (truly degenerate)
+        // These should still fail since 2D rotation cannot be determined
+        engine.addCalibrationPoint(arKit: SIMD3<Float>(0, 2.5, 0), bridge: SIMD3<Float>(0, 2.5, 0))
+        engine.addCalibrationPoint(arKit: SIMD3<Float>(1, 2.5, 0), bridge: SIMD3<Float>(1, 2.5, 0))
+        engine.addCalibrationPoint(arKit: SIMD3<Float>(2, 2.5, 0), bridge: SIMD3<Float>(2, 2.5, 0))
+        
+        // Should fail - collinear in XZ plane means no unique 2D rotation
+        XCTAssertFalse(engine.isCalibrated)
+        XCTAssertEqual(engine.calibrationFailure, .illConditionedCovariance)
+    }
+    
     // MARK: - Helper Functions
     
     /// Dot product of two 3D vectors.

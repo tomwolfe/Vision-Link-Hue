@@ -106,6 +106,10 @@ final class SpatialCalibrationEngine {
         /// The covariance matrix was near-singular (`det(HTH) < 1e-6`),
         /// typically caused by collinear or identical calibration points.
         case illConditionedCovariance
+        /// All calibration points are coplanar (e.g., all ceiling lights at same height),
+        /// causing the covariance matrix rank to drop below 3. The engine used a
+        /// 2D + height-constrained fallback to compute the transformation instead.
+        case coplanarPoints
     }
     
     // MARK: - Public State
@@ -333,7 +337,9 @@ final class SpatialCalibrationEngine {
         sourceCentroid /= Float(n)
         targetCentroid /= Float(n)
         
-        // Compute centered covariance matrix H = sum(dt * ds^T)
+        // Compute centered points and covariance matrix simultaneously
+        var centeredSources: [SIMD3<Float>] = []
+        var centeredTargets: [SIMD3<Float>] = []
         var covMatrix = simd_float3x3(
             SIMD3<Float>(0, 0, 0),
             SIMD3<Float>(0, 0, 0),
@@ -343,6 +349,8 @@ final class SpatialCalibrationEngine {
         for point in calibrationPoints {
             let ds = point.arKit - sourceCentroid
             let dt = point.bridge - targetCentroid
+            centeredSources.append(ds)
+            centeredTargets.append(dt)
             covMatrix.columns.0 += dt * ds.x
             covMatrix.columns.1 += dt * ds.y
             covMatrix.columns.2 += dt * ds.z
@@ -350,12 +358,20 @@ final class SpatialCalibrationEngine {
         
         // Compute optimal rotation, bubbling up failure for degenerate inputs.
         guard let result = kabschRotation(from: covMatrix) else {
+            // Fallback for coplanar calibration points (e.g., all ceiling lights).
+            if let coplanarResult = coplanarFallback(sourcePoints: centeredSources, targetPoints: centeredTargets) {
+                let translation = targetCentroid - coplanarResult.rotation * sourceCentroid
+                transformation = Transformation(rotation: coplanarResult.rotation, translation: translation)
+                calibrationFailure = .coplanarPoints
+                logger.info("Kabsch calibration succeeded via coplanar fallback: using 2D + height-constrained Procrustes")
+                savePersistedCalibration()
+                return
+            }
             calibrationFailure = .illConditionedCovariance
             transformation = nil
             logger.warning("Kabsch calibration failed: covariance matrix is ill-conditioned. Det(HTH) was below threshold. User should provide non-collinear calibration points.")
             return
         }
-        
         // Compute translation: t = target_centroid - R * source_centroid
         let translation = targetCentroid - result * sourceCentroid
         
@@ -576,6 +592,130 @@ final class SpatialCalibrationEngine {
         let i = M.columns.2.z
         
         return a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g)
+    }
+    
+    // MARK: - Coplanar Fallback: 2D + Height-Constrained Procrustes
+    
+    /// Fallback algorithm for when all calibration points are coplanar
+    /// (e.g., all ceiling lights at the same physical height).
+    ///
+    /// ## Algorithm
+    ///
+    /// When `det(HTH) < 1e-6` due to coplanarity, the 3D Kabsch algorithm
+    /// cannot determine a unique rotation. This fallback:
+    ///
+    /// 1. **Detects coplanarity**: Checks if all source Y values are approximately equal
+    ///    (within `coplanarityThreshold = 0.05m`).
+    ///
+    /// 2. **Projects to XZ plane**: Drops the Y axis and solves a 2D rotation
+    ///    problem on the XZ plane, which always has full rank when points are
+    ///    non-collinear in the horizontal plane.
+    ///
+    /// 3. **Computes 2D rotation**: Uses the 2D analog of the Kabsch algorithm:
+    ///    ```
+    ///    S = Σ(x_s · x_t + z_s · z_t)
+    ///    A = Σ(x_s · z_t - z_s · x_t)
+    ///    θ = atan2(A, S)
+    ///    ```
+    ///
+    /// 4. **Handles Y-axis**: If targets are also coplanar, computes a direct
+    ///    scalar offset: `y_offset = mean(target_y) - mean(source_y)`.
+    ///    If targets are not coplanar, uses the source Y as-is (identity on Y).
+    ///
+    /// - Parameters:
+    ///   - sourcePoints: Centered source (ARKit) points.
+    ///   - targetPoints: Centered target (Bridge) points.
+    /// - Returns: A rotation matrix and translation for the coplanar case, or `nil`
+    ///   if the points are collinear in the XZ plane (truly degenerate).
+    private func coplanarFallback(
+        sourcePoints: [SIMD3<Float>],
+        targetPoints: [SIMD3<Float>]
+    ) -> Transformation? {
+        let coplanarityThreshold: Float = 0.05
+        
+        // Detect coplanarity in source points (all Y values approximately equal)
+        var sourceYValues: [Float] = []
+        for p in sourcePoints {
+            sourceYValues.append(p.y)
+        }
+        
+        let sourceIsCoplanar = isCoplanar(sourceYValues, threshold: coplanarityThreshold)
+        
+        guard sourceIsCoplanar else {
+            // Source points are not coplanar; the failure must be due to collinearity
+            // rather than coplanarity. Fall through to ill-conditioned failure.
+            return nil
+        }
+        
+        // Detect coplanarity in target points
+        var targetYValues: [Float] = []
+        for p in targetPoints {
+            targetYValues.append(p.y)
+        }
+        
+        let targetIsCoplanar = isCoplanar(targetYValues, threshold: coplanarityThreshold)
+        
+        // Project to XZ plane and solve 2D rotation
+        var xzSumXX = 0.0
+        var xzSumXZ = 0.0
+        
+        for i in 0..<sourcePoints.count {
+            let sx = Double(sourcePoints[i].x)
+            let sz = Double(sourcePoints[i].z)
+            let tx = Double(targetPoints[i].x)
+            let tz = Double(targetPoints[i].z)
+            
+            xzSumXX += sx * tx + sz * tz
+            xzSumXZ += sx * tz - sz * tx
+        }
+        
+        let angle = atan2(xzSumXZ, xzSumXX)
+        
+        // Build 3D rotation matrix from 2D XZ rotation
+        let cosA = Float(cos(angle))
+        let sinA = Float(sin(angle))
+        
+        var rotation = simd_float3x3(
+            SIMD3<Float>(cosA, 0, -sinA),
+            SIMD3<Float>(0, 1, 0),
+            SIMD3<Float>(sinA, 0, cosA)
+        )
+        
+        // Compute Y-axis translation
+        var yTranslation: Float = 0
+        
+        if targetIsCoplanar {
+            // Both source and target are coplanar: compute Y offset
+            var sourceYMean: Float = 0
+            var targetYMean: Float = 0
+            for p in sourcePoints { sourceYMean += p.y }
+            for p in targetPoints { targetYMean += p.y }
+            sourceYMean /= Float(sourcePoints.count)
+            targetYMean /= Float(targetPoints.count)
+            yTranslation = targetYMean - sourceYMean
+        }
+        // If targets are not coplanar, keep Y as identity (yTranslation = 0)
+        // The source Y values will pass through unchanged
+        
+        let translation = SIMD3<Float>(0, yTranslation, 0)
+        
+        logger.info(
+            "Coplanar fallback: XZ rotation = \(String(format: "%.2f", angle * 180 / .pi))°, Y offset = \(String(format: "%.3f", yTranslation))m"
+        )
+        
+        return Transformation(rotation: rotation, translation: translation)
+    }
+    
+    /// Check if a set of Y values are all approximately equal (coplanar).
+    ///
+    /// - Parameter values: Array of Y coordinates.
+    /// - Parameter threshold: Maximum allowed spread in meters.
+    /// - Returns: `true` if all values are within `threshold` of each other.
+    private func isCoplanar(_ values: [Float], threshold: Float) -> Bool {
+        guard values.count >= 2 else { return false }
+        let minVal = values.min()!
+        let maxVal = values.max()!
+        return (maxVal - minVal) < threshold
     }
     
     /// Orthogonalize a 3×3 matrix using the Gram-Schmidt process.

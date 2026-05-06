@@ -405,7 +405,12 @@ actor HueEventStreamActor {
         sseTask = nil
         reconnectTask?.cancel()
         reconnectTask = nil
+        
+        // Explicitly invalidate the URLSession to release internal OS buffers
+        // that can leak if the network drops ungracefully.
+        urlSession?.invalidateAndCancel()
         urlSession = nil
+        
         sseDataBuffer = ""
         reconnectDelay = minReconnectDelay
         parseFailures = 0

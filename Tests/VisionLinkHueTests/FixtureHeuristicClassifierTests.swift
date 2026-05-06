@@ -124,4 +124,87 @@ final class FixtureHeuristicClassifierTests: XCTestCase {
         // Ceiling has higher specificity, so it should win.
         XCTAssertEqual(type, .ceiling, "Tie should favor higher-specificity ceiling over recessed")
     }
+    
+    // MARK: - World-Space Height Classification Tests
+    
+    /// Helper to create `ObservationData` with optional world-space height.
+    private func mockObservationData(
+        minX: Float, minY: Float, width: Float, height: Float,
+        worldSpaceHeightMeters: Float? = nil
+    ) -> ObservationData {
+        let box = CGRect(x: Double(minX), y: Double(minY), width: Double(width), height: Double(height))
+        return ObservationData(boundingBox: box, worldSpaceHeightMeters: worldSpaceHeightMeters)
+    }
+    
+    func testWorldSpaceHeightClassifiesCeilingFixtureCorrectly() {
+        // When camera points straight up at ceiling light, the bounding box
+        // center is at midY = 0.5 (center of frame). Without world-space height,
+        // this would incorrectly score as a mid-range object. With world-space
+        // height of 2.5m, it correctly classifies as ceiling.
+        let observation = mockObservationData(minX: 0.4, minY: 0.4, width: 0.2, height: 0.2, worldSpaceHeightMeters: 2.5)
+        let type = classifier.classify(typeFrom: observation)
+        
+        XCTAssertEqual(type, .ceiling, "World-space height 2.5m should classify as ceiling even when camera points straight up")
+    }
+    
+    func testWorldSpaceHeightClassifiesPendantLightCorrectly() {
+        // Pendant light at 1.5m above floor, even when centered in frame.
+        let observation = mockObservationData(minX: 0.35, minY: 0.35, width: 0.25, height: 0.25, worldSpaceHeightMeters: 1.5)
+        let type = classifier.classify(typeFrom: observation)
+        
+        XCTAssertEqual(type, .pendant, "World-space height 1.5m should classify as pendant")
+    }
+    
+    func testWorldSpaceHeightClassifiesFloorLampCorrectly() {
+        // Floor lamp at 0.5m above floor.
+        let observation = mockObservationData(minX: 0.4, minY: 0.6, width: 0.2, height: 0.2, worldSpaceHeightMeters: 0.5)
+        let type = classifier.classify(typeFrom: observation)
+        
+        XCTAssertEqual(type, .lamp, "World-space height 0.5m should classify as lamp")
+    }
+    
+    func testWorldSpaceHeightClassifiesDeskLampCorrectly() {
+        // Desk lamp at 0.6m above floor (on desk surface).
+        let observation = mockObservationData(minX: 0.4, minY: 0.5, width: 0.15, height: 0.15, worldSpaceHeightMeters: 0.6)
+        let type = classifier.classify(typeFrom: observation)
+        
+        XCTAssertEqual(type, .deskLamp, "World-space height 0.6m should classify as desk lamp")
+    }
+    
+    func testWorldSpaceHeightClassifiesSconceCorrectly() {
+        // Wall sconce at 1.8m above floor.
+        let observation = mockObservationData(minX: 0.4, minY: 0.3, width: 0.15, height: 0.2, worldSpaceHeightMeters: 1.8)
+        let type = classifier.classify(typeFrom: observation)
+        
+        XCTAssertEqual(type, .sconce, "World-space height 1.8m should classify as sconce")
+    }
+    
+    func testWorldSpaceHeightClassifiesRecessedLightCorrectly() {
+        // Recessed light flush with ceiling at 2.4m.
+        let observation = mockObservationData(minX: 0.45, minY: 0.1, width: 0.1, height: 0.1, worldSpaceHeightMeters: 2.4)
+        let type = classifier.classify(typeFrom: observation)
+        
+        XCTAssertEqual(type, .recessed, "World-space height 2.4m with small square should classify as recessed")
+    }
+    
+    func testObservationWithoutWorldSpaceHeightStillWorks() {
+        // When worldSpaceHeightMeters is nil, classification falls back to
+        // 2D normalized Y position (existing behavior).
+        let observation = mockObservationData(minX: 0.4, minY: 0.05, width: 0.2, height: 0.2, worldSpaceHeightMeters: nil)
+        let type = classifier.classify(typeFrom: observation)
+        
+        XCTAssertEqual(type, .ceiling, "Observation without world-space height should still classify via 2D position")
+    }
+    
+    func testObservationWithoutWorldSpaceHeightIgnoresHeightRules() {
+        // When worldSpaceHeightMeters is nil and a rule specifies heightRange,
+        // that rule should be skipped (not matched).
+        let classifier = FixtureHeuristicClassifier()
+        let observation = mockObservationData(minX: 0.4, minY: 0.5, width: 0.2, height: 0.2, worldSpaceHeightMeters: nil)
+        let type = classifier.classify(typeFrom: observation)
+        
+        // Should not be classified as lamp (height rule) since no world-space height available
+        // The 2D position rules should still apply
+        XCTAssertNotEqual(type, .lamp, "Without world-space height, height-based rules should be skipped")
+    }
 }
