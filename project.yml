@@ -27,6 +27,7 @@ targets:
       - VisionLinkHue.entitlements
     resources:
       - VisionLinkHue/Config/classification_rules.json
+      - VisionLinkHue/Shaders
     dependencies: []
 
   VisionLinkHueTests:

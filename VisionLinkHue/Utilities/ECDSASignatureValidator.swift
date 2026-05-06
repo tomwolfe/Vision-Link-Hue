@@ -109,7 +109,7 @@ enum ECDSASignatureValidator {
         var error: Unmanaged<CFError>?
         let verified = SecKeyVerifySignature(
             publicKey,
-            .ecdsaSignatureMessageX962SHA256,
+            .ecdsaSignatureDigestX962SHA256,
             messageHashData as CFData,
             signature as CFData,
             &error
@@ -259,7 +259,7 @@ enum ECDSASignatureValidator {
         let messageHashData = Data(messageHash)
         var error: Unmanaged<CFError>?
         
-        guard let signature = SecKeyCreateSignature(privateKey, .ecdsaSignatureMessageX962SHA256, messageHashData as CFData, &error) else {
+        guard let signature = SecKeyCreateSignature(privateKey, .ecdsaSignatureDigestX962SHA256, messageHashData as CFData, &error) else {
             throw SignatureError.signatureVerificationFailed
         }
         

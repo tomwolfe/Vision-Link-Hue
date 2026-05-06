@@ -803,8 +803,10 @@ actor FixturePersistence {
                 let result = try await operation(i)
                 results.append(result)
                 
-                try modelContext.save()
-                modelContext.rollback()
+                if (i + 1) % batchSize == 0 || i == count - 1 {
+                    try modelContext.save()
+                    modelContext.rollback()
+                }
             } catch {
                 logger.error("Failed to execute batched operation at index \(i): \(error.localizedDescription)")
                 throw error

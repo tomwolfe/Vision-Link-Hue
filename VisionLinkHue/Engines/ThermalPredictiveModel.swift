@@ -160,11 +160,15 @@ final class ThermalPredictiveModel {
             sumXY += Double(i) * y
         }
         
-        if abs(precomputedDenominator) < 1e-10 {
+        let sumX = n * (n - 1.0) / 2.0
+        let sumX2 = (n - 1.0) * n * (2.0 * n - 1.0) / 6.0
+        let denominator = n * sumX2 - sumX * sumX
+        
+        if abs(denominator) < 1e-10 {
             return 0.0
         }
         
-        return (n * sumXY - precomputedSumX * sumY) / precomputedDenominator
+        return (n * sumXY - sumX * sumY) / denominator
     }
     
     private let logger = Logger(

@@ -313,11 +313,119 @@ final class RelocalizationGuide {
         #endif
     }
     
-    /// GPU-accelerated depth distribution analysis using MPS histogram kernels.
-    /// Uses Metal to compute quadrant feature densities in parallel, avoiding
-    /// CPU-side pixel iteration entirely.
+    /// GPU-accelerated depth distribution analysis using Metal compute shaders.
+    /// Maps the depth map CVPixelBuffer to an MTLTexture and dispatches a
+    /// compute kernel that bins valid depth pixels into 4 quadrants in parallel.
+    /// Results are read back as a 4-element float array representing quadrant
+    /// feature counts, which are then converted to densities and analyzed.
     private func analyzeDepthDistributionMPS(_ depthMap: CVPixelBuffer, imageBufferSize: CGSize) -> LookDirection {
-        return analyzeDepthDistributionCPU(depthMap, imageBufferSize: imageBufferSize)
+        CVPixelBufferLockBaseAddress(depthMap, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
+        
+        let width = CVPixelBufferGetWidth(depthMap)
+        let height = CVPixelBufferGetHeight(depthMap)
+        
+        guard let device = MTLCreateSystemDefaultDevice() else {
+            return analyzeDepthDistributionCPU(depthMap, imageBufferSize: imageBufferSize)
+        }
+        
+        guard let commandQueue = device.makeCommandQueue() else {
+            return analyzeDepthDistributionCPU(depthMap, imageBufferSize: imageBufferSize)
+        }
+        
+        guard let texture = createTextureFromPixelBuffer(depthMap, device: device) else {
+            return analyzeDepthDistributionCPU(depthMap, imageBufferSize: imageBufferSize)
+        }
+        
+        guard let computePipeline = makeQuadrantComputePipeline(device: device) else {
+            return analyzeDepthDistributionCPU(depthMap, imageBufferSize: imageBufferSize)
+        }
+        
+        let quadrantCounts = [Float](repeating: 0.0, count: 4)
+        guard let outputBuffer = device.makeBuffer(bytes: quadrantCounts, length: quadrantCounts.count * MemoryLayout<Float>.stride, options: .storageModePrivate) else {
+            return analyzeDepthDistributionCPU(depthMap, imageBufferSize: imageBufferSize)
+        }
+        
+        guard let commandBuffer = commandQueue.makeCommandBuffer(),
+              let encoder = commandBuffer.makeComputeCommandEncoder() else {
+            return analyzeDepthDistributionCPU(depthMap, imageBufferSize: imageBufferSize)
+        }
+        
+        encoder.setComputePipelineState(computePipeline)
+        encoder.setTexture(texture, index: 0)
+        encoder.setBuffer(outputBuffer, offset: 0, index: 1)
+        encoder.setBytes(&Float32(width), length: MemoryLayout<Float32>.stride, index: 2)
+        encoder.setBytes(&Float32(height), length: MemoryLayout<Float32>.stride, index: 3)
+        
+        let threadsPerGrid = MTLSize(width: (width + 15) / 16, height: (height + 15) / 16, depth: 1)
+        let threadsPerThreadgroup = MTLSize(width: 16, height: 16, depth: 1)
+        encoder.dispatchThreads(threadsPerGrid, threadsPerThreadgroup: threadsPerThreadgroup)
+        encoder.endEncoding()
+        
+        commandBuffer.waitUntilCompleted()
+        
+        var results = [Float](repeating: 0.0, count: 4)
+        outputBuffer.contents().copyMemory(from: results, byteCount: results.count * MemoryLayout<Float>.stride)
+        
+        let samplesPerQuadrant = (width / 2) * (height / 2)
+        var adjustedCounts = QuadrantCounts()
+        for quadrant in DepthQuadrant.allCases {
+            let count = Int(results[quadrant.index])
+            adjustedCounts[quadrant] = count
+        }
+        
+        return computeLookDirection(from: adjustedCounts, pixelCountPerQuadrant: max(samplesPerQuadrant, 1))
+    }
+    
+    private func createTextureFromPixelBuffer(_ pixelBuffer: CVPixelBuffer, device: MTLDevice) -> MTLTexture? {
+        CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
+        
+        let width = CVPixelBufferGetWidth(pixelBuffer)
+        let height = CVPixelBufferGetHeight(pixelBuffer)
+        let bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
+        let baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer)
+        
+        let textureDescriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .r32Float,
+            width: width,
+            height: height,
+            mipmapped: false
+        )
+        textureDescriptor.usage = .shaderRead
+        
+        guard let texture = device.makeTexture(descriptor: textureDescriptor) else {
+            return nil
+        }
+        
+        let region = MTLRegionMake2D(0, 0, width, height)
+        texture.replace(
+            region: region,
+            mipmapLevel: 0,
+            withBytes: baseAddress,
+            bytesPerRow: bytesPerRow
+        )
+        
+        return texture
+    }
+    
+    private let quadrantComputeFunctionName = "quadrantDepthHistogram"
+    private var cachedQuadrantPipeline: MTLComputePipelineState?
+    
+    private func makeQuadrantComputePipeline(device: MTLDevice) -> MTLComputePipelineState? {
+        if let cached = cachedQuadrantPipeline {
+            return cached
+        }
+        
+        guard let library = device.makeDefaultLibrary() else {
+            return nil
+        }
+        
+        guard let function = library.makeFunction(name: quadrantComputeFunctionName) else {
+            return nil
+        }
+        
+        return try? device.makeComputePipelineState(function: function)
     }
     
     /// CPU-side depth distribution analysis using stride-based sampling.

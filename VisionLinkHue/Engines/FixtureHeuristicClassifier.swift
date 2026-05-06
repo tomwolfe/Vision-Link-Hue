@@ -394,11 +394,10 @@ struct FixtureHeuristicClassifier {
     private func computeConfidence(area: Double, centerX: Double, centerY: Double) -> Double {
         var confidence: Double = DetectionConstants.baseConfidence
         
-        if area > DetectionConstants.areaBonusLowerBound && area < DetectionConstants.areaBonusUpperBoundLarge {
-            confidence += DetectionConstants.areaBonusWellSized
-        }
         if area > DetectionConstants.areaBonusMediumLowerBound && area < DetectionConstants.areaBonusMediumUpperBound {
             confidence += DetectionConstants.areaBonusMedium
+        } else if area > DetectionConstants.areaBonusLowerBound && area < DetectionConstants.areaBonusUpperBoundLarge {
+            confidence += DetectionConstants.areaBonusWellSized
         }
         
         let distanceFromCenter = sqrt(
