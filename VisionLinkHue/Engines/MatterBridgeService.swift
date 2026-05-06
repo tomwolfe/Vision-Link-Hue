@@ -97,55 +97,48 @@ final class MatterBridgeService: NSObject, @unchecked Sendable {
     }
     
     /// Update the device state by scanning all HomeKit accessories.
+    /// Batches all HomeKit reads into a single MainActor pass to avoid
+    /// per-accessory context switches that cause UI stuttering.
     private func updateDeviceState() async {
-        await MainActor.run { [weak self] in
-            guard let self else { return }
+        let discoveredLights = await MainActor.run { [weak self] in
+            guard let self else { return [MatterLightDevice]() }
             self.homes = self.homeManager?.homes ?? []
-        }
-        
-        var discoveredLights: [MatterLightDevice] = []
-        
-        for home in homes {
-            for accessory in home.accessories {
-                guard accessory.isReachable else { continue }
-                
-                let hasLightService = accessory.services.contains { service in
-                    service.serviceType == .lightbulb
+            
+            var lights: [MatterLightDevice] = []
+            
+            for home in self.homes {
+                for accessory in home.accessories {
+                    guard accessory.isReachable else { continue }
+                    
+                    guard let lightbulbService = accessory.services.first(where: { $0.serviceType == .lightbulb }) else {
+                        continue
+                    }
+                    
+                    let isOn = lightbulbService.characteristics.first(where: { $0.characteristicType == .on })?.int_value == 1
+                    let brightness = lightbulbService.characteristics.first(where: { $0.characteristicType == .brightness })?.int_value ?? 0
+                    
+                    let device = MatterLightDevice(
+                        id: accessory.identifier.uuidString,
+                        name: accessory.name ?? "Unknown Device",
+                        deviceType: .extendedColorLight,
+                        manufacturerName: accessory.manufacturer ?? "Unknown",
+                        modelIdentifier: accessory.model ?? "Unknown",
+                        firmwareVersion: "",
+                        isReachable: accessory.isReachable,
+                        powerState: isOn,
+                        brightness: brightness,
+                        colorTemperatureMireds: nil,
+                        colorX: nil,
+                        colorY: nil,
+                        threadNetworkName: nil,
+                        commissioningMode: 0
+                    )
+                    
+                    lights.append(device)
                 }
-                
-                guard hasLightService else { continue }
-                
-                let isOn = await MainActor.run {
-                    accessory.services.first(where: { $0.serviceType == .lightbulb })?
-                        .characteristics.first(where: { $0.characteristicType == .on })?
-                        .int_value == 1
-                } ?? false
-                
-                let brightness = await MainActor.run {
-                    accessory.services.first(where: { $0.serviceType == .lightbulb })?
-                        .characteristics.first(where: { $0.characteristicType == .brightness })?
-                        .int_value ?? 0
-                }
-                
-                let device = MatterLightDevice(
-                    id: accessory.identifier.uuidString,
-                    name: accessory.name ?? "Unknown Device",
-                    deviceType: .extendedColorLight,
-                    manufacturerName: accessory.manufacturer ?? "Unknown",
-                    modelIdentifier: accessory.model ?? "Unknown",
-                    firmwareVersion: "",
-                    isReachable: accessory.isReachable,
-                    powerState: isOn,
-                    brightness: brightness,
-                    colorTemperatureMireds: nil,
-                    colorX: nil,
-                    colorY: nil,
-                    threadNetworkName: nil,
-                    commissioningMode: 0
-                )
-                
-                discoveredLights.append(device)
             }
+            
+            return lights
         }
         
         await MainActor.run { [weak self, discoveredLights] in

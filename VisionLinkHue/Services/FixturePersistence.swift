@@ -214,6 +214,91 @@ actor FixturePersistence {
         }
     }
     
+    /// Load fixture mappings that need syncing for CloudKit upload.
+    /// Returns serializable snapshots suitable for crossing actor boundaries.
+    func loadMappingsNeedingSync() async -> [FixtureMappingUploadData] {
+        let descriptor = FetchDescriptor<FixtureMapping>()
+        
+        do {
+            let mappings = try modelContext.fetch(descriptor)
+            return mappings
+                .filter { !$0.isSyncedToBridge }
+                .map { mapping in
+                    FixtureMappingUploadData(
+                        fixtureId: mapping.fixtureId,
+                        lightId: mapping.lightId,
+                        position: mapping.position,
+                        orientation: mapping.orientation,
+                        distanceMeters: mapping.distanceMeters,
+                        fixtureType: mapping.fixtureType,
+                        confidence: mapping.confidence
+                    )
+                }
+        } catch {
+            logger.error("Failed to load mappings needing sync: \(error.localizedDescription)")
+            return []
+        }
+    }
+    
+    /// Mark a fixture mapping as synced to CloudKit.
+    func markMappingSynced(_ fixtureId: UUID) {
+        do {
+            let descriptor = FetchDescriptor<FixtureMapping>(
+                predicate: #Predicate<FixtureMapping> { $0.fixtureId == fixtureId }
+            )
+            
+            let results = try modelContext.fetch(descriptor)
+            if let mapping = results.first {
+                mapping.isSyncedToBridge = true
+                mapping.updatedAt = Date()
+                try modelContext.save()
+                logger.debug("Marked fixture \(fixtureId) as synced for CloudKit")
+            }
+        } catch {
+            logger.error("Failed to mark fixture as synced: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Apply remote spatial data to a fixture mapping.
+    /// Updates position, orientation, distance, and confidence from
+    /// remote sync records to maintain consistency across devices.
+    func applyRemoteSpatialData(
+        fixtureId: UUID,
+        position: SIMD3<Float>,
+        orientation: simd_quatf,
+        distanceMeters: Float,
+        confidence: Double
+    ) {
+        guard validateSpatialData(position: position, orientation: orientation, distanceMeters: distanceMeters) else {
+            logger.error("Rejected malformed remote spatial data for fixture \(fixtureId)")
+            return
+        }
+        
+        do {
+            let descriptor = FetchDescriptor<FixtureMapping>(
+                predicate: #Predicate<FixtureMapping> { $0.fixtureId == fixtureId }
+            )
+            
+            let results = try modelContext.fetch(descriptor)
+            if let mapping = results.first {
+                mapping.positionX = position.x
+                mapping.positionY = position.y
+                mapping.positionZ = position.z
+                mapping.orientationX = orientation.vector.x
+                mapping.orientationY = orientation.vector.y
+                mapping.orientationZ = orientation.vector.z
+                mapping.orientationW = orientation.vector.w
+                mapping.distanceMeters = distanceMeters
+                mapping.confidence = confidence
+                mapping.updatedAt = Date()
+                try modelContext.save()
+                logger.debug("Applied remote spatial data for fixture \(fixtureId)")
+            }
+        } catch {
+            logger.error("Failed to apply remote spatial data for fixture \(fixtureId): \(error.localizedDescription)")
+        }
+    }
+    
     /// Save a fixture-light mapping with spatial coordinates atomically.
     /// Validates the spatial data before persisting to prevent malformed
     /// coordinate data from being stored in SwiftData.
@@ -578,12 +663,12 @@ actor FixturePersistence {
     /// This is called from the UI to initiate bidirectional sync of
     /// fixture mappings across the user's devices.
     func triggerSpatialSync() async -> SpatialSyncResult {
-        await SpatialSyncService().sync()
+        await SpatialSyncService.shared.sync()
     }
     
     /// Check if CloudKit spatial sync is available.
     func checkSpatialSyncAvailability() async -> Bool {
-        await SpatialSyncService().checkCloudKitAvailability()
+        await SpatialSyncService.shared.checkCloudKitAvailability()
     }
     
     // MARK: - Manual Placement Persistence

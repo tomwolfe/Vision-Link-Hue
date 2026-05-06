@@ -111,6 +111,17 @@ struct CRDTConflictResolver {
     }
 }
 
+/// Serializable snapshot of a fixture mapping for upload across actor boundaries.
+struct FixtureMappingUploadData: Sendable {
+    let fixtureId: UUID
+    let lightId: String?
+    let position: SIMD3<Float>
+    let orientation: simd_quatf
+    let distanceMeters: Float
+    let fixtureType: String
+    let confidence: Double
+}
+
 /// Represents a spatial sync record for CloudKit Sharing of fixture mappings
 /// across a user's Vision Pro and iPhone devices.
 @Model
@@ -235,10 +246,11 @@ struct SpatialSyncModelContainer {
 ///
 /// The service operates with background isolation to prevent
 /// main-thread blocking during sync operations.
-final class SpatialSyncService: @unchecked Sendable {
+@ModelActor
+final actor SpatialSyncService {
     
-    let modelContainer: ModelContainer
-    var modelContext: ModelContext { ModelContext(modelContainer) }
+    nonisolated static let shared = SpatialSyncService()
+    
     private let logger = Logger(
         subsystem: "com.tomwolfe.visionlinkhue",
         category: "SpatialSyncService"
@@ -350,19 +362,19 @@ final class SpatialSyncService: @unchecked Sendable {
         var changes = 0
         var success = true
         
-        // Load local fixture mappings that need syncing.
-        let localMappings = await loadLocalMappingsNeedingSync()
+        // Load local fixture mappings that need syncing from FixturePersistence.
+        let unsyncedMappings = await persistence.loadMappingsNeedingSync()
         
-        for mapping in localMappings {
+        for mapping in unsyncedMappings {
             do {
-                // Create or update the spatial sync record.
-                let syncRecord = await createOrUpdateSyncRecord(from: mapping)
+                // Create a new spatial sync record for upload.
+                let syncRecord = await createSyncRecord(from: mapping)
                 
                 // Upload to CloudKit.
                 try await uploadRecord(syncRecord)
                 
-                // Mark as synced.
-                await markAsSynced(syncRecord)
+                // Mark as synced in FixturePersistence.
+                await persistence.markMappingSynced(syncRecord.fixtureId)
                 
                 changes += 1
             } catch {
@@ -462,32 +474,11 @@ final class SpatialSyncService: @unchecked Sendable {
         return conflictCount
     }
     
-    /// Create or update a spatial sync record from a local fixture mapping.
-    private func createOrUpdateSyncRecord(from mapping: FixtureMapping) async -> SpatialSyncRecord {
-        // Check if a sync record already exists for this fixture.
-        if let existing = await loadSyncRecord(for: mapping.fixtureId) {
-            existing.lightId = mapping.lightId
-            existing.positionX = mapping.position.x
-            existing.positionY = mapping.position.y
-            existing.positionZ = mapping.position.z
-            existing.orientationX = mapping.orientation.vector.x
-            existing.orientationY = mapping.orientation.vector.y
-            existing.orientationZ = mapping.orientation.vector.z
-            existing.orientationW = mapping.orientation.vector.w
-            existing.distanceMeters = mapping.distanceMeters
-            existing.fixtureType = mapping.fixtureType
-            existing.confidence = mapping.confidence
-            existing.lastSyncedAt = Date()
-            existing.lastModifiedByDevice = deviceIdentifier
-            existing.version = incrementVersion(for: mapping.fixtureId)
-            existing.vectorClockJSON = serializeVectorClock(for: mapping.fixtureId)
-            existing.lastSyncError = nil
-            
-            return existing
-        }
+    /// Create a spatial sync record from a mapping snapshot for CloudKit upload.
+    private func createSyncRecord(from mapping: FixtureMappingUploadData) async -> SpatialSyncRecord {
+        _ = incrementVersion(for: mapping.fixtureId)
         
-        // Create a new sync record.
-        return SpatialSyncRecord(
+        let record = SpatialSyncRecord(
             fixtureId: mapping.fixtureId,
             lightId: mapping.lightId,
             position: mapping.position,
@@ -496,6 +487,11 @@ final class SpatialSyncService: @unchecked Sendable {
             fixtureType: mapping.fixtureType,
             confidence: mapping.confidence
         )
+        
+        record.lastModifiedByDevice = deviceIdentifier
+        record.vectorClockJSON = serializeVectorClock(for: mapping.fixtureId)
+        
+        return record
     }
     
     /// Upload a spatial sync record to CloudKit.
@@ -594,7 +590,7 @@ final class SpatialSyncService: @unchecked Sendable {
     }
     
     /// Apply a remote record to the local store.
-    /// Updates the local FixtureMapping with position, orientation,
+    /// Delegates to FixturePersistence to update position, orientation,
     /// and light ID from the remote record to maintain consistency.
     private func applyRemoteRecord(_ record: SpatialSyncRecord) async {
         let fixtureUUID = record.fixtureId
@@ -604,37 +600,19 @@ final class SpatialSyncService: @unchecked Sendable {
             await persistence.linkFixture(fixtureUUID, toLight: lightId)
         }
         
-        let recordFixtureId = record.fixtureId
-        
-        // Update spatial coordinates from the remote record.
-        let descriptor = FetchDescriptor<FixtureMapping>(
-            predicate: #Predicate<FixtureMapping> { $0.fixtureId == recordFixtureId }
+        // Update spatial coordinates via FixturePersistence.
+        await persistence.applyRemoteSpatialData(
+            fixtureId: fixtureUUID,
+            position: record.position,
+            orientation: record.orientation,
+            distanceMeters: record.distanceMeters,
+            confidence: record.confidence
         )
-        
-        do {
-            var mappings = try modelContext.fetch(descriptor)
-            if let mapping = mappings.first {
-                mapping.positionX = record.position.x
-                mapping.positionY = record.position.y
-                mapping.positionZ = record.position.z
-                mapping.orientationX = record.orientation.vector.x
-                mapping.orientationY = record.orientation.vector.y
-                mapping.orientationZ = record.orientation.vector.z
-                mapping.orientationW = record.orientation.vector.w
-                mapping.distanceMeters = record.distanceMeters
-                mapping.confidence = record.confidence
-                mapping.updatedAt = Date()
-                try modelContext.save()
-                logger.debug("Applied remote spatial data for fixture \(record.fixtureId)")
-            }
-        } catch {
-            logger.error("Failed to apply remote record for fixture \(fixtureUUID): \(error.localizedDescription)")
-        }
     }
     
     /// Apply remote changes for a specific fixture.
     /// Fetches the latest remote record from CloudKit and applies
-    /// it to the local store, updating position, orientation, and metadata.
+    /// it to the local store via FixturePersistence.
     private func applyRemoteChanges(for fixtureId: UUID) async {
         guard let database = cloudKitDatabase else { return }
         
@@ -655,28 +633,23 @@ final class SpatialSyncService: @unchecked Sendable {
                 return
             }
             
-            let descriptor = FetchDescriptor<FixtureMapping>(
-                predicate: #Predicate<FixtureMapping> { $0.fixtureId == fixtureId }
+            let position = SIMD3<Float>(positionX, positionY, positionZ)
+            let orientation = simd_quatf(real: orientationW, imag: SIMD3<Float>(orientationX, orientationY, orientationZ))
+            
+            // Update spatial coordinates via FixturePersistence.
+            await persistence.applyRemoteSpatialData(
+                fixtureId: fixtureId,
+                position: position,
+                orientation: orientation,
+                distanceMeters: distanceMeters,
+                confidence: confidence
             )
             
-            var mappings = try modelContext.fetch(descriptor)
-            if let mapping = mappings.first {
-                mapping.positionX = positionX
-                mapping.positionY = positionY
-                mapping.positionZ = positionZ
-                mapping.orientationX = orientationX
-                mapping.orientationY = orientationY
-                mapping.orientationZ = orientationZ
-                mapping.orientationW = orientationW
-                mapping.distanceMeters = distanceMeters
-                mapping.confidence = confidence
-                mapping.updatedAt = Date()
-                if let lightId = record["light_id"] as? String {
-                    mapping.lightId = lightId
-                }
-                try modelContext.save()
-                logger.debug("Applied remote changes for fixture \(fixtureId)")
+            if let lightId = record["light_id"] as? String {
+                await persistence.linkFixture(fixtureId, toLight: lightId)
             }
+            
+            logger.debug("Applied remote changes for fixture \(fixtureId)")
         } catch {
             logger.error("Failed to fetch remote record for fixture \(fixtureId): \(error.localizedDescription)")
         }
@@ -759,18 +732,9 @@ final class SpatialSyncService: @unchecked Sendable {
     }
     
     /// Load local fixture mappings that need syncing.
+    /// Delegates to FixturePersistence which manages the FixtureMapping context.
     private func loadLocalMappingsNeedingSync() async -> [FixtureMapping] {
-        // Load all fixture mappings that haven't been synced yet
-        // or have been modified since last sync.
-        let descriptor = FetchDescriptor<FixtureMapping>()
-        
-        do {
-            let mappings = try modelContext.fetch(descriptor)
-            return mappings.filter { !$0.isSyncedToBridge }
-        } catch {
-            logger.error("Failed to load local mappings: \(error.localizedDescription)")
-            return []
-        }
+        await persistence.loadMappingsNeedingSync()
     }
     
     /// Load a sync record for a specific fixture.
@@ -810,7 +774,7 @@ final class SpatialSyncService: @unchecked Sendable {
     }
     
     /// Get the persistence reference for fixture mapping operations.
-    private var persistence: FixturePersistence {
+    nonisolated var persistence: FixturePersistence {
         FixturePersistence.shared
     }
 }
