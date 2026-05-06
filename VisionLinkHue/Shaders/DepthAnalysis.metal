@@ -4,8 +4,8 @@ using namespace metal;
 kernel void quadrantDepthHistogram(
     texture2d<float> depthTexture [[texture(0)]],
     device float* quadrantCounts [[buffer(1)]],
-    constant float32& width [[buffer(2)]],
-    constant float32& height [[buffer(3)]],
+    constant float& width [[buffer(2)]],
+    constant float& height [[buffer(3)]],
     uint2 gid [[thread_position_in_grid]]
 ) {
     if (gid.x >= uint(width) || gid.y >= uint(height)) return;
@@ -21,5 +21,5 @@ kernel void quadrantDepthHistogram(
         quadrant = (gid.y < uint(height) / 2) ? 1 : 3;
     }
     
-    atomic_add(&quadrantCounts[quadrant], 1.0f);
+    quadrantCounts[quadrant] += 1.0f;
 }

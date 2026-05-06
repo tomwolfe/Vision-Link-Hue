@@ -60,6 +60,20 @@ protocol SpatialSyncServiceFactory {
     func create() -> SpatialSyncService
 }
 
+/// Protocol for creating `MetricKitTelemetryService` instances.
+/// Enables dependency injection of mock telemetry services in tests.
+@MainActor
+protocol MetricKitTelemetryServiceFactory {
+    func create() -> MetricKitTelemetryService
+}
+
+/// Protocol for creating `LocalSyncActor` instances.
+/// Enables dependency injection of mock local sync actors in tests.
+@MainActor
+protocol LocalSyncActorFactory {
+    func create() -> LocalSyncActor
+}
+
 /// Default implementations of all factory protocols.
 /// Used by `AppContainer` for production dependency creation.
 @MainActor
@@ -72,6 +86,8 @@ final class DefaultFactories: @unchecked Sendable {
     let arSessionManagerFactory: ARSessionManagerFactory
     let matterBridgeServiceFactory: MatterBridgeServiceFactory
     let spatialSyncServiceFactory: SpatialSyncServiceFactory
+    let metricKitTelemetryFactory: MetricKitTelemetryServiceFactory
+    let localSyncActorFactory: LocalSyncActorFactory
     
     init(
         stateStreamFactory: HueStateStreamFactory = DefaultHueStateStreamFactory(),
@@ -80,7 +96,9 @@ final class DefaultFactories: @unchecked Sendable {
         spatialProjectorFactory: SpatialProjectorFactory = DefaultSpatialProjectorFactory(),
         arSessionManagerFactory: ARSessionManagerFactory = DefaultARSessionManagerFactory(),
         matterBridgeServiceFactory: MatterBridgeServiceFactory = DefaultMatterBridgeServiceFactory(),
-        spatialSyncServiceFactory: SpatialSyncServiceFactory = DefaultSpatialSyncServiceFactory()
+        spatialSyncServiceFactory: SpatialSyncServiceFactory = DefaultSpatialSyncServiceFactory(),
+        metricKitTelemetryFactory: MetricKitTelemetryServiceFactory = DefaultMetricKitTelemetryServiceFactory(),
+        localSyncActorFactory: LocalSyncActorFactory = DefaultLocalSyncActorFactory()
     ) {
         self.stateStreamFactory = stateStreamFactory
         self.hueClientFactory = hueClientFactory
@@ -89,6 +107,8 @@ final class DefaultFactories: @unchecked Sendable {
         self.arSessionManagerFactory = arSessionManagerFactory
         self.matterBridgeServiceFactory = matterBridgeServiceFactory
         self.spatialSyncServiceFactory = spatialSyncServiceFactory
+        self.metricKitTelemetryFactory = metricKitTelemetryFactory
+        self.localSyncActorFactory = localSyncActorFactory
     }
 }
 
@@ -172,6 +192,22 @@ final class DefaultSpatialSyncServiceFactory: SpatialSyncServiceFactory {
     }
 }
 
+/// Default factory for `MetricKitTelemetryService`.
+@MainActor
+final class DefaultMetricKitTelemetryServiceFactory: MetricKitTelemetryServiceFactory {
+    func create() -> MetricKitTelemetryService {
+        MetricKitTelemetryService()
+    }
+}
+
+/// Default factory for `LocalSyncActor`.
+@MainActor
+final class DefaultLocalSyncActorFactory: LocalSyncActorFactory {
+    func create() -> LocalSyncActor {
+        LocalSyncActor()
+    }
+}
+
 /// Centralized dependency injection container for the application.
 /// Initializes all core services once at app launch and provides
 /// deterministic access to dependencies throughout the view hierarchy.
@@ -190,6 +226,8 @@ final class AppContainer {
     let spatialProjector: SpatialProjector
     let matterService: MatterBridgeService
     let spatialSyncService: SpatialSyncService
+    let telemetryService: MetricKitTelemetryService
+    let localSyncActor: LocalSyncActor
     let detectionSettings: DetectionSettings
     let relocalizationMonitor: RelocalizationMonitoringService
     
@@ -245,6 +283,30 @@ final class AppContainer {
         
         let spatialSyncService = factories.spatialSyncServiceFactory.create()
         
+        let telemetryService = factories.metricKitTelemetryFactory.create()
+        let localSyncActor = factories.localSyncActorFactory.create()
+        
+        // Wire up telemetry service to detection engine for inference latency reporting.
+        // Telemetry records are collected periodically and submitted via MetricKit
+        // for correlation with real-world device thermals across A15-M4 chips.
+        detector.configureTelemetryService(telemetryService)
+        
+        // Wire up local sync actor for P2P spatial data sharing.
+        // Provides real-time coordinate sharing between Vision Pro and iPhone
+        // on the local network, bypassing CloudKit latency.
+        localSyncActor.onSpatialSyncReceived = { [weak spatialSyncService] payload in
+            guard let syncService = spatialSyncService else { return }
+            Task {
+                await syncService.applyRemoteSpatialSync(payload)
+            }
+        }
+        
+        // Start local sync actor for P2P discovery.
+        Task {
+            try? await localSyncActor.start()
+            await localSyncActor.discoverPeers()
+        }
+        
         self.stateStream = stream
         self.hueClient = client
         self.detectionEngine = detector
@@ -252,6 +314,8 @@ final class AppContainer {
         self.spatialProjector = projector
         self.matterService = matterService
         self.spatialSyncService = spatialSyncService
+        self.telemetryService = telemetryService
+        self.localSyncActor = localSyncActor
         self.relocalizationMonitor = relocalizationMonitor
     }
 }

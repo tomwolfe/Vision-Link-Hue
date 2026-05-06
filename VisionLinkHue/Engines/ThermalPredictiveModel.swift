@@ -68,8 +68,8 @@ final class ThermalPredictiveModel {
     }
     
     private var configuration: PredictiveConfiguration
-    private var latencyHistory: [Double]
-    private var sampleCount: Int = 0
+    var latencyHistory: [Double]
+    var sampleCount: Int = 0
     
     /// Precomputed least-squares constants for the fixed slope window.
     /// For x = [0, 1, ..., n-1]:

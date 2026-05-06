@@ -70,8 +70,8 @@ final class ThermalMonitor: Sendable {
     private var thermalMonitoringTask: Task<Void, Never>?
     
     /// Predictive thermal model for proactive throttling based on
-    /// inference latency trends.
-    private var predictiveModel: ThermalPredictiveModel
+    /// inference latency trends. Exposed for telemetry reporting.
+    var predictiveModel: ThermalPredictiveModel
     
     /// Initialize with an optional predictive model configuration.
     /// - Parameter predictiveConfig: Configuration for the predictive throttling model.

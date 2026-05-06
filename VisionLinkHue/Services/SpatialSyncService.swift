@@ -800,6 +800,42 @@ actor SpatialSyncService {
     nonisolated var persistence: FixturePersistence {
         FixturePersistence.shared
     }
+    
+    /// Apply a spatial sync payload received from a peer device.
+    /// Creates or updates the local fixture mapping with the remote
+    /// spatial data, using the peer's vector clock for conflict resolution.
+    /// - Parameter payload: The spatial sync payload from a peer device.
+    func applyRemoteSpatialSync(_ payload: SpatialSyncPayload) async {
+        let fixtureKey = payload.fixtureId
+        
+        // Update the vector clock for this fixture.
+        let fixtureUUID = UUID(uuidString: fixtureKey) ?? UUID()
+        let fixtureUUIDString = fixtureUUID.uuidString
+        
+        var remoteClock: [String: Int64] = [:]
+        remoteClock[payload.deviceID] = payload.version
+        
+        let localClock = vectorClocks[fixtureUUIDString] ?? [:]
+        vectorClocks[fixtureUUIDString] = CRDTConflictResolver.mergeClocks(localClock, remoteClock)
+        
+        // Apply the spatial data to the local store.
+        let position = SIMD3<Float>(payload.positionX, payload.positionY, payload.positionZ)
+        let orientation = simd_quatf(real: payload.orientationW, imag: SIMD3<Float>(payload.orientationX, payload.orientationY, payload.orientationZ))
+        
+        await persistence.applyRemoteSpatialData(
+            fixtureId: fixtureUUID,
+            position: position,
+            orientation: orientation,
+            distanceMeters: payload.distanceMeters,
+            confidence: payload.confidence
+        )
+        
+        if let lightId = payload.lightId {
+            await persistence.linkFixture(fixtureUUID, toLight: lightId)
+        }
+        
+        logger.debug("Applied remote spatial sync for fixture \(fixtureKey) from \(payload.deviceID)")
+    }
 }
 
 // MARK: - Sync Result Types

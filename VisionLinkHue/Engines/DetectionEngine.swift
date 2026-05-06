@@ -78,6 +78,11 @@ final class DetectionEngine {
     /// Whether the model is using 4-bit weight quantization.
     var isModelQuantized: Bool = false
     
+    /// The current CoreML compute units configuration.
+    /// Switches between `.all` (default) and `.cpuOnly` based on thermal state
+    /// to reduce NPU/GPU thermal load during predictive throttling.
+    private var currentComputeUnits: MLComputeUnits = .all
+    
     /// Reference to the state stream for reporting quantization fallback events.
     private weak var stateStream: HueStateStream?
     
@@ -99,11 +104,24 @@ final class DetectionEngine {
     /// a Jetsam termination on A13+ devices.
     private var onShouldPauseARSession: (@Sendable (Bool) -> Void)?
     
+    /// Reference to the MetricKit telemetry service for thermal/battery reporting.
+    /// When set, inference latency samples are recorded for MetricKit submission
+    /// to correlate predictive model thresholds with real-world device thermals.
+    private weak var telemetryService: MetricKitTelemetryService?
+    
     /// Configure the ARSession pause/resume handler.
     /// Call this after the DetectionEngine is created to wire up the ARSessionManager
     /// for automatic session pausing during unquantized model fallback loads.
     func configureARSessionPauseHandler(_ handler: @escaping (@Sendable (Bool) -> Void)) {
         onShouldPauseARSession = handler
+    }
+    
+    /// Configure the MetricKit telemetry service for thermal/battery reporting.
+    /// When set, inference latency samples are recorded and submitted via MetricKit
+    /// to correlate predictive model thresholds with real-world device thermals.
+    /// - Parameter service: The telemetry service to use for reporting.
+    func configureTelemetryService(_ service: MetricKitTelemetryService) {
+        self.telemetryService = service
     }
     
     /// Initialize with material fixture mapping loaded from classification_rules.json.
@@ -219,6 +237,19 @@ final class DetectionEngine {
         // Update predictive thermal model with latency measurement for proactive throttling.
         thermalMonitor.updateWithLatency(inferenceLatencyMs)
         
+        // Record telemetry for MetricKit submission to correlate
+        // predictive model thresholds with real-world device thermals.
+        telemetryService?.recordInference(
+            latencyMs: inferenceLatencyMs,
+            thermalState: thermalState,
+            predictedThermalState: thermalMonitor.predictedThermalState,
+            ewmaLatency: thermalMonitor.predictiveModel.ewmaLatency,
+            slopeMs: thermalMonitor.predictiveModel.latencyTrendSlope,
+            sampleCount: thermalMonitor.predictiveModel.sampleCount,
+            inferenceCount: frameCount,
+            isModelQuantized: isModelQuantized
+        )
+        
         let filtered = detections.filter { $0.confidence >= minConfidence }
         
         await MainActor.run {
@@ -234,8 +265,15 @@ final class DetectionEngine {
     }
     
     /// Update thermal state from the thermal monitor for adaptive throttling.
+    /// Also triggers compute unit switching when thermal state changes.
     private func updateThermalState() {
+        let previousState = thermalMonitor.thermalState
         _ = thermalMonitor.thermalState
+        
+        // Switch CoreML compute units when thermal state changes.
+        if thermalMonitor.thermalState != previousState {
+            updateComputeUnitsForThermalState()
+        }
     }
     
     // MARK: - CoreML Model Loading
@@ -349,6 +387,8 @@ final class DetectionEngine {
             }
             objectDetectionRequest?.imageCropAndScaleOption = .scaleFill
             
+            logger.info("CoreML compute units: \(self.currentComputeUnits == .all ? ".all" : ".cpuOnly")")
+            
         } catch {
             logger.warning("Failed to load CoreML model: \(error.localizedDescription)")
             isCoreMLAvailable = false
@@ -372,6 +412,36 @@ final class DetectionEngine {
         intentClassifier = CoreMLIntentClassifier()
         Task { await loadObjectDetectionModel() }
         Task { await loadIntentClassifierModel() }
+    }
+    
+    /// Switch CoreML compute units based on the effective thermal state.
+    /// When predictive throttling is active or thermal state is warning or worse,
+    /// switches from `.all` to `.cpuOnly` to reduce NPU/GPU thermal load
+    /// while preserving inference capability on the CPU.
+    ///
+    /// This is called automatically when the thermal monitor detects a state change.
+    func updateComputeUnitsForThermalState() {
+        let effectiveState = thermalMonitor.effectiveThermalState
+        let newState: MLComputeUnits
+        
+        if thermalMonitor.isPredictiveThrottlingActive || effectiveState >= .warning {
+            newState = .cpuOnly
+            if currentComputeUnits != .cpuOnly {
+                logger.info("Switching CoreML to .cpuOnly due to thermal state: \(effectiveState.description)")
+                currentComputeUnits = .cpuOnly
+            }
+        } else {
+            newState = .all
+            if currentComputeUnits != .all {
+                logger.info("Restoring CoreML to .all compute units (thermal state: \(effectiveState.description))")
+                currentComputeUnits = .all
+            }
+        }
+        
+        // Reload the model with the new compute units if the model is loaded.
+        if isObjectModelLoaded {
+            reloadObjectDetectionModel()
+        }
     }
     
     /// Load the intent classifier CoreML model asynchronously.
