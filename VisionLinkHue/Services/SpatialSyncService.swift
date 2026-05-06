@@ -220,6 +220,7 @@ struct SpatialSyncModelContainer {
     
     let schema: Schema
     let modelContainer: ModelContainer
+    let sharedService: SpatialSyncService
     
     private init() {
         self.schema = Schema([SpatialSyncRecord.self])
@@ -236,6 +237,8 @@ struct SpatialSyncModelContainer {
                 configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]
             )
         }
+        
+        self.sharedService = SpatialSyncService(modelContainer: self.modelContainer, deviceIdentifier: ProcessInfo().globallyUniqueString)
     }
 }
 
@@ -246,14 +249,12 @@ struct SpatialSyncModelContainer {
 ///
 /// The service operates with background isolation to prevent
 /// main-thread blocking during sync operations.
-@ModelActor
-final actor SpatialSyncService {
+actor SpatialSyncService {
     
-    nonisolated static let shared: SpatialSyncService = {
-        let container = SpatialSyncModelContainer.shared
-        let service = SpatialSyncService(modelExecutor: container.modelContainer as! any SwiftData.ModelExecutor, deviceIdentifier: ProcessInfo().globallyUniqueString)
-        return service
-    }()
+    private let modelContainer: ModelContainer
+    var modelContext: ModelContext
+    
+    nonisolated static let shared: SpatialSyncService = SpatialSyncModelContainer.shared.sharedService
     
     private let logger = Logger(
         subsystem: "com.tomwolfe.visionlinkhue",
@@ -286,10 +287,10 @@ final actor SpatialSyncService {
     private var cloudKitDatabase: CKDatabase?
     
     /// Initialize the spatial sync service.
-    init(modelExecutor: any SwiftData.ModelExecutor, deviceIdentifier: String = ProcessInfo().globallyUniqueString) {
+    init(modelContainer: ModelContainer, deviceIdentifier: String = ProcessInfo().globallyUniqueString) {
         self.deviceIdentifier = deviceIdentifier
-        self.modelExecutor = modelExecutor
-        self.modelContainer = SpatialSyncModelContainer.shared.modelContainer
+        self.modelContainer = modelContainer
+        self.modelContext = ModelContext(modelContainer)
         self.cloudKitDatabase = Self.setupCloudKitDatabase()
     }
     
