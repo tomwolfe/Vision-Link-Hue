@@ -235,13 +235,16 @@ let classificationRules: [ScoringRule] = [
 
 /// Safely creates a `ClosedRange<Double>` from a two-element array,
 /// handling inverted bounds (e.g., `[0.8, 0.2]`) by using min/max.
-/// This prevents crashes from server-side JSON typos in OTA config.
+/// Throws `ClassificationConfigError.invalidRange` if the array doesn't
+/// have exactly 2 elements, preventing silent degradation of OTA rules.
 /// - Parameter bounds: A two-element array of doubles.
-/// - Returns: A `ClosedRange<Double>` with correctly ordered bounds, or `nil` if
-///   the array doesn't have exactly 2 elements.
+/// - Returns: A `ClosedRange<Double>` with correctly ordered bounds.
+/// - Throws: `ClassificationConfigError.invalidRange` if the array is invalid.
 @inline(__always)
-private func safeClosedRange(_ bounds: [Double]) -> ClosedRange<Double>? {
-    guard bounds.count == 2 else { return nil }
+private func safeClosedRange(_ bounds: [Double]) throws -> ClosedRange<Double> {
+    guard bounds.count == 2 else {
+        throw ClassificationConfigError.invalidRange("Range must have exactly 2 elements, got \(bounds.count): \(bounds)")
+    }
     return ClosedRange(uncheckedBounds: (min(bounds[0], bounds[1]), max(bounds[0], bounds[1])))
 }
 
@@ -317,13 +320,33 @@ struct FixtureHeuristicClassifier {
         for jsonRule in configFile.rules {
             guard let type = FixtureType(from: jsonRule.type) else { continue }
             
-            let aspectRange = jsonRule.aspectRange.flatMap { safeClosedRange($0) }
+            let aspectRange: ClosedRange<Double>?
+            if let aspectBounds = jsonRule.aspectRange {
+                aspectRange = try safeClosedRange(aspectBounds)
+            } else {
+                aspectRange = nil
+            }
             
-            let yRange = jsonRule.yRange.flatMap { safeClosedRange($0) }
+            let yRange: ClosedRange<Double>?
+            if let yBounds = jsonRule.yRange {
+                yRange = try safeClosedRange(yBounds)
+            } else {
+                yRange = nil
+            }
             
-            let areaRange = jsonRule.areaRange.flatMap { safeClosedRange($0) }
+            let areaRange: ClosedRange<Double>?
+            if let areaBounds = jsonRule.areaRange {
+                areaRange = try safeClosedRange(areaBounds)
+            } else {
+                areaRange = nil
+            }
             
-            let heightRange = jsonRule.heightRange.flatMap { safeClosedRange($0) }
+            let heightRange: ClosedRange<Double>?
+            if let heightBounds = jsonRule.heightRange {
+                heightRange = try safeClosedRange(heightBounds)
+            } else {
+                heightRange = nil
+            }
             
             loadedRules.append(ScoringRule(
                 type: type,

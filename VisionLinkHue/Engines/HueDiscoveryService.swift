@@ -19,7 +19,9 @@ final class HueDiscoveryService {
     private var browser: NWBrowser?
     
     /// Discover Hue bridges on the local network using mDNS.
-    /// Uses a synchronous browser with a 3-second timeout.
+    /// Uses an adaptive timeout that extends if services are still being
+    /// discovered, accommodating congested Wi-Fi 7 / Thread environments
+    /// where mDNS resolution can take 4-5 seconds.
     /// - Parameter stateStream: Optional state stream for error reporting.
     /// - Returns: Array of discovered bridge information.
     func discoverBridges(stateStream: HueStateStream?) async -> [BridgeInfo] {
@@ -42,8 +44,42 @@ final class HueDiscoveryService {
         
         serviceBrowser.searchForServices(ofType: "_hue._tcp.", inDomain: "local.")
         
-        // Wait up to 3 seconds for discovery
-        try? await Task.sleep(for: .seconds(3))
+        // Adaptive timeout: wait at least 3 seconds, then check if new
+        // services are still arriving. If so, extend by up to 2 more
+        // seconds in 1-second increments to accommodate slower devices.
+        let baseTimeout: TimeInterval = 3.0
+        let maxAdaptiveExtension: TimeInterval = 2.0
+        let checkInterval: TimeInterval = 1.0
+        
+        let startTime = ContinuousClock.now
+        var lastDiscoveryCount = 0
+        
+        while true {
+            let elapsed = ContinuousClock.now - startTime
+            let remainingBase = baseTimeout - elapsed.components.seconds
+            
+            if remainingBase > 0 {
+                // Still within base timeout period, sleep for up to 1 second
+                let sleepDuration = min(checkInterval, remainingBase)
+                try? await Task.sleep(for: .seconds(sleepDuration))
+            } else {
+                // Base timeout reached, check for adaptive extension
+                if elapsed.components.seconds >= Int(baseTimeout + maxAdaptiveExtension) {
+                    // Maximum timeout reached
+                    break
+                }
+                
+                // Check if new services were discovered since last check
+                if discoveredBridges.count == lastDiscoveryCount {
+                    // No new discoveries, safe to stop
+                    break
+                }
+                
+                lastDiscoveryCount = discoveredBridges.count
+                try? await Task.sleep(for: .seconds(checkInterval))
+            }
+        }
+        
         serviceBrowser.stop()
         
         if discoveredBridges.isEmpty {

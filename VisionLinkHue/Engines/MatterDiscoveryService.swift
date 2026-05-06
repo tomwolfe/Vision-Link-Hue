@@ -37,9 +37,10 @@ final class MatterDiscoveryService: NSObject, @unchecked Sendable {
     }
     private var _isBridgeConnected: Bool = false
     
-    /// Discovered Matter border routers.
-    var discoveredBorderRouters: [MatterBorderRouter] {
-        _discoveredRouters.values.map { routerInfo in
+    /// Discovered Matter border routers (actor-isolated for thread safety).
+    func getDiscoveredBorderRouters() async -> [MatterBorderRouter] {
+        let routerInfos = await _routerStore.values
+        return routerInfos.map { routerInfo in
             MatterBorderRouter(
                 id: routerInfo.name,
                 name: routerInfo.displayName,
@@ -70,8 +71,27 @@ final class MatterDiscoveryService: NSObject, @unchecked Sendable {
     /// Resolved services being actively monitored.
     private var services: [NetService] = []
     
-    /// Discovered router information keyed by service name.
-    private var _discoveredRouters: [String: RouterInfo] = [:]
+    /// Actor-isolated store for discovered router information, protecting
+    /// against data races between delegate callbacks and discovery queries.
+    private actor RouterStore {
+        private var _routers: [String: RouterInfo] = [:]
+        
+        var values: [RouterInfo] { _routers.values }
+        
+        func addOrUpdate(_ info: RouterInfo) {
+            _routers[info.name] = info
+        }
+        
+        func remove(_ name: String) {
+            _routers.removeValue(forKey: name)
+        }
+        
+        func clear() {
+            _routers.removeAll()
+        }
+    }
+    
+    private let _routerStore = RouterStore()
     
     /// Callback for discovered border routers.
     var onBorderRouterDiscovered: (@Sendable (MatterBorderRouter) -> Void)?
@@ -103,13 +123,13 @@ final class MatterDiscoveryService: NSObject, @unchecked Sendable {
     }
     
     /// Stop discovering Matter Thread border routers.
-    func stopDiscovery() {
+    func stopDiscovery() async {
         browser?.stop()
         browser = nil
         
         services.removeAll()
         
-        _discoveredRouters.removeAll()
+        await _routerStore.clear()
         _isDiscovering = false
         isSuspended = false
         logger.info("Stopped Matter border router discovery")
@@ -172,15 +192,27 @@ final class MatterDiscoveryService: NSObject, @unchecked Sendable {
             startDiscovery()
             // Wait briefly for discovery to populate
             try? await Task.sleep(for: .seconds(3))
-            stopDiscovery()
+            await stopDiscovery()
         }
-        return discoveredBorderRouters
+        let routerInfos = await _routerStore.values
+        return routerInfos.map { routerInfo in
+            MatterBorderRouter(
+                id: routerInfo.name,
+                name: routerInfo.displayName,
+                manufacturer: routerInfo.manufacturer,
+                model: routerInfo.model,
+                isOnline: true,
+                threadNetworkName: routerInfo.threadNetworkName,
+                rssi: nil,
+                areaMetadata: routerInfo.areaMetadata
+            )
+        }
     }
     
     // MARK: - Private
     
-    private func addOrUpdateRouter(_ info: RouterInfo) {
-        _discoveredRouters[info.name] = info
+    private func addOrUpdateRouter(_ info: RouterInfo) async {
+        await _routerStore.addOrUpdate(info)
         
         let router = MatterBorderRouter(
             id: info.name,
@@ -196,8 +228,8 @@ final class MatterDiscoveryService: NSObject, @unchecked Sendable {
         onBorderRouterDiscovered?(router)
     }
     
-    private func removeRouter(_ name: String) {
-        _discoveredRouters.removeValue(forKey: name)
+    private func removeRouter(_ name: String) async {
+        await _routerStore.remove(name)
         onBorderRouterLost?(name)
     }
 }
@@ -238,7 +270,7 @@ extension MatterDiscoveryService: NetServiceBrowserDelegate {
         
         // Remove from discovered routers
         Task { @MainActor [name = service.name] in
-            self.removeRouter(name)
+            await self.removeRouter(name)
         }
     }
     
