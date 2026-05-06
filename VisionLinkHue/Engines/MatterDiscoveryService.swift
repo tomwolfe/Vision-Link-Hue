@@ -68,8 +68,28 @@ final class MatterDiscoveryService: NSObject, @unchecked Sendable {
     /// Browser for discovering Matter services on the local network.
     private var browser: NetServiceBrowser?
     
-    /// Resolved services being actively monitored.
-    private var services: [NetService] = []
+    /// Actor-isolated store for tracking resolved NetService instances,
+    /// protecting against data races between delegate callbacks on arbitrary
+    /// threads and stopDiscovery() on the calling executor.
+    private actor ServicesStore {
+        private var _services: [NetService] = []
+        
+        var count: Int { _services.count }
+        
+        func append(_ service: NetService) {
+            _services.append(service)
+        }
+        
+        func removeAll(where predicate: (NetService) -> Bool) {
+            _services.removeAll(where: predicate)
+        }
+        
+        func removeAll() {
+            _services.removeAll()
+        }
+    }
+    
+    private let _servicesStore = ServicesStore()
     
     /// Actor-isolated store for discovered router information, protecting
     /// against data races between delegate callbacks and discovery queries.
@@ -127,7 +147,7 @@ final class MatterDiscoveryService: NSObject, @unchecked Sendable {
         browser?.stop()
         browser = nil
         
-        services.removeAll()
+        await _servicesStore.removeAll()
         
         await _routerStore.clear()
         _isDiscovering = false
@@ -258,15 +278,15 @@ extension MatterDiscoveryService: NetServiceBrowserDelegate {
         service.delegate = self
         service.resolve(withTimeout: 5.0)
         
-        // Track the service for cleanup
-        services.append(service)
+        // Track the service for cleanup (actor-isolated to prevent data races)
+        Task { await _servicesStore.append(service) }
     }
     
     func netServiceBrowser(_ browser: NetServiceBrowser, didRemove service: NetService, moreComing: Bool) {
         logger.debug("Removed mDNS service: \(service.name)")
         
-        // Remove from tracked services
-        services.removeAll { $0 == service }
+        // Remove from tracked services (actor-isolated to prevent data races)
+        Task { await _servicesStore.removeAll { $0 == service } }
         
         // Remove from discovered routers
         Task { @MainActor [name = service.name] in

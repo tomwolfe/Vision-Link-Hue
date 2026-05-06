@@ -318,7 +318,9 @@ struct FixtureHeuristicClassifier {
         
         var loadedRules: [ScoringRule] = []
         for jsonRule in configFile.rules {
-            guard let type = FixtureType(from: jsonRule.type) else { continue }
+            guard let type = FixtureType(from: jsonRule.type) else {
+                throw ClassificationConfigError.unknownFixtureType(jsonRule.type)
+            }
             
             let aspectRange: ClosedRange<Double>?
             if let aspectBounds = jsonRule.aspectRange {
@@ -362,9 +364,10 @@ struct FixtureHeuristicClassifier {
         if let specificityConfig = configFile.config?.specificity {
             var loadedSpecificity: [FixtureType: Int] = [:]
             for (typeName, value) in specificityConfig {
-                if let type = FixtureType(from: typeName) {
-                    loadedSpecificity[type] = value
+                guard let type = FixtureType(from: typeName) else {
+                    throw ClassificationConfigError.unknownFixtureType(typeName)
                 }
+                loadedSpecificity[type] = value
             }
             self.specificity = loadedSpecificity
         }

@@ -274,10 +274,6 @@ final class DetectionEngine {
             } catch {
                 logger.debug("4-bit quantization not available for model, falling back to unquantized: \(error.localizedDescription)")
                 
-                // Explicitly nil out the failed model to release CoreML resources
-                // before attempting the fallback, preventing RAM spikes on older devices.
-                loadedModel = nil
-                
                 // Report quantization fallback to stateStream for thermal model baseline tracking.
                 // Rate-limit to a single report per session to avoid spamming on older devices.
                 if let stateStream, !hasReportedQuantizationFallback {
@@ -292,10 +288,12 @@ final class DetectionEngine {
                     stateStream.reportError(fallbackError, severity: .warning, source: "DetectionEngine.quantization_fallback")
                 }
                 
-                // Wrap fallback model loading in autoreleasepool to ensure memory
-                // from the failed 4-bit initialization is flushed before allocating
-                // the larger 16-bit model.
+                // Wrap failed model release and fallback load in a single autoreleasepool
+                // to ensure memory from the failed 4-bit CoreML initialization is flushed
+                // before allocating the larger 16-bit model, preventing RAM spikes on
+                // older A-series/M-series chips.
                 autoreleasepool {
+                    loadedModel = nil
                     loadedModel = try MLModel(contentsOf: modelURL, configuration: baseConfig)
                     quantizationApplied = false
                 }
