@@ -208,6 +208,22 @@ final class ARSessionManager {
         logger.info("AR session paused")
     }
     
+    /// Pause the AR session temporarily to reduce memory pressure, e.g., during
+    /// CoreML model fallback loading. The detection engine is also stopped.
+    /// Call `resumeAfterMemoryPressure()` to restore normal operation.
+    func pauseForMemoryPressure() {
+        pause()
+        logger.info("AR session paused for memory pressure (model loading)")
+    }
+    
+    /// Resume the AR session after a temporary memory-pressure pause.
+    /// Restores the detection engine and session state.
+    func resumeAfterMemoryPressure() {
+        detectionEngine.start()
+        isSessionActive = true
+        logger.info("AR session resumed after memory pressure")
+    }
+    
     /// Reset tracking and restart.
     func resetTracking() async {
         detectionEngine.start()

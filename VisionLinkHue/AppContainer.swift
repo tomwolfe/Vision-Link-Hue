@@ -223,6 +223,18 @@ final class AppContainer {
             relocalizationMonitor: relocalizationMonitor
         )
         
+        // Wire the ARSession pause/resume callback to the detection engine.
+        // This prevents memory spikes on A13+ devices when loading an unquantized
+        // CoreML model while ARKit Neural Surface Synthesis is running.
+        detector.configureARSessionPauseHandler { [weak manager] shouldPause in
+            guard let manager else { return }
+            if shouldPause {
+                manager.pauseForMemoryPressure()
+            } else {
+                manager.resumeAfterMemoryPressure()
+            }
+        }
+        
         // Wire up calibration persistence to the spatial service's engine
         let keychainManager = KeychainManager()
         let calibrationStore = KeychainCalibrationStore(keychainManager: keychainManager)

@@ -93,6 +93,19 @@ final class DetectionEngine {
     /// Callback for model loading progress updates.
     private var onModelLoadingProgress: (@Sendable (Double) -> Void)?
     
+    /// Callback to signal that the ARSession should be paused while a
+    /// large unquantized CoreML model is being loaded. This prevents
+    /// memory pressure from ARKit Neural Surface Synthesis from triggering
+    /// a Jetsam termination on A13+ devices.
+    private var onShouldPauseARSession: (@Sendable (Bool) -> Void)?
+    
+    /// Configure the ARSession pause/resume handler.
+    /// Call this after the DetectionEngine is created to wire up the ARSessionManager
+    /// for automatic session pausing during unquantized model fallback loads.
+    func configureARSessionPauseHandler(_ handler: @escaping (@Sendable (Bool) -> Void)) {
+        onShouldPauseARSession = handler
+    }
+    
     /// Initialize with material fixture mapping loaded from classification_rules.json.
     /// Optionally verifies an ECDSA signature for OTA config authenticity.
     /// - Parameters:
@@ -101,7 +114,9 @@ final class DetectionEngine {
     ///   - configKeyID: Optional key identifier for multi-key rotation support.
     ///   - stateStream: Optional reference to the state stream for reporting quantization fallback events.
     ///   - detectionSettings: User-configurable detection settings for battery/performance trade-offs.
-    init(onModelLoadingProgress: (@Sendable (Double) -> Void)? = nil, configSignature: Data? = nil, configKeyID: String? = nil, stateStream: HueStateStream? = nil, detectionSettings: DetectionSettings = DetectionSettings()) {
+    ///   - onShouldPauseARSession: Optional callback to pause/resume the ARSession during
+    ///     unquantized model fallback load to prevent memory spikes.
+    init(onModelLoadingProgress: (@Sendable (Double) -> Void)? = nil, configSignature: Data? = nil, configKeyID: String? = nil, stateStream: HueStateStream? = nil, detectionSettings: DetectionSettings = DetectionSettings(), onShouldPauseARSession: (@Sendable (Bool) -> Void)? = nil) {
         self.materialClassifier = NeuralSurfaceMaterialClassifier(
             materialFixtureMapping: NeuralSurfaceMaterialClassifier.loadMaterialMapping(signature: configSignature, keyID: configKeyID),
             materialIndexMapping: NeuralSurfaceMaterialClassifier.loadMaterialIndexMapping(signature: configSignature, keyID: configKeyID)
@@ -109,6 +124,7 @@ final class DetectionEngine {
         self.detectionSettings = detectionSettings
         self.thermalMonitor = ThermalMonitor()
         self.onModelLoadingProgress = onModelLoadingProgress
+        self.onShouldPauseARSession = onShouldPauseARSession
         self.stateStream = stateStream
         Task { await loadObjectDetectionModel() }
         Task { await loadIntentClassifierModel() }
@@ -288,6 +304,13 @@ final class DetectionEngine {
                     stateStream.reportError(fallbackError, severity: .warning, source: "DetectionEngine.quantization_fallback")
                 }
                 
+                // Pause the ARSession before loading the unquantized model to prevent
+                // a memory spike that could trigger Jetsam termination on A13+ devices.
+                // ARKit Neural Surface Synthesis consumes significant memory, and loading
+                // an unquantized 16-bit model while the session is running can exceed
+                // the available memory budget even on modern devices.
+                onShouldPauseARSession?(true)
+                
                 // Wrap failed model release and fallback load in a single autoreleasepool
                 // to ensure memory from the failed 4-bit CoreML initialization is flushed
                 // before allocating the larger 16-bit model, preventing RAM spikes on
@@ -297,6 +320,9 @@ final class DetectionEngine {
                     loadedModel = try MLModel(contentsOf: modelURL, configuration: baseConfig)
                     quantizationApplied = false
                 }
+                
+                // Resume the ARSession after the model is loaded.
+                onShouldPauseARSession?(false)
             }
             
             objectDetectionModel = loadedModel

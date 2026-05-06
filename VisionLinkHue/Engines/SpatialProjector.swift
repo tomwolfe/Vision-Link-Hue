@@ -39,6 +39,12 @@ final class SpatialProjector {
     private let emaAdaptiveAlphaPeak: Float = 0.8
     private let emaDepthChangeThreshold: Float = 0.5
     
+    /// Maximum depth drop in a single frame before the measurement is
+    /// treated as a temporary occlusion (e.g., user walking in front of
+    /// the fixture) and rejected. Prevents the fixture's HUD from jumping
+    /// forward when the depth sensor briefly measures the user's head/body.
+    private let occlusionDepthSpikeThreshold: Float = 1.0
+    
     init(session: ARSession? = nil, configuration: Configuration = .init(), provider: CameraConfigurationProvider? = nil) {
         self.configuration = configuration
         self.provider = provider ?? DefaultCameraConfigurationProvider()
@@ -379,18 +385,34 @@ extension SpatialProjector {
     /// measurements stabilize, alpha drops back to `emaBaseSmoothingFactor` (0.2) for
     /// micro-jitter resistance against mirrors, windows, or reflective surfaces.
     ///
+    /// Occlusion rejection: if the depth drops by more than `occlusionDepthSpikeThreshold`
+    /// (1.0m) in a single frame, the measurement is treated as a temporary occlusion
+    /// (e.g., user walking in front of the fixture) and rejected to prevent the HUD
+    /// from jumping forward. The EMA retains its previous value.
+    ///
     /// - Parameters:
     ///   - depth: The new depth measurement in meters.
     ///   - currentEma: The current EMA value, or nil for the first measurement.
-    /// - Returns: The updated EMA value.
+    /// - Returns: The updated EMA value, or the previous EMA if the measurement
+    ///   is rejected as an occlusion spike.
     private func updateEMA(depth: Float, currentEma: Float?) -> Float {
         guard let currentEma = currentEma else { return depth }
         
-        let depthDelta = abs(depth - currentEma)
+        // Occlusion spike rejection: ignore sudden, massive depth drops that
+        /// indicate temporary occlusion (e.g., user walking in front of the fixture).
+        /// A drop of more than 1.0 meter in a single frame is physically implausible
+        /// for a fixed fixture and almost certainly represents the depth sensor
+        /// measuring the user's head/body instead of the target.
+        let depthDelta = depth - currentEma
+        if depthDelta < -occlusionDepthSpikeThreshold {
+            return currentEma
+        }
+        
+        let absDepthDelta = abs(depthDelta)
         
         // Adaptive alpha: ramp up when depth changes significantly
         let alpha: Float
-        if depthDelta > emaDepthChangeThreshold {
+        if absDepthDelta > emaDepthChangeThreshold {
             // Large depth change detected — snap quickly to new boundary
             alpha = emaAdaptiveAlphaPeak
         } else {
