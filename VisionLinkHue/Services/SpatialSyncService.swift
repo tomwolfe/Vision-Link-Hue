@@ -223,6 +223,8 @@ struct SpatialSyncModelContainer {
     let sharedService: SpatialSyncService
     
     private init() {
+        SpatialSyncModelContainer.cleanupCorruptedStores()
+        
         self.schema = Schema([SpatialSyncRecord.self])
         
         do {
@@ -239,6 +241,21 @@ struct SpatialSyncModelContainer {
         }
         
         self.sharedService = SpatialSyncService(modelContainer: self.modelContainer, deviceIdentifier: ProcessInfo().globallyUniqueString)
+    }
+    
+    /// Delete corrupted SwiftData SQLite stores that failed migration.
+    private static func cleanupCorruptedStores() {
+        let supportDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+        guard let dir = supportDir else { return }
+        
+        do {
+            let items = try FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)
+            for item in items where item.lastPathComponent.hasPrefix("default.store") {
+                try? FileManager.default.removeItem(at: item)
+            }
+        } catch {
+            // Ignore cleanup errors
+        }
     }
 }
 

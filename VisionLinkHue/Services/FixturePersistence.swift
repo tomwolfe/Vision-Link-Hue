@@ -110,8 +110,28 @@ actor FixturePersistence {
     /// lost when the app terminates.
     var isUsingInMemoryStorage: Bool = false
     
+    /// Delete corrupted SwiftData SQLite stores that failed migration.
+    /// SwiftData stores the SQLite database in the app's Application Support
+    /// directory. When a model change (e.g., NSString → UUID) breaks migration,
+    /// the only recovery is to delete the old store and start fresh.
+    private static func cleanupCorruptedStores() {
+        let supportDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+        guard let dir = supportDir else { return }
+        
+        do {
+            let items = try FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)
+            for item in items where item.lastPathComponent.hasPrefix("default.store") {
+                try? FileManager.default.removeItem(at: item)
+            }
+        } catch {
+            // Ignore cleanup errors
+        }
+    }
+    
     /// Shared singleton instance for app-wide persistence.
     static let shared: FixturePersistence = {
+        FixturePersistence.cleanupCorruptedStores()
+        
         let schema = Schema([FixtureMapping.self, SpatialSyncRecord.self])
         let modelConfiguration = ModelConfiguration(schema: schema)
         
