@@ -249,7 +249,11 @@ struct SpatialSyncModelContainer {
 @ModelActor
 final actor SpatialSyncService {
     
-    nonisolated static let shared = SpatialSyncService()
+    nonisolated static let shared: SpatialSyncService = {
+        let container = SpatialSyncModelContainer.shared
+        let service = SpatialSyncService(modelExecutor: container.modelContainer as! any SwiftData.ModelExecutor, deviceIdentifier: ProcessInfo().globallyUniqueString)
+        return service
+    }()
     
     private let logger = Logger(
         subsystem: "com.tomwolfe.visionlinkhue",
@@ -276,14 +280,15 @@ final actor SpatialSyncService {
     private var vectorClocks: [String: [String: Int64]] = [:]
     
     /// Device identifier for this device (used in conflict resolution).
-    private var deviceIdentifier: String
+    private var deviceIdentifier: String = ProcessInfo().globallyUniqueString
     
     /// CloudKit sharing database for spatial sync records.
     private var cloudKitDatabase: CKDatabase?
     
     /// Initialize the spatial sync service.
-    init(deviceIdentifier: String = ProcessInfo().globallyUniqueString) {
+    init(modelExecutor: any SwiftData.ModelExecutor, deviceIdentifier: String = ProcessInfo().globallyUniqueString) {
         self.deviceIdentifier = deviceIdentifier
+        self.modelExecutor = modelExecutor
         self.modelContainer = SpatialSyncModelContainer.shared.modelContainer
         self.cloudKitDatabase = Self.setupCloudKitDatabase()
     }

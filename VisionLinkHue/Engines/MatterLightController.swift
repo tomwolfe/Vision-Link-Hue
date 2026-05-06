@@ -44,56 +44,62 @@ final class DefaultMatterLightController: MatterLightController {
     private let home: HMHome
     private let logger = Logger(subsystem: "com.tomwolfe.visionlinkhue", category: "MatterLightController")
     
+    private let lightbulbServiceType = "E863F10A-079E-48FF-8F27-9C2605A29F52"
+    private let onCharacteristicType = "E863F10F-079E-48FF-8F27-9C2605A29F52"
+    private let brightnessCharacteristicType = "E863F10D-079E-48FF-8F27-9C2605A29F52"
+    private let colorTemperatureCharacteristicType = "E863F127-079E-48FF-8F27-9C2605A29F52"
+    private let colorXYCharacteristicType = "E863F10F-079E-48FF-8F27-9C2605A29F52"
+    
     init(home: HMHome, accessory: HMAccessory) async throws {
         self.home = home
         self.accessory = accessory
         self.deviceId = accessory.identifier.uuidString
         self.isReachable = accessory.isReachable
         
-        guard let lightService = accessory.services.first(where: { $0.serviceType == .lightbulb }) else {
+        guard let lightService = accessory.services.first(where: { $0.serviceType == lightbulbServiceType }) else {
             throw MatterError.noLightServiceFound
         }
         
-        guard lightService.characteristics.contains(where: { $0.characteristicType == .on }) else {
+        guard lightService.characteristics.contains(where: { $0.characteristicType == onCharacteristicType }) else {
             throw MatterError.noPowerCharacteristic
         }
     }
     
     private func onCharacteristic() throws -> HMCharacteristic {
-        guard let lightService = accessory.services.first(where: { $0.serviceType == .lightbulb }) else {
+        guard let lightService = accessory.services.first(where: { $0.serviceType == lightbulbServiceType }) else {
             throw MatterError.noLightServiceFound
         }
-        guard let onChar = lightService.characteristics.first(where: { $0.characteristicType == .on }) else {
+        guard let onChar = lightService.characteristics.first(where: { $0.characteristicType == onCharacteristicType }) else {
             throw MatterError.noPowerCharacteristic
         }
         return onChar
     }
     
     private func brightnessCharacteristic() throws -> HMCharacteristic {
-        guard let lightService = accessory.services.first(where: { $0.serviceType == .lightbulb }) else {
+        guard let lightService = accessory.services.first(where: { $0.serviceType == lightbulbServiceType }) else {
             throw MatterError.noLightServiceFound
         }
-        guard let brightnessChar = lightService.characteristics.first(where: { $0.characteristicType == .brightness }) else {
+        guard let brightnessChar = lightService.characteristics.first(where: { $0.characteristicType == brightnessCharacteristicType }) else {
             throw MatterError.noBrightnessCharacteristic
         }
         return brightnessChar
     }
     
     private func colorTemperatureCharacteristic() throws -> HMCharacteristic {
-        guard let lightService = accessory.services.first(where: { $0.serviceType == .lightbulb }) else {
+        guard let lightService = accessory.services.first(where: { $0.serviceType == lightbulbServiceType }) else {
             throw MatterError.noLightServiceFound
         }
-        guard let colorTempChar = lightService.characteristics.first(where: { $0.characteristicType == .colorTemperature }) else {
+        guard let colorTempChar = lightService.characteristics.first(where: { $0.characteristicType == colorTemperatureCharacteristicType }) else {
             throw MatterError.noColorTemperatureCharacteristic
         }
         return colorTempChar
     }
     
     private func colorXYCharacteristic() throws -> HMCharacteristic {
-        guard let lightService = accessory.services.first(where: { $0.serviceType == .lightbulb }) else {
+        guard let lightService = accessory.services.first(where: { $0.serviceType == lightbulbServiceType }) else {
             throw MatterError.noLightServiceFound
         }
-        guard let colorXYChar = lightService.characteristics.first(where: { $0.characteristicType == .colorXY }) else {
+        guard let colorXYChar = lightService.characteristics.first(where: { $0.characteristicType == colorXYCharacteristicType }) else {
             throw MatterError.noColorTemperatureCharacteristic
         }
         return colorXYChar
@@ -101,38 +107,27 @@ final class DefaultMatterLightController: MatterLightController {
     
     func setPower(_ on: Bool) async throws {
         let char = try onCharacteristic()
-        try await home.performWaitForAccess(characteristics: [char]) { completion in
-            char.writeValue(on ? 1.0 : 0.0, for: { _ in completion(nil) })
-        }
+        try await char.writeValue(on ? 1.0 : 0.0)
         isReachable = accessory.isReachable
     }
     
     func setBrightness(_ brightness: Int, transitionDuration: Int = 4) async throws {
         let char = try brightnessCharacteristic()
         let clampedBrightness = max(0, min(255, brightness))
-        try await home.performWaitForAccess(characteristics: [char]) { completion in
-            char.writeValue(Double(clampedBrightness) / 255.0 * 100.0, for: { _ in completion(nil) })
-        }
+        try await char.writeValue(Double(clampedBrightness) / 255.0 * 100.0)
         isReachable = accessory.isReachable
     }
     
     func setColorTemperature(_ mireds: Int, transitionDuration: Int = 4) async throws {
         let char = try colorTemperatureCharacteristic()
-        guard let minTemp = char.minimumValue, let maxTemp = char.maximumValue else {
-            throw MatterError.noColorTemperatureCharacteristic
-        }
-        let clampedTemp = max(minTemp, min(Double(mireds), maxTemp))
-        try await home.performWaitForAccess(characteristics: [char]) { completion in
-            char.writeValue(clampedTemp, for: { _ in completion(nil) })
-        }
+        let clampedTemp = max(0, min(10000, Double(mireds)))
+        try await char.writeValue(clampedTemp)
         isReachable = accessory.isReachable
     }
     
     func setColorXY(_ x: Double, _ y: Double, transitionDuration: Int = 4) async throws {
         let char = try colorXYCharacteristic()
-        try await home.performWaitForAccess(characteristics: [char]) { completion in
-            char.writeValue([x, y], for: { _ in completion(nil) })
-        }
+        try await char.writeValue([x, y])
         isReachable = accessory.isReachable
     }
     
@@ -140,22 +135,31 @@ final class DefaultMatterLightController: MatterLightController {
     private var lastWriteInstant: ContinuousClock.Instant = .now
     
     func patch(_ patch: MatterLightStatePatch) async throws {
-        var characteristics: [HMCharacteristic] = []
+        var actions: [() async throws -> Void] = []
         
         if let power = patch.power {
-            characteristics.append(try onCharacteristic())
+            if let char = try? onCharacteristic() {
+                actions.append { try await char.writeValue(power ? 1.0 : 0.0) }
+            }
         }
         if let brightness = patch.brightness {
-            characteristics.append(try brightnessCharacteristic())
+            if let char = try? brightnessCharacteristic() {
+                let clampedBrightness = max(0, min(255, brightness))
+                actions.append { try await char.writeValue(Double(clampedBrightness) / 255.0 * 100.0) }
+            }
         }
-        if let colorTemperature = patch.colorTemperature {
-            characteristics.append(try colorTemperatureCharacteristic())
+        if let colorTemperature = patch.colorTemperatureMireds {
+            if let char = try? colorTemperatureCharacteristic() {
+                actions.append { try await char.writeValue(Double(colorTemperature)) }
+            }
         }
-        if let xy = patch.colorXY {
-            characteristics.append(try colorXYCharacteristic())
+        if let colorX = patch.colorX, let colorY = patch.colorY {
+            if let char = try? colorXYCharacteristic() {
+                actions.append { try await char.writeValue([colorX, colorY]) }
+            }
         }
         
-        guard !characteristics.isEmpty else { return }
+        guard !actions.isEmpty else { return }
         
         let debounceInterval = Duration.milliseconds(100)
         let elapsed = ContinuousClock.now - lastWriteInstant
@@ -164,48 +168,17 @@ final class DefaultMatterLightController: MatterLightController {
         }
         lastWriteInstant = .now
         
-        try await home.performWaitForAccess(characteristics: characteristics) { completion in
-            var writeActions: [() -> Void] = []
-            
-            if let power = patch.power {
-                if let char = characteristics.first(where: { $0.characteristicType == .on }) {
-                    writeActions.append { char.writeValue(power ? 1.0 : 0.0, for: { _ in }) }
-                }
-            }
-            if let brightness = patch.brightness {
-                if let char = characteristics.first(where: { $0.characteristicType == .brightness }) {
-                    writeActions.append {
-                        let clampedBrightness = max(0, min(255, brightness))
-                        char.writeValue(Double(clampedBrightness) / 255.0 * 100.0, for: { _ in })
-                    }
-                }
-            }
-            if let colorTemperature = patch.colorTemperature {
-                if let char = characteristics.first(where: { $0.characteristicType == .colorTemperature }) {
-                    writeActions.append { char.writeValue(Double(colorTemperature), for: { _ in }) }
-                }
-            }
-            if let xy = patch.colorXY {
-                if let char = characteristics.first(where: { $0.characteristicType == .colorXY }) {
-                    writeActions.append { char.writeValue([xy.x, xy.y], for: { _ in }) }
-                }
-            }
-            
-            for action in writeActions {
-                action()
-            }
-            completion(nil)
+        for action in actions {
+            try await action()
         }
         isReachable = accessory.isReachable
     }
     
     func refreshState() async throws {
-        try await home.performWaitForAccess(characteristics: [
-            try onCharacteristic(),
-            try brightnessCharacteristic()
-        ]) { completion in
-            completion(nil)
-        }
+        let onChar = try onCharacteristic()
+        let brightnessChar = try brightnessCharacteristic()
+        _ = try onChar.value
+        _ = try brightnessChar.value
         isReachable = accessory.isReachable
     }
 }

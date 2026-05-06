@@ -73,15 +73,17 @@ final class MatterDiscoveryService: NSObject, @unchecked Sendable {
         }
         
         let defaults = UserDefaults.standard
-        if let storedUUID = defaults.string(forKey: Self.peerIDKey),
-           let storedPeerID = MCPeerID(uuidString: storedUUID) {
+        if let storedDisplayName = defaults.string(forKey: Self.peerIDKey),
+           !storedDisplayName.isEmpty {
+            let storedPeerID = MCPeerID(displayName: storedDisplayName)
             cachedPeerID = storedPeerID
             return storedPeerID
         }
         
         let newUUID = UUID().uuidString
-        defaults.set(newUUID, forKey: Self.peerIDKey)
-        let newPeerID = MCPeerID(displayName: "Vision-Link-Hue-\(newUUID.prefix(8))")
+        let newDisplayName = "Vision-Link-Hue-\(newUUID.prefix(8))"
+        defaults.set(newDisplayName, forKey: Self.peerIDKey)
+        let newPeerID = MCPeerID(displayName: newDisplayName)
         cachedPeerID = newPeerID
         return newPeerID
     }

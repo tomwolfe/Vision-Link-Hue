@@ -39,7 +39,7 @@ enum SchemaMigration {
         for oldMapping in oldMappings {
             // Create a new-version mapping with all existing data
             let newMapping = FixtureMapping(
-                fixtureId: UUID(uuidString: oldMapping.fixtureId) ?? UUID(),
+                fixtureId: oldMapping.fixtureId,
                 lightId: oldMapping.lightId,
                 position: oldMapping.position,
                 orientation: oldMapping.orientation,
@@ -69,7 +69,7 @@ enum SchemaMigration {
         
         for oldRecord in oldRecords {
             let newRecord = SpatialSyncRecord(
-                fixtureId: UUID(uuidString: oldRecord.fixtureId) ?? UUID(),
+                fixtureId: oldRecord.fixtureId,
                 lightId: oldRecord.lightId,
                 position: oldRecord.position,
                 orientation: oldRecord.orientation,

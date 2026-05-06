@@ -168,7 +168,7 @@ final class DefaultMatterBridgeServiceFactory: MatterBridgeServiceFactory {
 @MainActor
 final class DefaultSpatialSyncServiceFactory: SpatialSyncServiceFactory {
     func create() -> SpatialSyncService {
-        SpatialSyncService()
+        SpatialSyncService.shared
     }
 }
 

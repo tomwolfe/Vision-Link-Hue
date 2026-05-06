@@ -50,7 +50,7 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
     
     /// Callback for pin mismatch events, allowing the UI to prompt
     /// the user to accept a new certificate (e.g., after bridge reset).
-    var onCertificatePinMismatch: @Sendable (Data, Data) async -> Void
+    var onCertificatePinMismatch: @Sendable (Data, Data) async -> Void = { _, _ in }
     
     /// Dedicated actor for SSE event stream management.
     /// Isolates high-frequency network events from the MainActor.
@@ -121,7 +121,6 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
         self.discoveryService = HueDiscoveryService()
         self.spatialService = HueSpatialService(stateStream: stateStream)
         self.matterService = MatterBridgeService(hueClient: self)
-        self.onCertificatePinMismatch = { _, _ in }
         setupURLSession()
     }
     

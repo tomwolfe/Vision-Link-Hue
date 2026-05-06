@@ -195,7 +195,7 @@ final class DetectionEngine {
             }
         }
         
-        let detections = try await runHybridDetection(pixelBuffer, lowPower: useLowPower)
+        let detections = try await runHybridDetection(pixelBuffer, lowPower: useLowPower, displayTransform: displayTransform ?? CGAffineTransform.identity)
         
         let elapsed = ContinuousClock.now - start
         inferenceLatencyMs = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
@@ -412,7 +412,6 @@ final class DetectionEngine {
         
         let box = ObjectDetectionBox(handler: handler, request: coreMLRequest)
         let observations = try await Task.detached(priority: priority, operation: { [box] in
-            Task.checkCancellation()
             try box.run()
         }).value
         
@@ -450,7 +449,6 @@ final class DetectionEngine {
         
         let box = RectangleDetectionBox(handler: handler, request: request)
         let observations = try await Task.detached(priority: priority, operation: { [box] in
-            Task.checkCancellation()
             try box.run()
         }).value
         
