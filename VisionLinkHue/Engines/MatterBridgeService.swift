@@ -184,7 +184,7 @@ final class MatterBridgeService: NSObject, @unchecked Sendable {
     private func refreshAccessoryState(_ accessory: HMAccessory) {
         guard accessory.isReachable else { return }
         
-        MainActor.run { [weak self] in
+        DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             
             // Check for lightbulb service
@@ -411,7 +411,7 @@ final class MatterBridgeService: NSObject, @unchecked Sendable {
     /// so that characteristic and reachability updates arrive via HMAccessoryDelegate.
     /// This enables event-driven state updates instead of polling.
     private func registerAccessoryDelegates() {
-        MainActor.run { [weak self] in
+        DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             for home in self.homeManager?.homes ?? [] {
                 for accessory in home.accessories {
@@ -498,7 +498,7 @@ extension MatterBridgeService: HMAccessoryDelegate {
     
     /// Called when an accessory's reachability changes (e.g., disconnects from Thread network).
     func accessoryDidUpdateReachability(_ accessory: HMAccessory) {
-        MainActor.run { [weak self] in
+        DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             
             let device = MatterLightDevice(

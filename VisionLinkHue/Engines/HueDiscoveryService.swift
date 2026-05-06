@@ -56,7 +56,7 @@ final class HueDiscoveryService {
         
         while true {
             let elapsed = ContinuousClock.now - startTime
-            let remainingBase = baseTimeout - elapsed.components.seconds
+            let remainingBase = baseTimeout - Double(elapsed.components.seconds)
             
             if remainingBase > 0 {
                 // Still within base timeout period, sleep for up to 1 second

@@ -184,7 +184,7 @@ final class MetricKitTelemetryService: Sendable {
     /// Check if the device is plugged in.
     private static func isPluggedIn() -> Bool {
         #if os(iOS) && !targetEnvironment(simulator)
-        return UIDevice.current.isPluggedIn
+        return UIDevice.current.batteryState == .charging || UIDevice.current.batteryState == .full
         #else
         return false
         #endif
