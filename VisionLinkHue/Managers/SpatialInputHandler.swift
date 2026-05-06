@@ -77,12 +77,20 @@ struct GazeTargetingConfiguration: Sendable {
     /// Visual feedback interval: how often to update gaze progress.
     let feedbackInterval: TimeInterval
     
+    /// Hysteresis threshold (0.0 to 1.0) for dwell progress.
+    /// When progress exceeds this value, any subsequent drop below it
+    /// triggers a dwell timer reset. This prevents eye-tracking jitter
+    /// from causing flicker near the selection threshold on Vision Pro hardware.
+    /// Default: 0.95 (resets if progress drops below 95% once near completion).
+    let hysteresisThreshold: Float
+    
     static let `default` = GazeTargetingConfiguration(
         dwellDuration: 1.5,
         fixationAngleDegrees: 3.0,
         maxTargetDistance: 5.0,
         minConfidence: 0.5,
-        feedbackInterval: 0.1
+        feedbackInterval: 0.1,
+        hysteresisThreshold: 0.95
     )
 }
 
@@ -133,6 +141,10 @@ final class GazeTargetingSystem: SpatialInputHandler, Sendable {
     
     /// Whether the user is currently fixating (within fixation angle).
     var isFixating: Bool = false
+    
+    /// Whether gaze progress has previously exceeded the hysteresis threshold.
+    /// Once true, any drop below hysteresisThreshold resets the dwell timer.
+    private var hasEnteredHysteresisZone: Bool = false
     
     /// Last timestamp when UI feedback properties were updated.
     /// Throttles @Observable mutations to the feedbackInterval rate
@@ -239,6 +251,20 @@ final class GazeTargetingSystem: SpatialInputHandler, Sendable {
             let elapsedSeconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
             let computedProgress = min(Float(elapsedSeconds / configuration.dwellDuration), 1.0)
             
+            // Apply hysteresis buffer to prevent gaze jitter flicker near
+            // the selection threshold. Once progress enters the hysteresis
+            // zone (e.g., >= 0.95), any drop below it resets the dwell timer.
+            // This is critical for Vision Pro hardware where eye-tracking
+            // micro-saccades can cause visible UI flicker at high progress values.
+            if hasEnteredHysteresisZone && computedProgress < configuration.hysteresisThreshold {
+                gazeFixationStart = nil
+                hasEnteredHysteresisZone = false
+                isFixating = false
+                dwellProgress = 0.0
+            } else if computedProgress >= configuration.hysteresisThreshold {
+                hasEnteredHysteresisZone = true
+            }
+            
             // Throttle UI updates to feedbackInterval rate.
             let shouldUpdateUI = shouldUpdateUIFeedback(now: now)
             
@@ -264,6 +290,7 @@ final class GazeTargetingSystem: SpatialInputHandler, Sendable {
                 isFixating = false
                 dwellProgress = 0.0
             }
+            hasEnteredHysteresisZone = false
         }
     }
     
@@ -337,6 +364,7 @@ final class GazeTargetingSystem: SpatialInputHandler, Sendable {
         dwellProgress = 0.0
         isFixating = false
         lastFeedbackTime = nil
+        hasEnteredHysteresisZone = false
     }
     
     /// Check if the current dwell selection has completed.
@@ -367,5 +395,6 @@ final class GazeTargetingSystem: SpatialInputHandler, Sendable {
         targetPosition = nil
         dwellProgress = 0.0
         isFixating = false
+        hasEnteredHysteresisZone = false
     }
 }

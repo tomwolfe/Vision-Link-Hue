@@ -112,6 +112,122 @@ final class LocalSyncActorTests: XCTestCase {
         XCTAssertEqual(LocalSyncError.noDevicesReachable.errorDescription, "No devices reachable on the local network")
         XCTAssertNotNil(LocalSyncError.connectionLost.errorDescription)
         XCTAssertEqual(LocalSyncError.syncRejected("test").errorDescription, "Remote device rejected sync: test")
+        
+        // Encryption-related error descriptions.
+        XCTAssertNotNil(LocalSyncError.encryptionHandshakeFailed("test").errorDescription)
+        XCTAssertTrue(LocalSyncError.encryptionHandshakeFailed("test").errorDescription!.contains("test"))
+        XCTAssertEqual(LocalSyncError.encryptionNotAvailable.errorDescription, "Transport encryption not available for selected protocol")
+        XCTAssertEqual(LocalSyncError.decryptionFailed.errorDescription, "Decryption failed - possible man-in-the-middle attack")
+    }
+    
+    // MARK: - Encryption Protocol Tests
+    
+    func testEncryptionProtocolRecommendedIsNoiseXX() {
+        XCTAssertEqual(EncryptionProtocol.recommended, .noiseXX)
+    }
+    
+    func testEncryptionProtocolProvidesEncryption() {
+        XCTAssertTrue(EncryptionProtocol.noiseXX.providesEncryption)
+        XCTAssertTrue(EncryptionProtocol.noiseXMPS.providesEncryption)
+        XCTAssertTrue(EncryptionProtocol.mls.providesEncryption)
+        XCTAssertFalse(EncryptionProtocol.none.providesEncryption)
+    }
+    
+    func testEncryptionProtocolCipherSuiteIdentifiers() {
+        XCTAssertEqual(EncryptionProtocol.noiseXX.cipherSuiteIdentifier, "Noise_XX_25519_ChaChaPoly_BLAKE2s")
+        XCTAssertEqual(EncryptionProtocol.noiseXMPS.cipherSuiteIdentifier, "Noise_XMPS_25519_ChaChaPoly_BLAKE2s")
+        XCTAssertEqual(EncryptionProtocol.mls.cipherSuiteIdentifier, "MLS10-PSK1")
+        XCTAssertEqual(EncryptionProtocol.none.cipherSuiteIdentifier, "none")
+    }
+    
+    func testEncryptionProtocolCaseIterable() {
+        XCTAssertEqual(EncryptionProtocol.allCases.count, 4)
+        XCTAssertTrue(EncryptionProtocol.allCases.contains(.noiseXX))
+        XCTAssertTrue(EncryptionProtocol.allCases.contains(.noiseXMPS))
+        XCTAssertTrue(EncryptionProtocol.allCases.contains(.mls))
+        XCTAssertTrue(EncryptionProtocol.allCases.contains(.none))
+    }
+    
+    func testEncryptionConfigurationDefaults() {
+        let config = EncryptionConfiguration.default
+        XCTAssertEqual(config.protocol, .noiseXX)
+        XCTAssertNil(config.preSharedKey)
+        XCTAssertTrue(config.requireEncryption)
+        XCTAssertEqual(config.maxMessageSize, 65536)
+        XCTAssertEqual(config.sessionKeyLifetimeSeconds, 3600)
+    }
+    
+    func testEncryptionConfigurationCanDisableEncryption() {
+        let config = EncryptionConfiguration(
+            protocol: .none,
+            preSharedKey: nil,
+            requireEncryption: false,
+            maxMessageSize: 32768,
+            sessionKeyLifetimeSeconds: 1800
+        )
+        
+        XCTAssertEqual(config.protocol, .none)
+        XCTAssertFalse(config.protocol.providesEncryption)
+        XCTAssertFalse(config.requireEncryption)
+    }
+    
+    func testEncryptionConfigurationCanEnableMLS() {
+        let psk = Data(repeating: 0x42, count: 32)
+        let config = EncryptionConfiguration(
+            protocol: .mls,
+            preSharedKey: psk,
+            requireEncryption: true,
+            maxMessageSize: 131072,
+            sessionKeyLifetimeSeconds: 7200
+        )
+        
+        XCTAssertEqual(config.protocol, .mls)
+        XCTAssertEqual(config.preSharedKey, psk)
+        XCTAssertTrue(config.protocol.providesEncryption)
+    }
+    
+    func testLocalSyncEncryptionPlaceholderInit() {
+        let config = EncryptionConfiguration.default
+        let encryption = LocalSyncEncryption(configuration: config)
+        XCTAssertNotNil(encryption)
+    }
+    
+    func testLocalSyncEncryptionHandshakeWithNoEncryption() async {
+        let config = EncryptionConfiguration(
+            protocol: .none,
+            preSharedKey: nil,
+            requireEncryption: false
+        )
+        let encryption = LocalSyncEncryption(configuration: config)
+        
+        let result = await encryption.beginHandshake(remoteDeviceID: "test-device")
+        XCTAssertTrue(result)
+    }
+    
+    func testLocalSyncEncryptionEncryptReturnsNilWhenNoEncryption() {
+        let config = EncryptionConfiguration(
+            protocol: .none,
+            preSharedKey: nil,
+            requireEncryption: false
+        )
+        let encryption = LocalSyncEncryption(configuration: config)
+        
+        let testData = "hello".data(using: .utf8)!
+        let encrypted = encryption.encrypt(testData)
+        XCTAssertNil(encrypted, "Should return nil when encryption protocol is .none")
+    }
+    
+    func testLocalSyncEncryptionDecryptPassesThroughWhenNoEncryption() {
+        let config = EncryptionConfiguration(
+            protocol: .none,
+            preSharedKey: nil,
+            requireEncryption: false
+        )
+        let encryption = LocalSyncEncryption(configuration: config)
+        
+        let testData = "hello".data(using: .utf8)!
+        let decrypted = encryption.decrypt(testData)
+        XCTAssertEqual(decrypted, testData, "Should pass through data unchanged when no encryption")
     }
 }
 

@@ -221,6 +221,96 @@ final class GazeTargetingTests: XCTestCase {
         XCTAssertFalse(gazeSystem.isFixating)
     }
     
+    // MARK: - Hysteresis Buffer Tests
+    
+    func testHysteresisThresholdInConfig() {
+        XCTAssertEqual(gazeSystem.configuration.hysteresisThreshold, 0.95)
+    }
+    
+    func testHysteresisResetsDwellWhenProgressDropsBelowThreshold() async {
+        let fixture = createFixture(position: SIMD3<Float>(0, 1.5, -1.0))
+        gazeSystem.configure(trackedFixtures: [fixture])
+        
+        let gazeOrigin = SIMD3<Float>(0, 1.6, 0)
+        let gazeDirection = simd_normalize(SIMD3<Float>(0, -0.1, -1.0))
+        
+        gazeSystem.updateGazeTarget(
+            gazeOrigin: gazeOrigin,
+            gazeDirection: gazeDirection,
+            cameraTransform: .identity
+        )
+        
+        gazeSystem.beginSelection()
+        XCTAssertNotNil(gazeSystem.gazeFixationStart)
+        
+        // Simulate waiting until progress approaches hysteresis threshold
+        // (95% of 1.5s = 1425ms). At this point hasEnteredHysteresisZone becomes true.
+        try? await Task.sleep(for: .milliseconds(1425))
+        
+        // Now move gaze away significantly to drop progress below hysteresis threshold.
+        let gazeDirection2 = SIMD3<Float>(1.0, 0, -0.5)
+        gazeSystem.updateGazeTarget(
+            gazeOrigin: gazeOrigin,
+            gazeDirection: gazeDirection2,
+            cameraTransform: .identity
+        )
+        
+        // The fixation should have been reset due to hysteresis.
+        XCTAssertNil(gazeSystem.gazeFixationStart, "Dwell timer should reset when gaze moves after entering hysteresis zone")
+        XCTAssertFalse(gazeSystem.isFixating, "Should not be fixating after hysteresis reset")
+        XCTAssertEqual(gazeSystem.dwellProgress, 0.0, "Progress should reset to 0 after hysteresis trigger")
+    }
+    
+    func testHysteresisDoesNotResetWhenBelowThreshold() async {
+        let fixture = createFixture(position: SIMD3<Float>(0, 1.5, -1.0))
+        gazeSystem.configure(trackedFixtures: [fixture])
+        
+        let gazeOrigin = SIMD3<Float>(0, 1.6, 0)
+        let gazeDirection = simd_normalize(SIMD3<Float>(0, -0.1, -1.0))
+        
+        gazeSystem.updateGazeTarget(
+            gazeOrigin: gazeOrigin,
+            gazeDirection: gazeDirection,
+            cameraTransform: .identity
+        )
+        
+        gazeSystem.beginSelection()
+        XCTAssertNotNil(gazeSystem.gazeFixationStart)
+        
+        // Wait only 500ms - well below hysteresis threshold (95% of 1.5s = 1425ms).
+        try? await Task.sleep(for: .milliseconds(500))
+        
+        // Move gaze away - should reset due to gaze angle change, not hysteresis.
+        let gazeDirection2 = SIMD3<Float>(1.0, 0, -0.5)
+        gazeSystem.updateGazeTarget(
+            gazeOrigin: gazeOrigin,
+            gazeDirection: gazeDirection2,
+            cameraTransform: .identity
+        )
+        
+        XCTAssertNil(gazeSystem.gazeFixationStart, "Should reset due to gaze angle, not hysteresis")
+        XCTAssertFalse(gazeSystem.isFixating)
+    }
+    
+    func testHysteresisZoneTrackingResetsOnClearTarget() {
+        let fixture = createFixture(position: SIMD3<Float>(0, 1.5, -1.0))
+        gazeSystem.configure(trackedFixtures: [fixture])
+        
+        // Simulate entering hysteresis zone by moving gaze far away.
+        let gazeOrigin = SIMD3<Float>(0, 1.6, 0)
+        let gazeDirection = simd_normalize(SIMD3<Float>(0, -0.1, -1.0))
+        
+        gazeSystem.updateGazeTarget(
+            gazeOrigin: gazeOrigin,
+            gazeDirection: gazeDirection,
+            cameraTransform: .identity
+        )
+        
+        // Clear target should reset hysteresis tracking.
+        gazeSystem.reset()
+        XCTAssertFalse(gazeSystem.isFixating)
+    }
+    
     // MARK: - Selection Tests
     
     func testBeginSelectionSetsSelectingState() {
