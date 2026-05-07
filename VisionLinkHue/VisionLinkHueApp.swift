@@ -60,6 +60,7 @@ struct VisionLinkHueApp: App {
                 .environment(AppContainer.shared.detectionEngine)
                 .environment(AppContainer.shared.arSessionManager)
                 .environment(AppContainer.shared.spatialProjector)
+                .environment(AppContainer.shared.gestureManager)
                 .environment(AppContainer.shared.detectionSettings)
         }
     }

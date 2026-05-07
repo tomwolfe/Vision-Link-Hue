@@ -244,6 +244,18 @@ final class GestureManager: SpatialInputHandler, Sendable {
         generator.prepare()
     }
     
+    /// Provide a transient haptic pattern to confirm calibration point registration.
+    /// Uses a rapid double-tap pattern to give tactile feedback during Kabsch calibration
+    /// without requiring the user to look away from the fixture.
+    func provideCalibrationPointHaptic() {
+        let generator = UIImpactFeedbackGenerator(style: .rigid)
+        generator.impactOccurred()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) {
+            generator.impactOccurred()
+        }
+        generator.prepare()
+    }
+    
     // MARK: - Private Helpers
     
     /// Clamp brightness to valid Hue range (1-254).

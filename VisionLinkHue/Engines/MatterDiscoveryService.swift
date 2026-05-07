@@ -65,6 +65,10 @@ final class MatterDiscoveryService: NSObject, @unchecked Sendable {
     private let matterServiceType = "_matter._tcp."
     private let meshcopServiceType = "_meshcop._udp."
     
+    /// Thread 1.4 area metadata subtype for discovering Room/Zone names
+    /// directly from Apple TV/HomePod 2026 border routers without Hue Bridge.
+    private let threadAreaServiceType = "_thread-area._tcp."
+    
     /// Browser for discovering Matter services on the local network.
     private var browser: NetServiceBrowser?
     
@@ -137,6 +141,9 @@ final class MatterDiscoveryService: NSObject, @unchecked Sendable {
         
         browser = NetServiceBrowser()
         browser?.delegate = self
+        browser?.searchForInfos(ofType: matterServiceType, inDomain: "local.")
+        browser?.searchForInfos(ofType: meshcopServiceType, inDomain: "local.")
+        browser?.searchForInfos(ofType: threadAreaServiceType, inDomain: "local.")
         
         _isDiscovering = true
         logger.info("Started Matter border router mDNS discovery")

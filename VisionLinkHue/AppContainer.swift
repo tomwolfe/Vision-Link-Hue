@@ -224,6 +224,7 @@ final class AppContainer {
     let detectionEngine: DetectionEngine
     let arSessionManager: ARSessionManager
     let spatialProjector: SpatialProjector
+    let gestureManager: GestureManager
     let matterService: MatterBridgeService
     let spatialSyncService: SpatialSyncService
     let telemetryService: MetricKitTelemetryService
@@ -278,6 +279,15 @@ final class AppContainer {
         let calibrationStore = KeychainCalibrationStore(keychainManager: keychainManager)
         client.spatialService?.calibrationEngine.persistenceStore = calibrationStore
         
+        // Wire up GestureManager for haptic feedback during calibration.
+        // The calibration engine's onCalibrationPointAdded callback triggers
+        // a transient double-tap haptic pattern to confirm point registration
+        // without requiring the user to look away from the fixture.
+        let gestureManager = GestureManager()
+        client.spatialService?.calibrationEngine.onCalibrationPointAdded = {
+            gestureManager.provideCalibrationPointHaptic()
+        }
+        
         let matterService = factories.matterBridgeServiceFactory.create()
         client.matterService = matterService
         
@@ -312,6 +322,7 @@ final class AppContainer {
         self.detectionEngine = detector
         self.arSessionManager = manager
         self.spatialProjector = projector
+        self.gestureManager = gestureManager
         self.matterService = matterService
         self.spatialSyncService = spatialSyncService
         self.telemetryService = telemetryService

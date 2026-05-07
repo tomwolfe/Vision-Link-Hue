@@ -153,6 +153,11 @@ final class SpatialCalibrationEngine {
         category: "SpatialCalibration"
     )
     
+    /// Callback fired when a calibration point is successfully registered.
+    /// Used by the GestureManager to provide transient haptic feedback confirming
+    /// point registration without requiring the user to look away from the fixture.
+    var onCalibrationPointAdded: (() -> Void)?
+    
     // MARK: - Transformation Model
     
     /// Rigid-body transformation consisting of a 3x3 rotation matrix and 3D translation vector.
@@ -171,6 +176,7 @@ final class SpatialCalibrationEngine {
     /// Add a calibration point to the transformation solver.
     func addCalibrationPoint(arKit: SIMD3<Float>, bridge: SIMD3<Float>) {
         calibrationPoints.append((arKit: arKit, bridge: bridge))
+        onCalibrationPointAdded?()
         
         if calibrationPoints.count > Self.maxCalibrationPoints {
             calibrationPoints = Array(calibrationPoints.suffix(Self.maxCalibrationPoints))

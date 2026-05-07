@@ -95,6 +95,19 @@ final class DetectionEngine {
     /// Whether the quantization fallback error has already been reported.
     private var hasReportedQuantizationFallback: Bool = false
     
+    /// Memory guardrail: Threshold (8GB) below which loading the unquantized 16-bit model
+    /// risks triggering Jetsam termination when ARSession is under heavy load.
+    /// On constrained devices (iPhone 15 Pro series), the combination of ARKit Neural Surface
+    /// Synthesis and a full-precision CoreML model can exceed the Jetsam memory limit.
+    private static let fullPrecisionMemoryThreshold: UInt64 = 8 * 1024 * 1024 * 1024
+    
+    /// Check if the device has sufficient memory for the unquantized 16-bit CoreML model.
+    /// Prevents Jetsam termination on memory-constrained devices by falling back to
+    /// rectangle detection when physical memory is at or below the 8GB threshold.
+    private static var isMemoryAvailableForFullPrecision: Bool {
+        ProcessInfo.processInfo.physicalMemory > fullPrecisionMemoryThreshold
+    }
+    
     /// Callback for model loading progress updates.
     private var onModelLoadingProgress: (@Sendable (Double) -> Void)?
     
@@ -309,6 +322,8 @@ final class DetectionEngine {
             let baseConfig = MLModelConfiguration()
             baseConfig.computeUnits = .all
             
+            var skipModelSetup = false
+            
             #if targetEnvironment(simulator)
             objectDetectionModel = try MLModel(contentsOf: modelURL, configuration: baseConfig)
             isCoreMLAvailable = true
@@ -328,66 +343,96 @@ final class DetectionEngine {
             } catch {
                 logger.debug("4-bit quantization not available for model, falling back to unquantized: \(error.localizedDescription)")
                 
-                // Report quantization fallback to stateStream for thermal model baseline tracking.
-                // Rate-limit to a single report per session to avoid spamming on older devices.
-                if let stateStream, !hasReportedQuantizationFallback {
-                    hasReportedQuantizationFallback = true
-                    let fallbackError = NSError(
-                        domain: "DetectionEngine",
-                        code: 2,
-                        userInfo: [
-                            NSLocalizedDescriptionKey: "4-bit quantization unavailable, falling back to full precision model. This will increase inference latency and may impact the predictive thermal model baseline."
-                        ]
+                // Memory guardrail: On devices with <=8GB RAM (e.g., iPhone 15 Pro),
+                // loading the unquantized 16-bit model during active ARSession can trigger
+                // Jetsam termination. Check physical memory before attempting fallback load.
+                if Self.isMemoryAvailableForFullPrecision {
+                    // Report quantization fallback to stateStream for thermal model baseline tracking.
+                    // Rate-limit to a single report per session to avoid spamming on older devices.
+                    if let stateStream, !hasReportedQuantizationFallback {
+                        hasReportedQuantizationFallback = true
+                        let fallbackError = NSError(
+                            domain: "DetectionEngine",
+                            code: 2,
+                            userInfo: [
+                                NSLocalizedDescriptionKey: "4-bit quantization unavailable, falling back to full precision model. This will increase inference latency and may impact the predictive thermal model baseline."
+                            ]
+                        )
+                        stateStream.reportError(fallbackError, severity: .warning, source: "DetectionEngine.quantization_fallback")
+                    }
+                    
+                    // Pause the ARSession before loading the unquantized model to prevent
+                    // a memory spike that could trigger Jetsam termination on A13+ devices.
+                    // ARKit Neural Surface Synthesis consumes significant memory, and loading
+                    // an unquantized 16-bit model while the session is running can exceed
+                    // the available memory budget even on modern devices.
+                    onShouldPauseARSession?(true)
+                    
+                    // Wrap failed model release and fallback load in a single autoreleasepool
+                    // to ensure memory from the failed 4-bit CoreML initialization is flushed
+                    // before allocating the larger 16-bit model, preventing RAM spikes on
+                    // older A-series/M-series chips.
+                    autoreleasepool {
+                        loadedModel = nil
+                        loadedModel = try MLModel(contentsOf: modelURL, configuration: baseConfig)
+                        quantizationApplied = false
+                    }
+                    
+                    // Resume the ARSession after the model is loaded.
+                    onShouldPauseARSession?(false)
+                } else {
+                    let memoryGB = Double(ProcessInfo.processInfo.physicalMemory) / 1_000_000_000
+                    logger.warning(
+                        "Memory guardrail triggered: device has \(String(format: "%.1f", memoryGB))GB RAM. " +
+                        "Skipping unquantized model to prevent Jetsam. Falling back to rectangle detection."
                     )
-                    stateStream.reportError(fallbackError, severity: .warning, source: "DetectionEngine.quantization_fallback")
+                    isCoreMLAvailable = false
+                    isObjectModelLoaded = false
+                    isModelQuantized = false
+                    if let stateStream, !hasReportedQuantizationFallback {
+                        hasReportedQuantizationFallback = true
+                        let guardrailError = NSError(
+                            domain: "DetectionEngine",
+                            code: 3,
+                            userInfo: [
+                                NSLocalizedDescriptionKey: "Memory guardrail: insufficient RAM for full-precision model. Using heuristic rectangle detection."
+                            ]
+                        )
+                        stateStream.reportError(guardrailError, severity: .warning, source: "DetectionEngine.memory_guardrail")
+                    }
+                    skipModelSetup = true
                 }
-                
-                // Pause the ARSession before loading the unquantized model to prevent
-                // a memory spike that could trigger Jetsam termination on A13+ devices.
-                // ARKit Neural Surface Synthesis consumes significant memory, and loading
-                // an unquantized 16-bit model while the session is running can exceed
-                // the available memory budget even on modern devices.
-                onShouldPauseARSession?(true)
-                
-                // Wrap failed model release and fallback load in a single autoreleasepool
-                // to ensure memory from the failed 4-bit CoreML initialization is flushed
-                // before allocating the larger 16-bit model, preventing RAM spikes on
-                // older A-series/M-series chips.
-                autoreleasepool {
-                    loadedModel = nil
-                    loadedModel = try MLModel(contentsOf: modelURL, configuration: baseConfig)
-                    quantizationApplied = false
-                }
-                
-                // Resume the ARSession after the model is loaded.
-                onShouldPauseARSession?(false)
             }
             
-            objectDetectionModel = loadedModel
-            isCoreMLAvailable = true
-            isObjectModelLoaded = true
-            isModelQuantized = quantizationApplied
-            
-            if quantizationApplied {
-                logger.info("CoreML lighting archetype model loaded with 4-bit weight quantization")
-            } else {
-                logger.info("CoreML lighting archetype model loaded (quantization unavailable, using full precision)")
+            if !skipModelSetup {
+                objectDetectionModel = loadedModel
+                isCoreMLAvailable = true
+                isObjectModelLoaded = true
+                isModelQuantized = quantizationApplied
+                
+                if quantizationApplied {
+                    logger.info("CoreML lighting archetype model loaded with 4-bit weight quantization")
+                } else {
+                    logger.info("CoreML lighting archetype model loaded (quantization unavailable, using full precision)")
+                }
             }
             #endif
             
-            // Pre-create the VNCoreMLRequest to avoid per-frame allocation churn.
-            guard let model = objectDetectionModel else {
-                throw NSError(domain: "DetectionEngine", code: 1, userInfo: [NSLocalizedDescriptionKey: "Model was nil after loading"])
-            }
-            objectDetectionRequest = VNCoreMLRequest(model: try VNCoreMLModel(for: model)) { [weak self] request, error in
-                if let error {
-                    Logger(subsystem: "com.tomwolfe.visionlinkhue", category: "DetectionEngine")
-                        .warning("CoreML object detection failed: \(error.localizedDescription)")
+            if !skipModelSetup {
+                // Pre-create the VNCoreMLRequest to avoid per-frame allocation churn.
+                guard let model = objectDetectionModel else {
+                    throw NSError(domain: "DetectionEngine", code: 1, userInfo: [NSLocalizedDescriptionKey: "Model was nil after loading"])
                 }
+                objectDetectionRequest = VNCoreMLRequest(model: try VNCoreMLModel(for: model)) { [weak self] request, error in
+                    if let error {
+                        Logger(subsystem: "com.tomwolfe.visionlinkhue", category: "DetectionEngine")
+                            .warning("CoreML object detection failed: \(error.localizedDescription)")
+                    }
+                }
+                objectDetectionRequest?.imageCropAndScaleOption = .scaleFill
+                
+                logger.info("CoreML compute units: \(self.currentComputeUnits == .all ? ".all" : ".cpuOnly")")
             }
-            objectDetectionRequest?.imageCropAndScaleOption = .scaleFill
-            
-            logger.info("CoreML compute units: \(self.currentComputeUnits == .all ? ".all" : ".cpuOnly")")
             
         } catch {
             logger.warning("Failed to load CoreML model: \(error.localizedDescription)")
