@@ -62,6 +62,22 @@ struct ClusterReticle: View {
         default: return 100
         }
     }
+
+    /// Dynamic accessibility value that includes gaze dwell progress.
+    /// Users with limited vision hear progress updates through their AirPods.
+    private var clusterAccessibilityValueText: Text {
+        switch visualState {
+        case .gazeDwell(let progress):
+            let percent = Int(progress * 100)
+            return Text("\(cluster.lightCount) fixtures at \(String(format: "%.1f", cluster.averageConfidence * 100))% confidence. Selecting cluster, \(percent)% complete")
+        case .gazeSelecting:
+            return Text("\(cluster.lightCount) fixtures at \(String(format: "%.1f", cluster.averageConfidence * 100))% confidence. Selecting now")
+        case .gazeTargeted:
+            return Text("\(cluster.lightCount) fixtures at \(String(format: "%.1f", cluster.averageConfidence * 100))% confidence. Gaze targeted")
+        default:
+            return Text("\(cluster.lightCount) fixtures at \(String(format: "%.1f", cluster.averageConfidence * 100))% confidence")
+        }
+    }
     
     var body: some View {
         ZStack {
@@ -120,7 +136,7 @@ struct ClusterReticle: View {
         )
         .accessibilityLabel(Text("\(cluster.label) cluster"))
         .accessibilityHint(Text("\(cluster.lightCount) fixtures detected. Tap to control all."))
-        .accessibilityValue(Text("\(cluster.lightCount) fixtures at \(String(format: "%.1f", cluster.averageConfidence * 100))% confidence"))
+        .accessibilityValue(clusterAccessibilityValueText)
         #if !targetEnvironment(simulator)
         if #available(iOS 26, *) {
             .glassEffect(.liquid, alignment: .center)

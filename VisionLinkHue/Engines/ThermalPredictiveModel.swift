@@ -30,23 +30,28 @@ import os
 /// | Apple Vision Pro (M2) | Vision Pro | 15 TOPS | 300 | 5.0 | Same as A17 Pro NPU |
 /// | Apple Vision Pro 2 (M3) | Vision Pro 2 | 20 TOPS | 280 | 4.8 | Projected 2026 upgrade |
 ///
-/// ### Runtime Calibration
+/// ### Runtime Auto-Calibration
 ///
-/// At app launch, the model can auto-calibrate by measuring baseline
-/// inference latency over the first 32 samples:
+/// By default, the model auto-calibrates at launch by measuring baseline
+/// inference latency over the first 32 samples. It then adjusts thresholds
+/// relative to the measured baseline:
+/// - `latencyThresholdMs` = baseline * 2.5 (allows 2.5x headroom before warning)
+/// - `slopeThreshold` = baseline * 0.15 (detects rapid thermal ramp)
 ///
+/// This prevents over-throttling on powerful chips (M4 iPad Pro, Vision Pro 2)
+/// where the default 300ms threshold would trigger prematurely.
+///
+/// To disable auto-calibration and use fixed thresholds:
 /// ```swift
-/// let baselineLatency = measureBaselineInferenceLatency(samples: 32)
-/// let calibratedConfig = PredictiveConfiguration(
-///     latencyThresholdMs: baselineLatency * 2.0,
-///     slopeThreshold: baselineLatency * 0.1,
+/// let fixedConfig = PredictiveConfiguration(
+///     latencyThresholdMs: 300,
+///     slopeThreshold: 5.0,
 ///     smoothingFactor: 0.3,
-///     slopeWindow: 8
+///     slopeWindow: 8,
+///     enableAutoCalibration: false,
+///     calibrationSamples: 32
 /// )
 /// ```
-///
-/// This ensures the thresholds are always relative to the actual
-/// device performance rather than hardcoded values.
 ///
 /// ### Thermal State Transition Points
 ///
@@ -93,28 +98,50 @@ final class ThermalPredictiveModel {
     struct PredictiveConfiguration: Sendable {
         /// EWMA latency threshold (ms) that triggers throttling.
         let latencyThresholdMs: Double
-        
+
         /// Rate-of-change slope (ms per sample) that triggers preemptive throttling.
         let slopeThreshold: Double
-        
+
         /// EWMA smoothing factor (0.0 to 1.0). Higher values react faster
         /// to recent changes; lower values smooth out short-term spikes.
         let smoothingFactor: Double
-        
+
         /// Number of samples to retain for slope calculation.
         let slopeWindow: Int
-        
+
+        /// Whether to enable runtime auto-calibration. When enabled, the model
+        /// measures baseline inference latency over the first `calibrationSamples`
+        /// samples and adjusts thresholds relative to actual device performance.
+        /// This prevents over-throttling on more powerful chips (M4 iPad Pro,
+        /// Vision Pro 2) where the default 300ms threshold is too conservative.
+        let enableAutoCalibration: Bool
+
+        /// Number of initial samples to collect for baseline calibration.
+        let calibrationSamples: Int
+
         static let `default` = PredictiveConfiguration(
             latencyThresholdMs: 300,
             slopeThreshold: 5.0,
             smoothingFactor: 0.3,
-            slopeWindow: 8
+            slopeWindow: 8,
+            enableAutoCalibration: true,
+            calibrationSamples: 32
         )
     }
     
     private var configuration: PredictiveConfiguration
     var latencyHistory: [Double]
     var sampleCount: Int = 0
+
+    /// Baseline latency measured during calibration (milliseconds).
+    /// Set after the first `calibrationSamples` samples when auto-calibration is enabled.
+    private var baselineLatencyMs: Double?
+
+    /// Whether auto-calibration is active (measuring baseline from initial samples).
+    private var isCalibrating: Bool = false
+
+    /// Accumulator for baseline latency during calibration.
+    private var calibrationLatencySum: Double = 0
     
     /// Precomputed least-squares constants for the fixed slope window.
     /// For x = [0, 1, ..., n-1]:
@@ -134,18 +161,45 @@ final class ThermalPredictiveModel {
         self.ewmaLatency = 0.0
         self.latencyTrendSlope = 0.0
         self.latencyHistory = []
-        
+
         let n = Double(configuration.slopeWindow)
         precomputedSumX = n * (n - 1.0) / 2.0
         precomputedSumX2 = (n - 1.0) * n * (2.0 * n - 1.0) / 6.0
         precomputedDenominator = n * precomputedSumX2 - precomputedSumX * precomputedSumX
+
+        if configuration.enableAutoCalibration {
+            isCalibrating = true
+            logger.info("Runtime auto-calibration enabled: measuring baseline over \(configuration.calibrationSamples) samples")
+        }
     }
     
     /// Update the predictive model with a new inference latency measurement.
     /// - Parameter latencyMs: The inference latency in milliseconds.
     func update(withLatency latencyMs: Double) {
         sampleCount += 1
-        
+
+        // During calibration phase, accumulate raw latency for baseline measurement.
+        if isCalibrating {
+            calibrationLatencySum += latencyMs
+
+            if sampleCount >= configuration.calibrationSamples {
+                baselineLatencyMs = calibrationLatencySum / Double(configuration.calibrationSamples)
+                isCalibrating = false
+
+                if let baseline = baselineLatencyMs {
+                    logger.info("Auto-calibration complete: baseline latency \(String(format: "%.1f", baseline))ms. Adjusting thresholds.")
+                    configuration = PredictiveConfiguration(
+                        latencyThresholdMs: baseline * 2.5,
+                        slopeThreshold: baseline * 0.15,
+                        smoothingFactor: configuration.smoothingFactor,
+                        slopeWindow: configuration.slopeWindow,
+                        enableAutoCalibration: false,
+                        calibrationSamples: configuration.calibrationSamples
+                    )
+                }
+            }
+        }
+
         // Update EWMA
         if ewmaLatency == 0.0 {
             ewmaLatency = latencyMs
@@ -153,15 +207,15 @@ final class ThermalPredictiveModel {
             let alpha = configuration.smoothingFactor
             ewmaLatency = alpha * latencyMs + (1 - alpha) * ewmaLatency
         }
-        
+
         // Record latency for slope calculation
         latencyHistory.append(ewmaLatency)
-        
+
         // Maintain sliding window for slope
         if latencyHistory.count > configuration.slopeWindow {
             latencyHistory.removeFirst()
         }
-        
+
         // Compute trend slope using simple linear regression
         if latencyHistory.count >= 3 {
             latencyTrendSlope = computeSlope(latencyHistory)
@@ -175,6 +229,12 @@ final class ThermalPredictiveModel {
         latencyTrendSlope = 0.0
         latencyHistory.removeAll()
         sampleCount = 0
+
+        if configuration.enableAutoCalibration {
+            isCalibrating = true
+            calibrationLatencySum = 0
+            baselineLatencyMs = nil
+        }
     }
     
     /// Update the model with a new actual thermal state.

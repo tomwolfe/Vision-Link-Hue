@@ -80,6 +80,23 @@ struct FixtureReticle: View {
         default: return 100
         }
     }
+
+    /// Dynamic accessibility value that includes gaze dwell progress.
+    /// Users with limited vision hear "Selecting fixture, 50% complete" through
+    /// their AirPods while fixating on a reticle.
+    private var accessibilityValueText: Text {
+        switch visualState {
+        case .gazeDwell(let progress):
+            let percent = Int(progress * 100)
+            return Text("\(Int(fixture.detection.confidence * 100))% confidence. Selecting fixture, \(percent)% complete")
+        case .gazeSelecting:
+            return Text("\(Int(fixture.detection.confidence * 100))% confidence. Selecting now")
+        case .gazeTargeted:
+            return Text("\(Int(fixture.detection.confidence * 100))% confidence. Gaze targeted")
+        default:
+            return Text("\(Int(fixture.detection.confidence * 100))% confidence")
+        }
+    }
     
     var body: some View {
         ZStack {
@@ -138,7 +155,7 @@ struct FixtureReticle: View {
         )
         .accessibilityLabel(Text(fixture.type.displayName))
         .accessibilityHint(Text("Detection confidence \(Int(fixture.detection.confidence * 100)) percent. Tap to select."))
-        .accessibilityValue(Text("\(Int(fixture.detection.confidence * 100))% confidence"))
+        .accessibilityValue(accessibilityValueText)
         #if !targetEnvironment(simulator)
         if #available(iOS 26, *) {
             .glassEffect(.liquid, alignment: .center)

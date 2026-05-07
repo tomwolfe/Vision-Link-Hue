@@ -722,7 +722,7 @@ final class DetectionEngine {
             }
             
             if let region {
-                return materialClassifier.sampleMaterial(region: region, materialLabel: materialLabel)
+                return materialClassifier.sampleMaterial(region: region, materialLabel: materialLabel, confidenceMap: sceneDepth.confidenceMap)
             } else {
                 return materialClassifier.sampleMaterial(
                     at: SIMD2<Float>(0.5, 0.5),

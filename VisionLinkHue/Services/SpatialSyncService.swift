@@ -109,6 +109,42 @@ struct CRDTConflictResolver {
         updated[deviceID] = (updated[deviceID] ?? 0) + 1
         return updated
     }
+    
+    /// Prune stale device entries from a vector clock to prevent unbounded metadata growth.
+    /// Removes any device that hasn't synchronized within the given maximum age.
+    /// Over years of use and device upgrades, vector clocks accumulate device IDs that
+    /// will never sync again (sold phones, lost tablets, replaced computers). This method
+    /// keeps the clock metadata lean by removing entries older than the threshold.
+    ///
+    /// - Parameters:
+    ///   - clock: The vector clock to prune.
+    ///   - deviceLastSynced: Map of device IDs to their last successful sync timestamp.
+    ///   - maxAge: Maximum age (in seconds) before a device entry is considered stale.
+    ///   - now: Current time for age calculation (defaults to `Date()`).
+    /// - Returns: A new vector clock with stale device entries removed.
+    static func pruneStaleEntries(
+        _ clock: [String: Int64],
+        deviceLastSynced: [String: Date],
+        maxAge: TimeInterval = 30 * 24 * 60 * 60,
+        now: Date = Date()
+    ) -> [String: Int64] {
+        var pruned = clock
+        
+        for deviceID in clock.keys {
+            guard let lastSync = deviceLastSynced[deviceID] else {
+                // No tracked sync time; treat as stale and remove.
+                pruned.removeValue(forKey: deviceID)
+                continue
+            }
+            
+            let secondsSinceSync = now.timeIntervalSince(lastSync)
+            if secondsSinceSync > maxAge {
+                pruned.removeValue(forKey: deviceID)
+            }
+        }
+        
+        return pruned
+    }
 }
 
 /// Serializable snapshot of a fixture mapping for upload across actor boundaries.
@@ -296,7 +332,12 @@ actor SpatialSyncService {
     /// Vector clock for CRDT-based conflict resolution.
     /// Maps fixture IDs to their vector clock entries (device -> version).
     private var vectorClocks: [String: [String: Int64]] = [:]
-    
+
+    /// Tracks the last successful sync timestamp for each device.
+    /// Used to prune stale device entries from vector clocks to prevent
+    /// unbounded metadata growth over years of use and device upgrades.
+    private var deviceLastSynced: [String: Date] = [:]
+
     /// Device identifier for this device (used in conflict resolution).
     private var deviceIdentifier: String = ProcessInfo().globallyUniqueString
     
@@ -363,9 +404,10 @@ actor SpatialSyncService {
             
             let success = uploadResult.success && downloadResult.success
             lastSuccessfulSync = success ? Date() : lastSuccessfulSync
-            
+
             if success {
                 logger.info("Sync completed: \(uploadResult.changes) uploaded, \(downloadResult.changes) downloaded, \(conflicts) conflicts resolved")
+                await pruneStaleVectorClockEntries()
             }
             
             return .success(
@@ -382,6 +424,9 @@ actor SpatialSyncService {
     /// Upload local fixture mappings that have changed since last sync.
     /// Creates or updates CloudKit records for each local fixture mapping.
     private func uploadLocalChanges() async -> UploadResult {
+        // Track this device's sync time for pruning stale entries.
+        deviceLastSynced[deviceIdentifier] = Date()
+
         var changes = 0
         var success = true
         
@@ -427,6 +472,18 @@ actor SpatialSyncService {
                     let fixtureKey = remoteRecord.fixtureId.uuidString
                     let localClock = vectorClocks[fixtureKey] ?? [:]
                     vectorClocks[fixtureKey] = CRDTConflictResolver.mergeClocks(localClock, remoteClock)
+
+                    // Track when each device in the remote clock last synced.
+                    // This enables pruning of stale device entries.
+                    let now = Date()
+                    for deviceID in remoteClock.keys {
+                        deviceLastSynced[deviceID] = now
+                    }
+                }
+
+                // Track this device's sync time from the record metadata.
+                if let modDevice = remoteRecord.lastModifiedByDevice {
+                    deviceLastSynced[modDevice] = remoteRecord.lastSyncedAt
                 }
                 
                 // Check if local record exists and is newer.
@@ -794,6 +851,38 @@ actor SpatialSyncService {
     /// Clear all pending uploads.
     func clearPendingUploads() {
         pendingUploads.removeAll()
+    }
+
+    /// Prune stale device entries from all vector clocks to prevent unbounded growth.
+    /// Removes device IDs that haven't synchronized in over 30 days.
+    /// This is called after each successful sync to keep metadata lean.
+    private func pruneStaleVectorClockEntries() async {
+        let prunedCount = pruneVectorClocks()
+        if prunedCount > 0 {
+            logger.info("Pruned \(prunedCount) stale device entries from vector clocks")
+        }
+    }
+
+    /// Prune stale device entries from all vector clocks.
+    /// - Returns: The number of entries removed across all clocks.
+    private func pruneVectorClocks() -> Int {
+        var totalRemoved = 0
+        let now = Date()
+        let maxAge: TimeInterval = 30 * 24 * 60 * 60
+
+        for (fixtureKey, clock) in vectorClocks {
+            let pruned = CRDTConflictResolver.pruneStaleEntries(clock, deviceLastSynced: deviceLastSynced, maxAge: maxAge, now: now)
+            let removed = clock.count - pruned.count
+            totalRemoved += removed
+            vectorClocks[fixtureKey] = pruned
+        }
+
+        // Also prune the deviceLastSynced tracker itself.
+        for (deviceID, lastSync) in deviceLastSynced where now.timeIntervalSince(lastSync) > maxAge {
+            deviceLastSynced.removeValue(forKey: deviceID)
+        }
+
+        return totalRemoved
     }
     
     /// Get the persistence reference for fixture mapping operations.

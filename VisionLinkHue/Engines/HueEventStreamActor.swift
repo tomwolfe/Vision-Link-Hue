@@ -25,9 +25,15 @@ actor HueEventStreamActor {
     
     /// Event handler for parsed resource updates from the bridge.
     var onEvent: (@Sendable (ResourceUpdate) -> Void)?
-    
+
     /// Error handler for stream-level errors.
     var onError: (@Sendable (any Error) -> Void)?
+
+    /// Callback invoked when the SSE buffer overflows and a full sync is required.
+    /// When `maxSSEBufferLength` is exceeded, the incremental stream may be
+    /// corrupted or out of order. This callback signals the parent `HueClient`
+    /// to force a clean `GET /resources` fetch to recover state.
+    var onFullSyncRequired: (@Sendable () -> Void)?
     
     // MARK: - Private State
     
@@ -213,6 +219,11 @@ actor HueEventStreamActor {
     func setErrorHandler(_ handler: @escaping @Sendable (any Error) -> Void) {
         onError = handler
     }
+
+    /// Set the full sync required callback, triggered when the SSE buffer overflows.
+    func setFullSyncRequiredHandler(_ handler: @escaping @Sendable () -> Void) {
+        onFullSyncRequired = handler
+    }
     
     /// Configure the SSE connection behavior with custom thresholds.
     func configure(_ configuration: Configuration) {
@@ -299,6 +310,11 @@ actor HueEventStreamActor {
                         sseDataBuffer = ""
                         parseFailures = maxParseFailures
                         state = .degraded
+
+                        // Emit FullSyncRequired to force a clean GET /resources fetch.
+                        // This is the only way to recover if a massive burst of events
+                        // corrupted the incremental stream.
+                        onFullSyncRequired?()
                     }
                 }
             }

@@ -170,37 +170,67 @@ struct NeuralSurfaceMaterialClassifier: Sendable {
     ///   - materialLabel: The raw material label pixel buffer from `sceneDepth.materialLabel`.
     /// - Returns: The dominant material label string, or `nil` if no valid data.
     func sampleMaterial(region: NormalizedRect, materialLabel: CVPixelBuffer) -> String? {
+        sampleMaterial(region: region, materialLabel: materialLabel, confidenceMap: nil)
+    }
+
+    /// Sample material labels across a normalized bounding region, weighted by
+    /// depth confidence. Each vote is multiplied by the confidence value at that
+    /// pixel, preventing "Reflection Hallucination" where a fixture viewed through
+    /// glass might incorrectly inherit material properties of the reflection.
+    ///
+    /// - Parameters:
+    ///   - region: Normalized bounding box covering the fixture.
+    ///   - materialLabel: The raw material label pixel buffer from `sceneDepth.materialLabel`.
+    ///   - confidenceMap: Optional depth confidence map from `sceneDepth.confidenceMap`.
+    ///     When provided, each sample's vote is weighted by its confidence value.
+    /// - Returns: The dominant material label string, or `nil` if no valid data.
+    func sampleMaterial(region: NormalizedRect, materialLabel: CVPixelBuffer, confidenceMap: CVPixelBuffer?) -> String? {
         let pixelWidth = Int(CVPixelBufferGetWidth(materialLabel))
         let pixelHeight = Int(CVPixelBufferGetHeight(materialLabel))
-        
+
         let topLeftPx = Int(region.topLeft.x * Float(pixelWidth))
         let topLeftPy = Int(region.topLeft.y * Float(pixelHeight))
         let bottomRightPx = Int(region.bottomRight.x * Float(pixelWidth))
         let bottomRightPy = Int(region.bottomRight.y * Float(pixelHeight))
-        
-        var voteCount: [String: Int] = [:]
-        var totalSamples = 0
-        
+
+        var weightedVotes: [String: Float] = [:]
+        var totalWeight: Float = 0
+
         CVPixelBufferLockBaseAddress(materialLabel, .readOnly)
         defer { CVPixelBufferUnlockBaseAddress(materialLabel, .readOnly) }
-        
+
+        var confidenceLock: Bool = false
+        if let confidenceMap {
+            CVPixelBufferLockBaseAddress(confidenceMap, .readOnly)
+            confidenceLock = true
+            defer { CVPixelBufferUnlockBaseAddress(confidenceMap, .readOnly) }
+        }
+
         let step = max(1, min(bottomRightPx - topLeftPx, bottomRightPy - topLeftPy) / 5)
-        
+
         for py in stride(from: topLeftPy, through: bottomRightPy, by: step) {
             for px in stride(from: topLeftPx, through: bottomRightPx, by: step) {
                 guard px >= 0, px < pixelWidth, py >= 0, py < pixelHeight else { continue }
-                
+
                 let label = extractMaterialLabel(from: materialLabel, pixelX: px, pixelY: py, width: pixelWidth)
-                if let label, !label.isEmpty, NeuralSurfaceMaterialClassifier.supportedMaterials.contains(label) {
-                    voteCount[label, default: 0] += 1
-                    totalSamples += 1
-                }
+                guard let label, !label.isEmpty, NeuralSurfaceMaterialClassifier.supportedMaterials.contains(label) else { continue }
+
+                let weight: Float = {
+                    guard let confidenceMap, let baseAddress = CVPixelBufferGetBaseAddress(confidenceMap) else { return 1.0 }
+                    let bytesPerRow = CVPixelBufferGetBytesPerRow(confidenceMap)
+                    let byteOffset = py * bytesPerRow + px * MemoryLayout<Float>.stride
+                    let confidence = baseAddress.load(fromByteOffset: byteOffset, as: Float.self)
+                    return max(confidence, 0.0)
+                }()
+
+                weightedVotes[label, default: 0] += weight
+                totalWeight += weight
             }
         }
-        
-        guard totalSamples > 0 else { return nil }
-        
-        return voteCount.max { $0.value < $1.value }?.key
+
+        guard totalWeight > 0 else { return nil }
+
+        return weightedVotes.max { $0.value < $1.value }?.key
     }
     
     /// Extract a material label string from the material label pixel buffer.
