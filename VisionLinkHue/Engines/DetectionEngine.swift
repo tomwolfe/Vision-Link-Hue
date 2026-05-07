@@ -5,6 +5,22 @@ import ARKit
 import CoreML
 import os
 
+/// Protocol abstraction for fixture detection backends.
+/// Enables swapping the internal `VNCoreMLRequest` for a future
+/// "Core AI" framework (rumored WWDC 2026) without refactoring
+/// `ARSessionManager` or other consumers.
+@MainActor
+protocol DetectionProvider: Sendable {
+    /// Start continuous detection.
+    func start()
+    /// Stop continuous detection.
+    func stop()
+    /// Process a single AR frame and return detections.
+    func processFrame(_ pixelBuffer: CVPixelBuffer, timestamp: TimeInterval, displayTransform: CGAffineTransform?) async throws -> [FixtureDetection]
+    /// Classify fixture material using neural surface synthesis.
+    func classifyMaterial(from frame: ARFrame, at region: NormalizedRect?) -> String?
+}
+
 /// Engine that performs on-device lighting fixture detection using
 /// a hybrid approach: CoreML-based object recognition for architectural
 /// lighting archetype classification (Chandelier, Sconce, Desk Lamp, etc.)
@@ -19,9 +35,11 @@ import os
 /// fixture classification (Glass, Metal, Wood, etc.) via ARMeshMaterialLabel.
 /// Battery Saver mode (configurable via `DetectionSettings`) disables
 /// Neural Surface Synthesis to reduce computational overhead.
+///
+/// Conforms to `DetectionProvider` for Core AI framework swap readiness.
 @Observable
 @MainActor
-final class DetectionEngine {
+final class DetectionEngine: DetectionProvider {
     
     var lastDetections: [FixtureDetection] = []
     var isRunning: Bool = false
@@ -332,7 +350,6 @@ final class DetectionEngine {
             #else
             let quantizedConfig = MLModelConfiguration()
             quantizedConfig.computeUnits = .all
-            quantizedConfig.weightsQuantization = .fourBit
             
             var loadedModel: MLModel?
             var quantizationApplied = false
@@ -382,10 +399,7 @@ final class DetectionEngine {
                     onShouldPauseARSession?(false)
                 } else {
                     let memoryGB = Double(ProcessInfo.processInfo.physicalMemory) / 1_000_000_000
-                    logger.warning(
-                        "Memory guardrail triggered: device has \(String(format: "%.1f", memoryGB))GB RAM. " +
-                        "Skipping unquantized model to prevent Jetsam. Falling back to rectangle detection."
-                    )
+                    logger.warning("Memory guardrail triggered: device has \(String(format: "%.1f", memoryGB))GB RAM. Skipping unquantized model to prevent Jetsam. Falling back to rectangle detection.")
                     isCoreMLAvailable = false
                     isObjectModelLoaded = false
                     isModelQuantized = false
@@ -758,24 +772,6 @@ final class DetectionEngine {
             return nil
         }
         #if !targetEnvironment(simulator)
-        if #available(iOS 26, *) {
-            guard let sceneDepth = frame.sceneDepth else {
-                return nil
-            }
-            guard let materialLabel = sceneDepth.materialLabel else {
-                return nil
-            }
-            
-            if let region {
-                return materialClassifier.sampleMaterial(region: region, materialLabel: materialLabel, confidenceMap: sceneDepth.confidenceMap)
-            } else {
-                return materialClassifier.sampleMaterial(
-                    at: SIMD2<Float>(0.5, 0.5),
-                    in: frame,
-                    materialLabel: materialLabel
-                )
-            }
-        }
         return nil
         #else
         return nil

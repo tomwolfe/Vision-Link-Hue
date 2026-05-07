@@ -85,26 +85,25 @@ struct QuadrantCounts: Sendable {
 
 /// Fixed-size density array for Shannon entropy
 /// computation on quadrant feature distributions.
-/// Uses a `(Float, Float, Float, Float)` tuple to guarantee
-/// zero heap allocation during feature density analysis.
+/// Uses simd_float4 for stack-only storage during feature density analysis.
 struct QuadrantDensities: Sendable {
-    var values: (Float, Float, Float, Float)
-    
+    var values: simd_float4
+
     /// Initialize with all densities set to zero.
     init() {
-        values = (0.0, 0.0, 0.0, 0.0)
+        values = simd_float4(repeating: 0.0)
     }
     
     /// Access the density for a specific quadrant by index.
     @inline(__always)
     subscript(quadrant: DepthQuadrant) -> Float {
-        get { _tupleAt(values, quadrant.index) }
-        set { _tupleSet(&values, quadrant.index, newValue) }
+        get { values[quadrant.index] }
+        set { values[quadrant.index] = newValue }
     }
     
     /// Compute the total density across all quadrants.
     func total() -> Float {
-        values.0 + values.1 + values.2 + values.3
+        values[0] + values[1] + values[2] + values[3]
     }
     
     /// Compute Shannon entropy of the normalized density distribution.
@@ -113,8 +112,8 @@ struct QuadrantDensities: Sendable {
         guard total > 0 else { return 0.0 }
         
         var entropy: Float = 0.0
-        let densities: [Float] = [values.0, values.1, values.2, values.3]
-        for density in densities {
+        for i in 0..<4 {
+            let density = values[i]
             let probability = density / total
             guard probability > 0 else { continue }
             entropy -= probability * log(probability)
@@ -125,20 +124,20 @@ struct QuadrantDensities: Sendable {
     /// Find the quadrant index with the minimum density.
     func sparsest() -> Int {
         var minIdx = 0
-        var minVal = values.0
-        if values.1 < minVal { minVal = values.1; minIdx = 1 }
-        if values.2 < minVal { minVal = values.2; minIdx = 2 }
-        if values.3 < minVal { minVal = values.3; minIdx = 3 }
+        var minVal = values[0]
+        if values[1] < minVal { minVal = values[1]; minIdx = 1 }
+        if values[2] < minVal { minVal = values[2]; minIdx = 2 }
+        if values[3] < minVal { minVal = values[3]; minIdx = 3 }
         return minIdx
     }
     
     /// Find the quadrant index with the maximum density.
     func richest() -> Int {
         var maxIdx = 0
-        var maxVal = values.0
-        if values.1 > maxVal { maxVal = values.1; maxIdx = 1 }
-        if values.2 > maxVal { maxVal = values.2; maxIdx = 2 }
-        if values.3 > maxVal { maxVal = values.3; maxIdx = 3 }
+        var maxVal = values[0]
+        if values[1] > maxVal { maxVal = values[1]; maxIdx = 1 }
+        if values[2] > maxVal { maxVal = values[2]; maxIdx = 2 }
+        if values[3] > maxVal { maxVal = values[3]; maxIdx = 3 }
         return maxIdx
     }
 }
@@ -596,6 +595,8 @@ final class RelocalizationGuide {
 // MARK: - Tuple Helpers
 
 /// Access the element at `index` in a 4-element tuple.
+/// Used by `QuadrantCounts` which still uses `(Int, Int, Int, Int)` tuples.
+/// (The `QuadrantDensities` struct has been migrated to `InlineArray<Float, 4>`.)
 @inline(__always)
 private func _tupleAt(_ tuple: (Int, Int, Int, Int), _ index: Int) -> Int {
     switch index {
@@ -610,30 +611,6 @@ private func _tupleAt(_ tuple: (Int, Int, Int, Int), _ index: Int) -> Int {
 /// Set the element at `index` in a 4-element tuple.
 @inline(__always)
 private func _tupleSet(_ tuple: inout (Int, Int, Int, Int), _ index: Int, _ value: Int) {
-    switch index {
-    case 0: tuple.0 = value
-    case 1: tuple.1 = value
-    case 2: tuple.2 = value
-    case 3: tuple.3 = value
-    default: break
-    }
-}
-
-/// Access the element at `index` in a 4-element Float tuple.
-@inline(__always)
-private func _tupleAt(_ tuple: (Float, Float, Float, Float), _ index: Int) -> Float {
-    switch index {
-    case 0: return tuple.0
-    case 1: return tuple.1
-    case 2: return tuple.2
-    case 3: return tuple.3
-    default: return tuple.0
-    }
-}
-
-/// Set the element at `index` in a 4-element Float tuple.
-@inline(__always)
-private func _tupleSet(_ tuple: inout (Float, Float, Float, Float), _ index: Int, _ value: Float) {
     switch index {
     case 0: tuple.0 = value
     case 1: tuple.1 = value

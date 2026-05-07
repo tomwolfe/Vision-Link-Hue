@@ -20,7 +20,7 @@ final class SpatialSyncServiceTests: XCTestCase {
             configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]
         )
         
-        syncService = SpatialSyncService(deviceIdentifier: "test-device-1")
+        syncService = SpatialSyncService(modelContainer: modelContainer, deviceIdentifier: "test-device-1")
     }
     
     override func tearDown() {
@@ -126,7 +126,7 @@ final class SpatialSyncServiceTests: XCTestCase {
     }
     
     func testServiceHasCorrectDeviceIdentifier() {
-        let customService = SpatialSyncService(deviceIdentifier: "custom-device-id")
+        let customService = SpatialSyncService(modelContainer: modelContainer, deviceIdentifier: "custom-device-id")
         // The device identifier is private but we can verify the service was created.
         XCTAssertFalse(customService.isSyncing)
     }

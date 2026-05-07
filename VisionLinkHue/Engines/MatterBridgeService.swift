@@ -118,23 +118,18 @@ final class MatterBridgeService: NSObject, @unchecked Sendable {
                 for accessory in home.accessories {
                     guard accessory.isReachable else { continue }
                     
-                    // Check for lightbulb service by class name (HomeKit API compatibility)
+                    // Check for lightbulb service using HomeKit constants
                     let isLightService: (HMService) -> Bool = { service in
-                        let className = String(describing: type(of: service))
-                        return className.contains("Light") || className.contains("OnOff")
+                        service.serviceType == HMServiceTypeLightbulb
                     }
                     guard let lightbulbService = accessory.services.first(where: isLightService) else {
                         continue
                     }
-                    
-                    // Get characteristic values by class name
-                    let onCharacteristic = lightbulbService.characteristics.first { char in
-                        String(describing: type(of: char)).contains("On")
-                    }
+
+                    // Get characteristic values using HomeKit constants
+                    let onCharacteristic = lightbulbService.characteristics.first { $0.characteristicType == HMCharacteristicTypePowerState }
                     let isOn = onCharacteristic?.value as? Bool == true
-                    let brightnessCharacteristic = lightbulbService.characteristics.first { char in
-                        String(describing: type(of: char)).contains("Brightness")
-                    }
+                    let brightnessCharacteristic = lightbulbService.characteristics.first { $0.characteristicType == HMCharacteristicTypeBrightness }
                     let brightness = Int(brightnessCharacteristic?.value as? Double ?? 0)
                     
                     let device = MatterLightDevice(
@@ -187,23 +182,18 @@ final class MatterBridgeService: NSObject, @unchecked Sendable {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             
-            // Check for lightbulb service
+            // Check for lightbulb service using HomeKit constants
             let isLightService: (HMService) -> Bool = { service in
-                let className = String(describing: type(of: service))
-                return className.contains("Light") || className.contains("OnOff")
+                service.serviceType == HMServiceTypeLightbulb
             }
             guard let lightbulbService = accessory.services.first(where: isLightService) else {
                 return
             }
-            
-            // Read characteristic values
-            let onCharacteristic = lightbulbService.characteristics.first { char in
-                String(describing: type(of: char)).contains("On")
-            }
+
+            // Read characteristic values using HomeKit constants
+            let onCharacteristic = lightbulbService.characteristics.first { $0.characteristicType == HMCharacteristicTypePowerState }
             let isOn = onCharacteristic?.value as? Bool == true
-            let brightnessCharacteristic = lightbulbService.characteristics.first { char in
-                String(describing: type(of: char)).contains("Brightness")
-            }
+            let brightnessCharacteristic = lightbulbService.characteristics.first { $0.characteristicType == HMCharacteristicTypeBrightness }
             let brightness = Int(brightnessCharacteristic?.value as? Double ?? 0)
             
             let device = MatterLightDevice(
@@ -486,8 +476,7 @@ extension MatterBridgeService: HMAccessoryDelegate {
     func accessory(_ accessory: HMAccessory, didUpdateCharacteristics characteristics: [HMCharacteristic]) {
         // Only refresh state for light-related accessories to avoid unnecessary work.
         let isLightAccessory: (HMService) -> Bool = { service in
-            let className = String(describing: type(of: service))
-            return className.contains("Light") || className.contains("OnOff")
+            service.serviceType == HMServiceTypeLightbulb
         }
         
         let hasLightService = accessory.services.contains(where: isLightAccessory)

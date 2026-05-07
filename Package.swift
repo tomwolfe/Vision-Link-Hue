@@ -6,10 +6,13 @@ let package = Package(
     platforms: [
         .iOS(.v26)
     ],
-    dependencies: [],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0")
+    ],
     targets: [
         .target(
             name: "VisionLinkHue",
+            dependencies: ["Crypto"],
             path: "VisionLinkHue"
         ),
         .testTarget(

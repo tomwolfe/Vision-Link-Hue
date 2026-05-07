@@ -1,11 +1,8 @@
 import Foundation
 import simd
-#if canImport(ARKit)
-import ARKit
-#endif
 
 /// Lightweight camera intrinsics for use on both device and simulator.
-/// Mirrors `ARCamera.Intrinsics` which is unavailable on the simulator SDK.
+/// Extracts parameters from ARCamera's simd_float3x3 intrinsics matrix.
 struct CameraIntrinsics {
     let k0: Float
     let k4: Float
@@ -20,11 +17,15 @@ struct CameraIntrinsics {
     }
     
     #if !targetEnvironment(simulator)
-    init(_ intrinsics: ARCamera.Intrinsics) {
-        self.k0 = Float(intrinsics.k0)
-        self.k4 = Float(intrinsics.k4)
-        self.k2 = Float(intrinsics.k2)
-        self.k5 = Float(intrinsics.k5)
+    init(_ matrix: simd_float3x3) {
+        // simd_float3x3 stores camera intrinsics in column-major order:
+        // [fx,  0,  cx]
+        // [0,   fy, cy]
+        // [0,   0,   1]
+        self.k0 = matrix.columns.0.x  // fx
+        self.k4 = matrix.columns.1.y  // fy
+        self.k2 = matrix.columns.2.x  // cx
+        self.k5 = matrix.columns.2.y  // cy
     }
     #endif
 }

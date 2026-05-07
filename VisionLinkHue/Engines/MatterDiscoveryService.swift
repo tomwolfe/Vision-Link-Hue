@@ -141,9 +141,9 @@ final class MatterDiscoveryService: NSObject, @unchecked Sendable {
         
         browser = NetServiceBrowser()
         browser?.delegate = self
-        browser?.searchForInfos(ofType: matterServiceType, inDomain: "local.")
-        browser?.searchForInfos(ofType: meshcopServiceType, inDomain: "local.")
-        browser?.searchForInfos(ofType: threadAreaServiceType, inDomain: "local.")
+        browser?.searchForServices(ofType: matterServiceType, inDomain: "local.")
+        browser?.searchForServices(ofType: meshcopServiceType, inDomain: "local.")
+        browser?.searchForServices(ofType: threadAreaServiceType, inDomain: "local.")
         
         _isDiscovering = true
         logger.info("Started Matter border router mDNS discovery")

@@ -262,15 +262,15 @@ final class SpatialProjector {
         
         #if !targetEnvironment(simulator)
         if #available(iOS 26, *) {
-            guard let sceneDepth = frame.sceneDepth,
-                  let depthMap = sceneDepth.depthMap else {
+            guard let sceneDepth = frame.sceneDepth else {
                 return nil
             }
+            let depthMap = sceneDepth.depthMap
 
         let intrinsics = provider.intrinsics
-        
-        let pixelWidth = Int(depthMap.width)
-        let pixelHeight = Int(depthMap.height)
+
+        let pixelWidth = CVPixelBufferGetWidth(depthMap)
+        let pixelHeight = CVPixelBufferGetHeight(depthMap)
         
         let px = Int(normalizedPoint.x * Float(pixelWidth))
         let py = Int(normalizedPoint.y * Float(pixelHeight))

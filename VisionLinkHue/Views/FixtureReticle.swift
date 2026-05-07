@@ -156,11 +156,6 @@ struct FixtureReticle: View {
         .accessibilityLabel(Text(fixture.type.displayName))
         .accessibilityHint(Text("Detection confidence \(Int(fixture.detection.confidence * 100)) percent. Tap to select."))
         .accessibilityValue(accessibilityValueText)
-        #if !targetEnvironment(simulator)
-        if #available(iOS 26, *) {
-            .glassEffect(.liquid, alignment: .center)
-        }
-        #endif
     }
     
     // MARK: - Connecting Ring

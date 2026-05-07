@@ -9,6 +9,11 @@ options:
   groupSortPosition: top
   xcodeVersion: "17.0"
 
+packages:
+  SwiftCrypto:
+    url: https://github.com/apple/swift-crypto.git
+    from: 3.0.0
+
 targets:
   VisionLinkHue:
     type: application
@@ -28,7 +33,9 @@ targets:
     resources:
       - VisionLinkHue/Config/classification_rules.json
       - VisionLinkHue/Shaders
-    dependencies: []
+    dependencies:
+      - package: SwiftCrypto
+        product: Crypto
 
   VisionLinkHueTests:
     type: bundle.unit-test

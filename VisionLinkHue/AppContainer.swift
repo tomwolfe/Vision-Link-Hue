@@ -16,7 +16,10 @@ protocol HueClientFactory {
 }
 
 /// Protocol for creating `DetectionEngine` instances.
-/// Enables dependency injection of mock engines in tests.
+/// The factory returns the concrete type so that `AppContainer` can wire
+/// up callbacks like `configureARSessionPauseHandler` and `configureTelemetryService`.
+/// The `DetectionProvider` protocol abstracts the interface for `ARSessionManager`,
+/// enabling a future "Core AI" swap without refactoring the session manager.
 @MainActor
 protocol DetectionEngineFactory {
     func create(stateStream: HueStateStream, detectionSettings: DetectionSettings) -> DetectionEngine
@@ -267,10 +270,12 @@ final class AppContainer {
         // CoreML model while ARKit Neural Surface Synthesis is running.
         detector.configureARSessionPauseHandler { [weak manager] shouldPause in
             guard let manager else { return }
-            if shouldPause {
-                manager.pauseForMemoryPressure()
-            } else {
-                manager.resumeAfterMemoryPressure()
+            Task { @MainActor in
+                if shouldPause {
+                    manager.pauseForMemoryPressure()
+                } else {
+                    manager.resumeAfterMemoryPressure()
+                }
             }
         }
         

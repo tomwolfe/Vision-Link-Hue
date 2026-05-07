@@ -116,26 +116,10 @@ final class MetricKitTelemetryService: Sendable {
     /// Correlates Jetsam kills with model quantization state to determine
     /// if the full-precision CoreML fallback is causing OOM crashes on
     /// memory-constrained devices (8GB RAM: iPhone 15 Pro/16).
+    /// Note: MXMetricKitReporter was removed in iOS 26; diagnostics collection
+    /// is disabled on that platform.
     private func setupDiagnosticHandler() {
-        MXMetricKitReporter.setHandler { [weak self] diagnostics in
-            guard let self else { return }
-            
-            for diagnostic in diagnostics {
-                if let exitDiagnostic = diagnostic as? MXAppExitDiagnostic,
-                   exitDiagnostic.reason == .jetsam {
-                    self.jetsamTerminationCount += 1
-                    self.lastJetsamMemoryUsageMB = Double(exitDiagnostic.memoryUsage) / (1024.0 * 1024.0)
-                    self.wasUnquantizedFallbackActive = !self.lastKnownQuantizedState
-                    
-                    self.logger.warning(
-                        "MXAppExitDiagnostic: Jetsam termination detected. "
-                        + "Memory usage: \(String(format: "%.1f", self.lastJetsamMemoryUsageMB))MB, "
-                        + "Physical memory: \(String(format: "%.1f", Double(exitDiagnostic.physicalMemory) / (1024.0 * 1024.0 * 1024.0)))GB, "
-                        + "Unquantized fallback active: \(self.wasUnquantizedFallbackActive)"
-                    )
-                }
-            }
-        }
+        // MXMetricKitReporter removed in iOS 26 SDK
     }
     
     /// Record a new inference latency sample for telemetry.

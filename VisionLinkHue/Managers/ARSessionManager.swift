@@ -1,6 +1,7 @@
 import ARKit
 import RealityKit
 import Foundation
+import CoreVideo
 import os
 
 /// Represents the AR session relocalization state for the HUD.
@@ -96,7 +97,7 @@ final class ARSessionManager {
         category: "ARSessionManager"
     )
     
-    private let detectionEngine: DetectionEngine
+    private let detectionEngine: any DetectionProvider
     private let spatialProjector: SpatialProjector
     private let hueClient: HueClient
     private let stateStream: HueStateStream
@@ -135,7 +136,7 @@ final class ARSessionManager {
     }
     
     init(
-        detectionEngine: DetectionEngine,
+        detectionEngine: any DetectionProvider,
         spatialProjector: SpatialProjector,
         hueClient: HueClient,
         stateStream: HueStateStream,
@@ -525,7 +526,11 @@ final class ARSessionManager {
         do {
             let detections = try await detectionEngine.processFrame(
                 frame.imageBuffer,
-                timestamp: frame.timestamp
+                timestamp: frame.timestamp,
+                displayTransform: frame.displayTransform(for: .portrait, viewportSize: CGSize(
+                    width: CGFloat(CVPixelBufferGetWidth(frame.imageBuffer)),
+                    height: CGFloat(CVPixelBufferGetHeight(frame.imageBuffer))
+                ))
             )
             
             var newFixtures: [TrackedFixture] = []

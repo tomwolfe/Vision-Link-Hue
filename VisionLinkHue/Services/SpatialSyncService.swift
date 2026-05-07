@@ -125,7 +125,7 @@ struct CRDTConflictResolver {
     static func pruneStaleEntries(
         _ clock: [String: Int64],
         deviceLastSynced: [String: Date],
-        maxAge: TimeInterval = 30 * 24 * 60 * 60,
+        maxAge: TimeInterval = 90 * 24 * 60 * 60,
         now: Date = Date()
     ) -> [String: Int64] {
         var pruned = clock
@@ -854,7 +854,7 @@ actor SpatialSyncService {
     }
 
     /// Prune stale device entries from all vector clocks to prevent unbounded growth.
-    /// Removes device IDs that haven't synchronized in over 30 days.
+    /// Removes device IDs that haven't synchronized in over 90 days.
     /// This is called after each successful sync to keep metadata lean.
     private func pruneStaleVectorClockEntries() async {
         let prunedCount = pruneVectorClocks()
@@ -868,7 +868,7 @@ actor SpatialSyncService {
     private func pruneVectorClocks() -> Int {
         var totalRemoved = 0
         let now = Date()
-        let maxAge: TimeInterval = 30 * 24 * 60 * 60
+        let maxAge: TimeInterval = 90 * 24 * 60 * 60
 
         for (fixtureKey, clock) in vectorClocks {
             let pruned = CRDTConflictResolver.pruneStaleEntries(clock, deviceLastSynced: deviceLastSynced, maxAge: maxAge, now: now)

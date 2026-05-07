@@ -23,9 +23,11 @@ struct VisionLinkHueApp: App {
             forName: UIApplication.willResignActiveNotification,
             object: nil,
             queue: .main
-        ) { _ in
-            // Flush pending telemetry records before backgrounding.
-            AppContainer.shared.telemetryService.flush()
+        ) { [weak container = AppContainer.shared] _ in
+            guard let container else { return }
+            Task { @MainActor in
+                container.telemetryService.flush()
+            }
         }
         
         center.addObserver(

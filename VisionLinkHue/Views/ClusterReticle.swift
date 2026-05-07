@@ -137,11 +137,6 @@ struct ClusterReticle: View {
         .accessibilityLabel(Text("\(cluster.label) cluster"))
         .accessibilityHint(Text("\(cluster.lightCount) fixtures detected. Tap to control all."))
         .accessibilityValue(clusterAccessibilityValueText)
-        #if !targetEnvironment(simulator)
-        if #available(iOS 26, *) {
-            .glassEffect(.liquid, alignment: .center)
-        }
-        #endif
     }
     
     // MARK: - Sub-Views

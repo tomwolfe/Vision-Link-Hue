@@ -28,6 +28,7 @@
 		32CF656269CE2229B491F8DB /* BridgeDiscoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E443EB84995113663DCA191 /* BridgeDiscoveryView.swift */; };
 		33448964B4084256F8314494 /* LocalSyncActor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD02212544A6B61F0EAC61CA /* LocalSyncActor.swift */; };
 		338734094F83463E10A63B48 /* CalibrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1421575C5E9232F749767E85 /* CalibrationTests.swift */; };
+		33B134491AC33860CF58B2AA /* NetworkPartitionSimulationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCC4DF9289B0317D2328C8D0 /* NetworkPartitionSimulationTests.swift */; };
 		347DF421084E97162E882397 /* MaterialIndexMappingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E5F4C5DF71284345BD091CC /* MaterialIndexMappingTests.swift */; };
 		35241CBE47847607497D345C /* FixtureIntentClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85DB4B54E6CDAD53C3C96DD4 /* FixtureIntentClassifier.swift */; };
 		3765CCE937030AAF783682C8 /* HueControlPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77C3C0947E5619E680836273 /* HueControlPanel.swift */; };
@@ -51,6 +52,7 @@
 		6BBB4D236CBC177B5BFCB112 /* CloudKitSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B908D5AA1D7FF12E6183A179 /* CloudKitSyncTests.swift */; };
 		6C5C4ADB0E0E63747FF8F6BE /* HueNetworkClientProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = D99BF40CD00706299667D92F /* HueNetworkClientProtocol.swift */; };
 		6F8832B09A2529FF44500541 /* FixtureHeuristicClassifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 788CFC6CAFD604FC2DE4DF7A /* FixtureHeuristicClassifierTests.swift */; };
+		704ED179E578DD4ECB03DDD3 /* SpatialDataPurgeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A55C771E59C7346185039BD4 /* SpatialDataPurgeService.swift */; };
 		7335AB60C3C527C53294FAD3 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0B2F9CD762C0B9580DDD3AD /* ContentView.swift */; };
 		73AC28EA9E04D8AAEFB51CC4 /* FixtureHeuristicClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F602CDBD2A936AAA555F9B8 /* FixtureHeuristicClassifier.swift */; };
 		7E56506D8990A271C15C25CE /* FixtureReticle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98E97358C8FE198BCF090646 /* FixtureReticle.swift */; };
@@ -68,8 +70,10 @@
 		A4A2F668534A1812B3BB567B /* ManualPlacementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89294897435D7BE69BE6D10D /* ManualPlacementView.swift */; };
 		A69057D2E31E1E5148AEB633 /* MetricKitTelemetryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2755C433361F45C3873C5641 /* MetricKitTelemetryService.swift */; };
 		AA3A2E8FB0F991B5A65BF372 /* HueDiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F0AABA3866CBBC06D7C2A5F /* HueDiscoveryService.swift */; };
+		AA634CD3948022E544293864 /* CoreMLFallbackMemoryPressureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56EE0D9643F5FC4D3C0A2568 /* CoreMLFallbackMemoryPressureTests.swift */; };
 		AB38145C91591010F7D20E59 /* MatterBridgeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20BC691405C21EED97AAC775 /* MatterBridgeService.swift */; };
 		ADA2735170B0F5910CFF8F59 /* DetectionEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49DA178056BF1F365DB4D2C5 /* DetectionEngineTests.swift */; };
+		AFA4C26C8DB6F955D2B99B48 /* Crypto in Frameworks */ = {isa = PBXBuildFile; productRef = 889F1532732AE0ED5BF3BE5B /* Crypto */; };
 		AFB64174389CA2083EC430A1 /* CameraConfigurationProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0F3DECD166E82A3F0B1149 /* CameraConfigurationProvider.swift */; };
 		B093D1DB4970EFA16ACA4B4F /* ScenePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FEED54E9BED2EDF0DDAF8EE /* ScenePickerView.swift */; };
 		B0FD97156859E176C54B288F /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C7CFE88E1083C9D9ADC6DE6 /* KeychainManager.swift */; };
@@ -98,6 +102,7 @@
 		EB73F17300BF1941C679DD9B /* GazeTargetingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8C9435878F56BEE60D5335E /* GazeTargetingTests.swift */; };
 		F4CCEC981BB611E0E3D7812D /* HueEventStreamActor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A3088B6BD175CE1AE5D13D /* HueEventStreamActor.swift */; };
 		F625796960C8A1071CF0B17F /* FixtureHeuristicClassifierSafeRangeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B637C2074DF0C87C8D4BE6A /* FixtureHeuristicClassifierSafeRangeTests.swift */; };
+		F7ED96DBF7652D82F4ADED78 /* SpatialDataPurgeServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 739277B1DF73E0D2F4836BF3 /* SpatialDataPurgeServiceTests.swift */; };
 		F897E4F964A89C76FB832BAD /* HUDOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08E7992EF63FE19E26EE84A9 /* HUDOverlay.swift */; };
 		FBBEF8AB2333181EFAF387EF /* GestureManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D266CDCD5004FE423C142F9 /* GestureManagerTests.swift */; };
 		FEA584A66F891C2B0F182DEE /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F9DCCC892C073529129A8F7 /* Extensions.swift */; };
@@ -148,6 +153,7 @@
 		49DA178056BF1F365DB4D2C5 /* DetectionEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectionEngineTests.swift; sourceTree = "<group>"; };
 		4A9DA36AF8AE778FD3621488 /* RelocalizationGuideTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelocalizationGuideTests.swift; sourceTree = "<group>"; };
 		4E5F4C5DF71284345BD091CC /* MaterialIndexMappingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaterialIndexMappingTests.swift; sourceTree = "<group>"; };
+		56EE0D9643F5FC4D3C0A2568 /* CoreMLFallbackMemoryPressureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreMLFallbackMemoryPressureTests.swift; sourceTree = "<group>"; };
 		63D52FBF9BEA54F3BB00A0A2 /* ARViewContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARViewContainer.swift; sourceTree = "<group>"; };
 		649D84142EDDA63961A9D8A8 /* LocalSyncActorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalSyncActorTests.swift; sourceTree = "<group>"; };
 		6576F829EEB4F3A614EFEF1E /* FixturePersistenceContextTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixturePersistenceContextTests.swift; sourceTree = "<group>"; };
@@ -159,6 +165,7 @@
 		6F602CDBD2A936AAA555F9B8 /* FixtureHeuristicClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureHeuristicClassifier.swift; sourceTree = "<group>"; };
 		6FBE4ED0D7F289735CA52155 /* ViewAttachmentComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewAttachmentComponents.swift; sourceTree = "<group>"; };
 		705489F3F2BF68688FA1975B /* SpatialProjectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialProjectorTests.swift; sourceTree = "<group>"; };
+		739277B1DF73E0D2F4836BF3 /* SpatialDataPurgeServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialDataPurgeServiceTests.swift; sourceTree = "<group>"; };
 		7440109DBB64D611479021C3 /* RelocalizationMonitoringService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelocalizationMonitoringService.swift; sourceTree = "<group>"; };
 		75B7B6055290E9EA88D71E02 /* MetricKitTelemetryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricKitTelemetryTests.swift; sourceTree = "<group>"; };
 		77C3C0947E5619E680836273 /* HueControlPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueControlPanel.swift; sourceTree = "<group>"; };
@@ -180,6 +187,7 @@
 		9E5E8EEB1B69F992D330E955 /* FixtureMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureMapping.swift; sourceTree = "<group>"; };
 		9FF43A6D23F49BADFF951607 /* AppContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppContainer.swift; sourceTree = "<group>"; };
 		A0D1087AA290C599B6DA95FF /* MatterDiscoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatterDiscoveryService.swift; sourceTree = "<group>"; };
+		A55C771E59C7346185039BD4 /* SpatialDataPurgeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialDataPurgeService.swift; sourceTree = "<group>"; };
 		A58A999810DADAC4665355D9 /* CertificatePinningDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertificatePinningDelegate.swift; sourceTree = "<group>"; };
 		A63E0729E60D33BA5A1C2A23 /* ObjectAnchorPersistenceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObjectAnchorPersistenceService.swift; sourceTree = "<group>"; };
 		AD02212544A6B61F0EAC61CA /* LocalSyncActor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalSyncActor.swift; sourceTree = "<group>"; };
@@ -187,6 +195,7 @@
 		B1A3088B6BD175CE1AE5D13D /* HueEventStreamActor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueEventStreamActor.swift; sourceTree = "<group>"; };
 		B6CC7C6072CFA6D940C3DBA3 /* VisionLinkHueTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = VisionLinkHueTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B908D5AA1D7FF12E6183A179 /* CloudKitSyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitSyncTests.swift; sourceTree = "<group>"; };
+		BCC4DF9289B0317D2328C8D0 /* NetworkPartitionSimulationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPartitionSimulationTests.swift; sourceTree = "<group>"; };
 		BCD263062DA119E21F6562DC /* HueSpatialService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueSpatialService.swift; sourceTree = "<group>"; };
 		C3773D6FD40A1D0C05AB37AA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C92FC31D5DC45B0FB3303855 /* SpatialSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialSyncService.swift; sourceTree = "<group>"; };
@@ -214,6 +223,17 @@
 		FBBF8203E4120722A605B455 /* SpatialSyncServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialSyncServiceTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFrameworksBuildPhase section */
+		FAFE7EA35014C6F293B635A0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AFA4C26C8DB6F955D2B99B48 /* Crypto in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
 /* Begin PBXGroup section */
 		1B87872BBF7ABBCA097A5925 /* Config */ = {
 			isa = PBXGroup;
@@ -231,6 +251,7 @@
 				A63E0729E60D33BA5A1C2A23 /* ObjectAnchorPersistenceService.swift */,
 				2B5513B637FCA1D67EE778A8 /* RelocalizationGuide.swift */,
 				7440109DBB64D611479021C3 /* RelocalizationMonitoringService.swift */,
+				A55C771E59C7346185039BD4 /* SpatialDataPurgeService.swift */,
 				C92FC31D5DC45B0FB3303855 /* SpatialSyncService.swift */,
 			);
 			path = Services;
@@ -338,6 +359,7 @@
 				1421575C5E9232F749767E85 /* CalibrationTests.swift */,
 				67293D64B00DBCFB19C2638F /* CloudKitPersistenceTests.swift */,
 				B908D5AA1D7FF12E6183A179 /* CloudKitSyncTests.swift */,
+				56EE0D9643F5FC4D3C0A2568 /* CoreMLFallbackMemoryPressureTests.swift */,
 				9CA41627C989633924FC9E30 /* CoreMLIntentClassifierTests.swift */,
 				49DA178056BF1F365DB4D2C5 /* DetectionEngineTests.swift */,
 				45ED88D4B03AEF9DFD029823 /* DetectionSettingsTests.swift */,
@@ -355,11 +377,13 @@
 				297E5CEFCA8E13FA709DCF03 /* MatterBridgeFallbackTests.swift */,
 				75B7B6055290E9EA88D71E02 /* MetricKitTelemetryTests.swift */,
 				20436443E97ED90C6AA2852D /* MockHueClient.swift */,
+				BCC4DF9289B0317D2328C8D0 /* NetworkPartitionSimulationTests.swift */,
 				EA904496E2166935941B655A /* ObjectAnchorPersistenceServiceTests.swift */,
 				F66DF5C2E40EA9D490F25A49 /* PersistenceTests.swift */,
 				9899A9F3D45F6092CA1C01E7 /* QuadrantStorageTests.swift */,
 				4A9DA36AF8AE778FD3621488 /* RelocalizationGuideTests.swift */,
 				E33BA4B54BABD90C54B4F6BA /* RelocalizationMonitoringServiceTests.swift */,
+				739277B1DF73E0D2F4836BF3 /* SpatialDataPurgeServiceTests.swift */,
 				DF9FF5ED8521E57492B18C2B /* SpatialMathTests.swift */,
 				705489F3F2BF68688FA1975B /* SpatialProjectorTests.swift */,
 				FBBF8203E4120722A605B455 /* SpatialSyncServiceTests.swift */,
@@ -451,6 +475,7 @@
 			buildPhases = (
 				C5D1D1628778AD3731DCD83E /* Sources */,
 				AB6EF97FAB2A017C138B6763 /* Resources */,
+				FAFE7EA35014C6F293B635A0 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -458,6 +483,7 @@
 			);
 			name = VisionLinkHue;
 			packageProductDependencies = (
+				889F1532732AE0ED5BF3BE5B /* Crypto */,
 			);
 			productName = VisionLinkHue;
 			productReference = DAFFF1902C936FFC20B66AAD /* VisionLinkHue.app */;
@@ -483,6 +509,9 @@
 			);
 			mainGroup = 9B2DEE114CF431DF7A46AB69;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				7986CCEB8B4601E7F9B3F325 /* XCRemoteSwiftPackageReference "swift-crypto" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 35BEC28BAA1762B791F5B167 /* Products */;
 			projectDirPath = "";
@@ -516,6 +545,7 @@
 				338734094F83463E10A63B48 /* CalibrationTests.swift in Sources */,
 				613B98CA54DB674EC90D4519 /* CloudKitPersistenceTests.swift in Sources */,
 				6BBB4D236CBC177B5BFCB112 /* CloudKitSyncTests.swift in Sources */,
+				AA634CD3948022E544293864 /* CoreMLFallbackMemoryPressureTests.swift in Sources */,
 				05578B159BCC81355FCD946C /* CoreMLIntentClassifierTests.swift in Sources */,
 				ADA2735170B0F5910CFF8F59 /* DetectionEngineTests.swift in Sources */,
 				BECE227F748EB723A042919A /* DetectionSettingsTests.swift in Sources */,
@@ -533,6 +563,7 @@
 				E3DE2410738AA93612CEF02D /* MatterBridgeFallbackTests.swift in Sources */,
 				24A3D31BAEAACB55C3A48D20 /* MetricKitTelemetryTests.swift in Sources */,
 				BD1754EB51AAA94D737475F2 /* MockHueClient.swift in Sources */,
+				33B134491AC33860CF58B2AA /* NetworkPartitionSimulationTests.swift in Sources */,
 				B4982781F22B734388396392 /* ObjectAnchorPersistenceServiceTests.swift in Sources */,
 				62A8605DB3263A88A0BCCCB5 /* PersistenceTests.swift in Sources */,
 				86AEF636508614FBF1E7997C /* QuadrantStorageTests.swift in Sources */,
@@ -540,6 +571,7 @@
 				53B7F783FF3B539180DC3377 /* RelocalizationMonitoringServiceTests.swift in Sources */,
 				06ABF50A4BDFDB52963FCE5F /* SSELifecycleTests.swift in Sources */,
 				D3E87C8ACC7E85F0AD8D544C /* SSEStressTests.swift in Sources */,
+				F7ED96DBF7652D82F4ADED78 /* SpatialDataPurgeServiceTests.swift in Sources */,
 				C35A9803FA2101A929F1E93E /* SpatialMathTests.swift in Sources */,
 				29BA3BD4BA9E48D3E85CF905 /* SpatialProjectorTests.swift in Sources */,
 				4771EB5EBD167CB9E9939D24 /* SpatialSyncServiceTests.swift in Sources */,
@@ -602,6 +634,7 @@
 				532949754C9D06A1539ABF00 /* SpatialCalibrationEngine.swift in Sources */,
 				969BEEE2637704A74A043D4D /* SpatialCalibrationPersistenceStore.swift in Sources */,
 				9674C7B1524AF0BEB3FDF291 /* SpatialClusterEngine.swift in Sources */,
+				704ED179E578DD4ECB03DDD3 /* SpatialDataPurgeService.swift in Sources */,
 				B17E8F67EC750B5A66AD65EA /* SpatialInputHandler.swift in Sources */,
 				4EBD8F5E9DC7711DC5B9505A /* SpatialMath.swift in Sources */,
 				11B44BA2FD7378C702D08504 /* SpatialProjector.swift in Sources */,
@@ -846,6 +879,25 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		7986CCEB8B4601E7F9B3F325 /* XCRemoteSwiftPackageReference "swift-crypto" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-crypto.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		889F1532732AE0ED5BF3BE5B /* Crypto */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7986CCEB8B4601E7F9B3F325 /* XCRemoteSwiftPackageReference "swift-crypto" */;
+			productName = Crypto;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = D9FB3B583B9DCE05B48D2757 /* Project object */;
 }

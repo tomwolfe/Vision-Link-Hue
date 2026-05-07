@@ -9,7 +9,7 @@ import os
 /// (point clouds, world maps, fixture coordinates) must provide
 /// a mechanism for the OS to request purging of this data.
 /// This aligns with the spatial data minimization principle.
-enum SpatialDataType: CaseIterable, Sendable {
+enum SpatialDataType: CaseIterable, Sendable, RawRepresentable {
     /// ARKit point cloud data used for scene reconstruction.
     case pointCloud
     
@@ -27,6 +27,29 @@ enum SpatialDataType: CaseIterable, Sendable {
     
     /// Local sync P2P coordinate caches.
     case localSyncCaches
+    
+    var rawValue: String {
+        switch self {
+        case .pointCloud: return "pointCloud"
+        case .worldMap: return "worldMap"
+        case .fixtureCoordinates: return "fixtureCoordinates"
+        case .objectAnchors: return "objectAnchors"
+        case .calibrationTransforms: return "calibrationTransforms"
+        case .localSyncCaches: return "localSyncCaches"
+        }
+    }
+    
+    init(rawValue: String) {
+        switch rawValue {
+        case "pointCloud": self = .pointCloud
+        case "worldMap": self = .worldMap
+        case "fixtureCoordinates": self = .fixtureCoordinates
+        case "objectAnchors": self = .objectAnchors
+        case "calibrationTransforms": self = .calibrationTransforms
+        case "localSyncCaches": self = .localSyncCaches
+        default: self = .pointCloud
+        }
+    }
     
     /// Whether this data type contains sensitive spatial topology.
     var isSensitiveTopology: Bool {
@@ -165,7 +188,7 @@ final class SpatialDataPurgeService: Sendable {
         }
         
         isPurging = false
-        logger.info("Spatial data purge complete. Purged: \(purgedTypes.map { $0.rawValue }.joined(separator: ", "))")
+        logger.info("Spatial data purge complete. Purged: \(self.purgedTypes.map { $0.rawValue }.joined(separator: ", "))")
         onPurgeComplete?(purgedTypes)
     }
     
@@ -293,16 +316,16 @@ final class SpatialDataPurgeService: Sendable {
 }
 
 /// Protocol for services that can purge fixture coordinates.
-protocol FixtureCoordinatPurgeable: AnyObject {
+protocol FixtureCoordinatPurgeable: AnyObject, Sendable {
     func purgeAllCoordinates() async throws
 }
 
 /// Protocol for services that can purge object anchor archetypes.
-protocol ObjectAnchorPurgeable: AnyObject {
+protocol ObjectAnchorPurgeable: AnyObject, Sendable {
     func purgeAllArchetypes() async
 }
 
 /// Protocol for stores that can purge calibration transforms.
-protocol CalibrationPurgeable: AnyObject {
+protocol CalibrationPurgeable: AnyObject, Sendable {
     func purgeCalibration() async
 }

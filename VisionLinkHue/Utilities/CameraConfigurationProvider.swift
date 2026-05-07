@@ -10,9 +10,6 @@ protocol CameraConfigurationProvider {
     /// Returns device intrinsics on real hardware, simulator fallback on simulator.
     var intrinsics: CameraIntrinsics { get }
     
-    /// Returns the world reconstruction mode for the current environment.
-    var worldReconstructionMode: Int? { get }
-    
     /// Returns the appropriate anchor type for the current environment.
     func makeWorldAnchor() -> AnchorEntity
 }
@@ -29,45 +26,21 @@ final class DefaultCameraConfigurationProvider: CameraConfigurationProvider {
     
     var intrinsics: CameraIntrinsics {
         #if !targetEnvironment(simulator)
-        if let frame, let intrinsics = frame.camera.intrinsics {
-            return CameraIntrinsics(intrinsics)
+        if let frame {
+            return CameraIntrinsics(frame.camera.intrinsics)
         }
         #endif
         return CameraIntrinsics(k0: 1.0, k4: 1.0, k2: 0.5, k5: 0.5)
     }
     
-    var worldReconstructionMode: Int? {
-        #if !targetEnvironment(simulator)
-        if #available(iOS 26, *) {
-            return 1
-        }
-        return nil
-        #else
-        return nil
-        #endif
-    }
-    
     func makeWorldAnchor() -> AnchorEntity {
-        #if !targetEnvironment(simulator)
-        if #available(iOS 26, *) {
-            return AnchorEntity.world()
-        }
-        return AnchorEntity()
-        #else
-        return AnchorEntity()
-        #endif
+        AnchorEntity()
     }
 }
 
 /// Provides the default plane detection configuration for the current environment.
 extension ARWorldTrackingConfiguration {
     func configuredWithEnvironment() -> ARWorldTrackingConfiguration {
-        #if !targetEnvironment(simulator)
-        if #available(iOS 26, *) {
-            self.worldReconstructionMode = .automatic
-            self.lightEstimation = .automatic
-        }
-        #endif
         self.planeDetection = [.horizontal, .vertical]
         return self
     }

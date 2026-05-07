@@ -40,18 +40,28 @@ final class FixtureMapping {
     var isSyncedToBridge: Bool
     
     /// Bridge room-space X coordinate (source of truth for persistence).
+    /// Marked ephemeral to exclude from device backups per 2026 Sensitive Topology audit.
+    @Attribute(.ephemeral)
     var bridgePositionX: Float?
     
     /// Bridge room-space Y coordinate (source of truth for persistence).
+    /// Marked ephemeral to exclude from device backups per 2026 Sensitive Topology audit.
+    @Attribute(.ephemeral)
     var bridgePositionY: Float?
     
     /// Bridge room-space Z coordinate (source of truth for persistence).
+    /// Marked ephemeral to exclude from device backups per 2026 Sensitive Topology audit.
+    @Attribute(.ephemeral)
     var bridgePositionZ: Float?
     
     /// Room ID assigned via manual placement mode (older Bridge hardware).
+    /// Marked ephemeral to exclude from device backups per 2026 Sensitive Topology audit.
+    @Attribute(.ephemeral)
     var roomId: String?
     
     /// Area/zone ID assigned via manual placement mode (older Bridge hardware).
+    /// Marked ephemeral to exclude from device backups per 2026 Sensitive Topology audit.
+    @Attribute(.ephemeral)
     var areaId: String?
     
     init(

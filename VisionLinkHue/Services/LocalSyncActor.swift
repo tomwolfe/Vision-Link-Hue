@@ -1,7 +1,7 @@
 import Foundation
 import os
 import UIKit
-import CryptoKit
+import Crypto
 
 /// Represents a device in the local P2P network.
 struct LocalDevice: Sendable, Identifiable, Hashable {
@@ -287,7 +287,7 @@ struct EncryptionConfiguration: Sendable {
     let sessionKeyLifetimeSeconds: TimeInterval
     
     static let `default` = EncryptionConfiguration(
-        `protocol`: .recommended,
+        protocol: .recommended,
         preSharedKey: nil,
         requireEncryption: true,
         maxMessageSize: 65536,
@@ -318,10 +318,10 @@ struct NoisePeerSession: Sendable {
     let establishedAt: Date
     
     /// Ephemeral key pair used for this session (forward secrecy).
-    let ephemeralPublicKey: Curve25519.PublicKey
+    let ephemeralPublicKey: Crypto.Curve25519.KeyAgreement.PublicKey
     
     /// Remote ephemeral public key from the handshake.
-    let remoteEphemeralPublicKey: Curve25519.PublicKey
+    let remoteEphemeralPublicKey: Crypto.Curve25519.KeyAgreement.PublicKey
 }
 
 /// Transport encryption layer implementing Noise Protocol XX with
@@ -376,7 +376,7 @@ final class LocalSyncEncryption: Sendable {
     /// Static X25519 key pair for this device. Generated once on
     /// initialization and used for all handshakes. Provides long-term
     /// identity binding between devices.
-    private let staticKeyPair: Curve25519.KeyPair
+    private let staticKeyPair: Crypto.Curve25519.KeyAgreement.PrivateKey
     
     /// Per-peer encrypted sessions. Maps remote device ID to its
     /// active session state, including derived keys and nonces.
@@ -384,7 +384,7 @@ final class LocalSyncEncryption: Sendable {
     
     /// The encryption configuration governing protocol selection,
     /// key lifetime, and encryption requirements.
-    private let configuration: EncryptionConfiguration
+    fileprivate let configuration: EncryptionConfiguration
     
     /// Logger for encryption operations.
     private let logger = Logger(
@@ -396,7 +396,7 @@ final class LocalSyncEncryption: Sendable {
     /// - Parameter configuration: The encryption configuration to use.
     init(configuration: EncryptionConfiguration) {
         self.configuration = configuration
-        self.staticKeyPair = Curve25519.KeyPair()
+        self.staticKeyPair = Crypto.Curve25519.KeyAgreement.PrivateKey()
     }
     
     /// Begin the Noise Protocol XX handshake with a remote device.
@@ -412,7 +412,7 @@ final class LocalSyncEncryption: Sendable {
             return nil
         }
         
-        let ephemeralKeyPair = Curve25519.KeyPair()
+        let ephemeralKeyPair = Crypto.Curve25519.KeyAgreement.PrivateKey()
         
         let payload = HandshakeInitPayload(
             messageId: UUID().uuidString,
@@ -431,11 +431,11 @@ final class LocalSyncEncryption: Sendable {
     
     /// Pending ephemeral key pairs for handshakes in progress.
     /// Cleared once the handshake completes or times out.
-    private var pendingHandshakeEphemeralKeys: [String: Curve25519.KeyPair] = [:]
+    private var pendingHandshakeEphemeralKeys: [String: Crypto.Curve25519.KeyAgreement.PrivateKey] = [:]
     
     /// Pending remote static public keys received from handshake initiators.
     /// Used to complete the `es` and `ss` DH computations.
-    private var pendingRemoteStaticKeys: [String: Curve25519.PublicKey] = [:]
+    private var pendingRemoteStaticKeys: [String: Crypto.Curve25519.KeyAgreement.PublicKey] = [:]
     
     /// Complete the handshake after receiving the responder's message.
     /// Computes all four DH shares and derives session keys.
@@ -452,15 +452,22 @@ final class LocalSyncEncryption: Sendable {
             return false
         }
         
-        guard let remoteEphemeralData = Data(base64Encoded: response.ephemeralPublicKey),
-              let remoteEphemeral = Curve25519.PublicKey(rawRepresentation: remoteEphemeralData) else {
+        guard let remoteEphemeralData = Data(base64Encoded: response.ephemeralPublicKey) else {
             logger.error("Invalid remote ephemeral public key in handshake response")
             return false
         }
-        
+
+        let remoteEphemeral: Crypto.Curve25519.KeyAgreement.PublicKey
+        do {
+            remoteEphemeral = try Crypto.Curve25519.KeyAgreement.PublicKey(rawRepresentation: remoteEphemeralData)
+        } catch {
+            logger.error("Invalid remote ephemeral public key in handshake response")
+            return false
+        }
+
         return finalizeSession(
             remoteDeviceID: response.messageId,
-            ourEphemeral: ourEphemeral,
+            ourEphemeral: ourEphemeral.publicKey,
             ourStatic: staticKeyPair.publicKey,
             remoteEphemeral: remoteEphemeral,
             remoteStatic: pendingRemoteStaticKeys[response.messageId] ?? staticKeyPair.publicKey
@@ -478,19 +485,33 @@ final class LocalSyncEncryption: Sendable {
             return nil
         }
         
-        guard let remoteEphemeralData = Data(base64Encoded: `init`.ephemeralPublicKey),
-              let remoteEphemeral = Curve25519.PublicKey(rawRepresentation: remoteEphemeralData) else {
+        guard let remoteEphemeralData = Data(base64Encoded: `init`.ephemeralPublicKey) else {
             logger.error("Invalid remote ephemeral public key in handshake init")
             return nil
         }
-        
-        guard let remoteStaticData = Data(base64Encoded: `init`.staticPublicKey),
-              let remoteStatic = Curve25519.PublicKey(rawRepresentation: remoteStaticData) else {
+
+        let remoteEphemeral: Crypto.Curve25519.KeyAgreement.PublicKey
+        do {
+            remoteEphemeral = try Crypto.Curve25519.KeyAgreement.PublicKey(rawRepresentation: remoteEphemeralData)
+        } catch {
+            logger.error("Invalid remote ephemeral public key in handshake init")
+            return nil
+        }
+
+        guard let remoteStaticData = Data(base64Encoded: `init`.staticPublicKey) else {
             logger.error("Invalid remote static public key in handshake init")
             return nil
         }
-        
-        let ourEphemeral = Curve25519.KeyPair()
+
+        let remoteStatic: Crypto.Curve25519.KeyAgreement.PublicKey
+        do {
+            remoteStatic = try Crypto.Curve25519.KeyAgreement.PublicKey(rawRepresentation: remoteStaticData)
+        } catch {
+            logger.error("Invalid remote static public key in handshake init")
+            return nil
+        }
+
+        let ourEphemeral = Crypto.Curve25519.KeyAgreement.PrivateKey()
         
         guard finalizeSession(
             remoteDeviceID: `init`.deviceID,
@@ -524,10 +545,10 @@ final class LocalSyncEncryption: Sendable {
     @discardableResult
     private func finalizeSession(
         remoteDeviceID: String,
-        ourEphemeral: Curve25519.PublicKey,
-        ourStatic: Curve25519.PublicKey,
-        remoteEphemeral: Curve25519.PublicKey,
-        remoteStatic: Curve25519.PublicKey
+        ourEphemeral: Crypto.Curve25519.KeyAgreement.PublicKey,
+        ourStatic: Crypto.Curve25519.KeyAgreement.PublicKey,
+        remoteEphemeral: Crypto.Curve25519.KeyAgreement.PublicKey,
+        remoteStatic: Crypto.Curve25519.KeyAgreement.PublicKey
     ) -> Bool {
         do {
             // Compute all four DH shares for Noise_XX.
@@ -536,45 +557,44 @@ final class LocalSyncEncryption: Sendable {
             
             // Note: For the initiator, `ourEphemeral` comes from
             // `pendingHandshakeEphemeralKeys`. For the responder, it's freshly generated.
-            let ourEphemeralPair: Curve25519.KeyPair
+            let ourEphemeralPair: Crypto.Curve25519.KeyAgreement.PrivateKey
             if let pending = pendingHandshakeEphemeralKeys[remoteDeviceID] {
                 ourEphemeralPair = pending
             } else {
-                ourEphemeralPair = Curve25519.KeyPair()
+                ourEphemeralPair = Crypto.Curve25519.KeyAgreement.PrivateKey()
             }
-            
+
             // ee = DH(ourEphemeral, remoteEphemeral) - forward secrecy
-            let eeShared = try ourEphemeralPair.sharedSecretFromKeyExchange(with: remoteEphemeral)
-            
+            let eeShared = try ourEphemeralPair.sharedSecretFromKeyAgreement(with: remoteEphemeral)
+
             // se = DH(ourStatic, remoteEphemeral) - initiator authentication
-            let seShared = try staticKeyPair.sharedSecretFromKeyExchange(with: remoteEphemeral)
-            
+            let seShared = try staticKeyPair.sharedSecretFromKeyAgreement(with: remoteEphemeral)
+
             // es = DH(ourEphemeral, remoteStatic) - responder authentication
-            let esShared = try ourEphemeralPair.sharedSecretFromKeyExchange(with: remoteStatic)
-            
+            let esShared = try ourEphemeralPair.sharedSecretFromKeyAgreement(with: remoteStatic)
+
             // ss = DH(ourStatic, remoteStatic) - long-term binding
-            let ssShared = try staticKeyPair.sharedSecretFromKeyExchange(with: remoteStatic)
+            let ssShared = try staticKeyPair.sharedSecretFromKeyAgreement(with: remoteStatic)
             
             // Concatenate all DH outputs for HKDF input key material.
             var ikm = Data()
-            ikm.append(eeShared.rawRepresentation)
-            ikm.append(seShared.rawRepresentation)
-            ikm.append(esShared.rawRepresentation)
-            ikm.append(ssShared.rawRepresentation)
-            
+            ikm.append(extractSharedSecretBytes(eeShared))
+            ikm.append(extractSharedSecretBytes(seShared))
+            ikm.append(extractSharedSecretBytes(esShared))
+            ikm.append(extractSharedSecretBytes(ssShared))
+
             // Derive session keys using HKDF-SHA256.
-            let salt = SymmetricKey(data: Data(repeating: 0, count: 32))
-            let info = "VisionLinkHue-NoiseXX-SessionKey".data(using: .utf8)!
-            
-            let hkdf = HKDF<algorithm: SHA256>(inputKeyMaterial: ikm)
-            guard let derivedKey = hkdf.deriveKey(using: salt, info: info, outputByteCount: 64) else {
-                logger.error("HKDF key derivation failed")
-                return false
-            }
-            
+            let derivedKey = eeShared.hkdfDerivedSymmetricKey(
+                using: SHA256.self,
+                salt: ikm,
+                sharedInfo: Data("VisionLinkHue-NoiseXX-SessionKey".utf8),
+                outputByteCount: 64
+            )
+
             // Split into send and receive keys (32 bytes each for AES-256).
-            let sendKey = SymmetricKey(data: Data(derivedKey.prefix(32)))
-            let receiveKey = SymmetricKey(data: Data(derivedKey.suffix(32)))
+            let keyBytes = symmetricKeyToData(derivedKey)
+            let sendKey = SymmetricKey(data: keyBytes.prefix(32))
+            let receiveKey = SymmetricKey(data: keyBytes.suffix(32))
             
             // Store the session.
             peerSessions[remoteDeviceID] = NoisePeerSession(
@@ -617,20 +637,20 @@ final class LocalSyncEncryption: Sendable {
         }
         
         // Construct the 96-bit nonce from the counter.
-        let nonceBytes = withUnsafeBytes(of: session.sendNonce.bigEndian, Data.init)
-        let nonce = AES.GCM.Nonce(rawBytes: nonceBytes)
-        
+        let nonceBytes = withUnsafeBytes(of: session.sendNonce.bigEndian) { Data($0) }
+
         do {
+            let nonce = try AES.GCM.Nonce(data: nonceBytes)
             let sealedBox = try AES.GCM.seal(data, using: session.sendKey, nonce: nonce)
             session.sendNonce += 1
             peerSessions[remoteDeviceID] = session
-            
+
             // Assemble: nonce + ciphertext + tag
             var result = Data()
-            result.append(sealedBox.nonce.rawBytes)
+            sealedBox.nonce.withUnsafeBytes { result.append(Data($0)) }
             result.append(sealedBox.ciphertext)
             result.append(sealedBox.tag)
-            
+
             return result
         } catch {
             logger.error("AES-GCM encryption failed: \(error.localizedDescription)")
@@ -661,13 +681,13 @@ final class LocalSyncEncryption: Sendable {
         
         // Parse: nonce (12) + ciphertext (variable) + tag (16)
         let nonceBytes = Array(data.prefix(12))
-        let nonce = AES.GCM.Nonce(rawBytes: nonceBytes)
         let tagStart = data.count - 16
         let ciphertext = Data(data[12..<tagStart])
         let tagBytes = Array(data[tagStart...])
-        
+
         do {
-            let sealedBox = AES.GCM.SealedBox(nonce: nonce, ciphertext: ciphertext, tag: tagBytes)
+            let nonce = try AES.GCM.Nonce(data: nonceBytes)
+            let sealedBox = try AES.GCM.SealedBox(nonce: nonce, ciphertext: ciphertext, tag: tagBytes)
             let plaintext = try AES.GCM.open(sealedBox, using: session.receiveKey)
             
             session.receiveNonce += 1
@@ -986,7 +1006,7 @@ final class LocalSyncActor {
             }
             
         case .ack(let ackId):
-            pendingAcks.removeValue(forKey: ackId)?.(.success(()))
+            pendingAcks.removeValue(forKey: ackId)?(.success(()))
             
         case .handshakeInit(let initPayload):
             await handleHandshakeInit(initPayload, from: senderID)
@@ -1435,4 +1455,18 @@ final class MDNSBrowser: Sendable {
         isActive = false
         logger.debug("mDNS browser stopped")
     }
+}
+
+func extractSharedSecretBytes(_ secret: Crypto.SharedSecret) -> Data {
+    let extracted = secret.hkdfDerivedSymmetricKey(
+        using: SHA256.self,
+        salt: Data(),
+        sharedInfo: Data(),
+        outputByteCount: 32
+    )
+    return Data(extracted.withUnsafeBytes { $0 })
+}
+
+func symmetricKeyToData(_ key: Crypto.SymmetricKey) -> Data {
+    return Data(key.withUnsafeBytes { $0 })
 }
