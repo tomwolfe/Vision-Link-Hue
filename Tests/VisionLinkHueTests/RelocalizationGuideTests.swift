@@ -34,6 +34,7 @@ final class RelocalizationGuideTests: XCTestCase {
         XCTAssertEqual(LookDirection.down.instruction, "Look down to help reconnect")
         XCTAssertEqual(LookDirection.closer.instruction, "Move your device closer to the room")
         XCTAssertEqual(LookDirection.farther.instruction, "Move your device farther from the room")
+        XCTAssertEqual(LookDirection.lowLight.instruction, "Turn on a light to improve tracking")
         XCTAssertEqual(LookDirection.none.instruction, "Move your device slowly to help the app reconnect")
     }
     
@@ -44,6 +45,7 @@ final class RelocalizationGuideTests: XCTestCase {
         XCTAssertEqual(LookDirection.down.icon, "arrow.down.circle.fill")
         XCTAssertEqual(LookDirection.closer.icon, "arrow.inward.circle.fill")
         XCTAssertEqual(LookDirection.farther.icon, "arrow.outward.circle.fill")
+        XCTAssertEqual(LookDirection.lowLight.icon, "lightbulb.circle.fill")
         XCTAssertEqual(LookDirection.none.icon, "arrow.forward.circle")
     }
     

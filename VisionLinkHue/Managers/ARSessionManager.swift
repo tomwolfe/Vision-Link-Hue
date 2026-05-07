@@ -31,6 +31,8 @@ enum LookDirection: Sendable, Equatable {
     case closer
     /// Move the device farther from the environment.
     case farther
+    /// Low light conditions detected; prompt user to illuminate the room.
+    case lowLight
     /// Quadrant-based environmental guidance with specific direction description.
     case environmental(description: String, icon: String)
     
@@ -44,6 +46,7 @@ enum LookDirection: Sendable, Equatable {
         case .down: return "Look down to help reconnect"
         case .closer: return "Move your device closer to the room"
         case .farther: return "Move your device farther from the room"
+        case .lowLight: return "Turn on a light to improve tracking"
         case .environmental(let description, _): return description
         }
     }
@@ -58,6 +61,7 @@ enum LookDirection: Sendable, Equatable {
         case .down: return "arrow.down.circle.fill"
         case .closer: return "arrow.inward.circle.fill"
         case .farther: return "arrow.outward.circle.fill"
+        case .lowLight: return "lightbulb.circle.fill"
         case .environmental(_, let icon): return icon
         }
     }

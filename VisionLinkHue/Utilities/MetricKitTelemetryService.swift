@@ -1,6 +1,7 @@
 import Foundation
 import os
 import UIKit
+import MetricKit
 
 /// Telemetry records for local telemetry collection.
 /// Captures thermal state, inference latency, and battery metrics
@@ -65,6 +66,9 @@ enum SiliconGeneration: String, Sendable {
 /// Collects thermal/battery telemetry for correlation analysis.
 /// Tracks `ThermalPredictiveModel` slope thresholds with
 /// real-world device thermals across A15–M4 chips.
+/// Subscribes to `MXAppExitDiagnostic` to track Jetsam terminations
+/// on memory-constrained devices (8GB RAM: iPhone 15 Pro/16) when the
+/// unquantized CoreML fallback is active.
 @MainActor
 final class MetricKitTelemetryService: Sendable {
     
@@ -80,6 +84,22 @@ final class MetricKitTelemetryService: Sendable {
     /// Number of records collected since last submission.
     private var pendingCount: Int = 0
     
+    /// Most recent model quantization state for Jetsam correlation.
+    /// Updated on each `recordInference` call so that exit diagnostics
+    /// can be correlated with whether the full-precision fallback was active.
+    private var lastKnownQuantizedState: Bool = true
+    
+    /// Total Jetsam terminations observed since app launch.
+    var jetsamTerminationCount: Int = 0
+    
+    /// Peak memory usage (MB) at the time of the last Jetsam event.
+    var lastJetsamMemoryUsageMB: Double = 0
+    
+    /// Whether the unquantized model fallback was active at the time
+    /// of the last Jetsam termination. `true` indicates the full-precision
+    /// model was likely the cause of the OOM kill.
+    var wasUnquantizedFallbackActive: Bool = false
+    
     private let logger = Logger(
         subsystem: "com.tomwolfe.visionlinkhue",
         category: "MetricKitTelemetry"
@@ -89,6 +109,33 @@ final class MetricKitTelemetryService: Sendable {
     /// - Parameter isEnabled: Whether telemetry collection is enabled.
     init(isEnabled: Bool = true) {
         self.isEnabled = isEnabled
+        setupDiagnosticHandler()
+    }
+    
+    /// Subscribe to `MXAppExitDiagnostic` to track unexpected terminations.
+    /// Correlates Jetsam kills with model quantization state to determine
+    /// if the full-precision CoreML fallback is causing OOM crashes on
+    /// memory-constrained devices (8GB RAM: iPhone 15 Pro/16).
+    private func setupDiagnosticHandler() {
+        MXMetricKitReporter.setHandler { [weak self] diagnostics in
+            guard let self else { return }
+            
+            for diagnostic in diagnostics {
+                if let exitDiagnostic = diagnostic as? MXAppExitDiagnostic,
+                   exitDiagnostic.reason == .jetsam {
+                    self.jetsamTerminationCount += 1
+                    self.lastJetsamMemoryUsageMB = Double(exitDiagnostic.memoryUsage) / (1024.0 * 1024.0)
+                    self.wasUnquantizedFallbackActive = !self.lastKnownQuantizedState
+                    
+                    self.logger.warning(
+                        "MXAppExitDiagnostic: Jetsam termination detected. "
+                        + "Memory usage: \(String(format: "%.1f", self.lastJetsamMemoryUsageMB))MB, "
+                        + "Physical memory: \(String(format: "%.1f", Double(exitDiagnostic.physicalMemory) / (1024.0 * 1024.0 * 1024.0)))GB, "
+                        + "Unquantized fallback active: \(self.wasUnquantizedFallbackActive)"
+                    )
+                }
+            }
+        }
     }
     
     /// Record a new inference latency sample for telemetry.
@@ -112,6 +159,8 @@ final class MetricKitTelemetryService: Sendable {
         isModelQuantized: Bool
     ) {
         guard isEnabled else { return }
+        
+        lastKnownQuantizedState = isModelQuantized
         
         let batteryLevel = Self.getBatteryLevel()
         let isPluggedIn = Self.isPluggedIn()

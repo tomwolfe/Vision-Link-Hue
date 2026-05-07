@@ -187,6 +187,11 @@ final class RelocalizationGuide {
     /// Maximum valid depth value in meters (filters out far-away pixels).
     private let maxValidDepth: Float = 10.0
     
+    /// Minimum depth coverage ratio to avoid low-light false positives.
+    /// Below this threshold (1% of sampled pixels are valid depth), combined
+    /// with high entropy (uniform distribution), we trigger a low-light hint.
+    private let minDepthCoverageRatio: Float = 0.01
+    
     /// Initialize the relocalization guide.
     init() {}
     
@@ -491,6 +496,15 @@ final class RelocalizationGuide {
         }
         
         let entropy = densities.entropy()
+        let maxEntropy = Float(log(4.0))
+        
+        let totalValidDepth = quadrantCounts.total()
+        let maxPossibleDepth = pixelCountPerQuadrant * 4
+        let depthCoverage = Float(totalValidDepth) / Float(maxPossibleDepth)
+        
+        if depthCoverage < minDepthCoverageRatio, entropy > maxEntropy * 0.7 {
+            return .lowLight
+        }
         
         let sparsestIdx = densities.sparsest()
         let richestIdx = densities.richest()
@@ -500,7 +514,6 @@ final class RelocalizationGuide {
             return .none
         }
         
-        let maxEntropy = Float(log(4.0))
         if entropy > maxEntropy * 0.85 {
             return .none
         }

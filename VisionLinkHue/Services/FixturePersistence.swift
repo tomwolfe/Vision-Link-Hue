@@ -777,6 +777,7 @@ actor FixturePersistence {
     ///   a context save and reset. Defaults to 50.
     func checkpointContext(batchSize: Int = 50) async {
         do {
+            modelContext.processPendingChanges()
             let isolatedContext = ModelContext(modelContainer)
             try isolatedContext.save()
             logger.debug("Model context checkpointed via isolated context and memory reclaimed")
@@ -793,6 +794,7 @@ actor FixturePersistence {
     /// modifications from other app components sharing the main context.
     func flushContext() async {
         do {
+            modelContext.processPendingChanges()
             let isolatedContext = ModelContext(modelContainer)
             try isolatedContext.save()
             logger.debug("Model context flushed via isolated context and memory reclaimed")

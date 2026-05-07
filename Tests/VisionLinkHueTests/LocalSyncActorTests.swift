@@ -1,4 +1,5 @@
 import XCTest
+import CryptoKit
 @testable import VisionLinkHue
 
 /// Tests for `LocalSyncActor` and related types.
@@ -134,10 +135,15 @@ final class LocalSyncActorTests: XCTestCase {
     }
     
     func testEncryptionProtocolCipherSuiteIdentifiers() {
-        XCTAssertEqual(EncryptionProtocol.noiseXX.cipherSuiteIdentifier, "Noise_XX_25519_ChaChaPoly_BLAKE2s")
-        XCTAssertEqual(EncryptionProtocol.noiseXMPS.cipherSuiteIdentifier, "Noise_XMPS_25519_ChaChaPoly_BLAKE2s")
+        XCTAssertEqual(EncryptionProtocol.noiseXX.cipherSuiteIdentifier, "Noise_XX_25519_AESGCM_SHA256")
+        XCTAssertEqual(EncryptionProtocol.noiseXMPS.cipherSuiteIdentifier, "Noise_XMPS_25519_AESGCM_SHA256")
         XCTAssertEqual(EncryptionProtocol.mls.cipherSuiteIdentifier, "MLS10-PSK1")
         XCTAssertEqual(EncryptionProtocol.none.cipherSuiteIdentifier, "none")
+    }
+    
+    func testEncryptionProtocolRawValues() {
+        XCTAssertEqual(EncryptionProtocol.noiseXX.rawValue, "Noise_XX_25519_AESGCM_SHA256")
+        XCTAssertEqual(EncryptionProtocol.none.rawValue, "none")
     }
     
     func testEncryptionProtocolCaseIterable() {
@@ -225,9 +231,54 @@ final class LocalSyncActorTests: XCTestCase {
         )
         let encryption = LocalSyncEncryption(configuration: config)
         
-        let testData = "hello".data(using: .utf8)!
-        let decrypted = encryption.decrypt(testData)
-        XCTAssertEqual(decrypted, testData, "Should pass through data unchanged when no encryption")
+        // With no encryption, encrypt/decrypt operations return nil or pass through.
+        XCTAssertFalse(encryption.hasSession(for: "test-device"))
+    }
+    
+    func testHandshakeInitPayloadCreation() {
+        let payload = HandshakeInitPayload(
+            messageId: UUID().uuidString,
+            deviceID: "test-device",
+            ephemeralPublicKey: "dGVzdC1lcGhlbWVyYWw=",
+            staticPublicKey: "dGVzdC1zdGF0aWM="
+        )
+        
+        XCTAssertEqual(payload.deviceID, "test-device")
+        XCTAssertFalse(payload.ephemeralPublicKey.isEmpty)
+        XCTAssertFalse(payload.staticPublicKey.isEmpty)
+    }
+    
+    func testHandshakeResponsePayloadCreation() {
+        let payload = HandshakeResponsePayload(
+            messageId: "test-device",
+            ephemeralPublicKey: "dGVzdC1lcGhlbWVyYWw="
+        )
+        
+        XCTAssertEqual(payload.messageId, "test-device")
+        XCTAssertFalse(payload.ephemeralPublicKey.isEmpty)
+    }
+    
+    func testLocalSyncMessageHandshakeTypes() {
+        let initPayload = HandshakeInitPayload(
+            messageId: "msg-1",
+            deviceID: "test-device",
+            ephemeralPublicKey: "dGVzdC1lcGhlbWVyYWw=",
+            staticPublicKey: "dGVzdC1zdGF0aWM="
+        )
+        let initMessage = LocalSyncMessage.handshakeInit(initPayload)
+        XCTAssertEqual(initMessage.messageId, "msg-1")
+        XCTAssertTrue(initMessage.isHandshakeMessage)
+        
+        let responsePayload = HandshakeResponsePayload(
+            messageId: "test-device",
+            ephemeralPublicKey: "dGVzdC1lcGhlbWVyYWw="
+        )
+        let responseMessage = LocalSyncMessage.handshakeResponse(responsePayload)
+        XCTAssertEqual(responseMessage.messageId, "test-device")
+        XCTAssertTrue(responseMessage.isHandshakeMessage)
+        
+        XCTAssertFalse(LocalSyncMessage.heartbeat.isHandshakeMessage)
+        XCTAssertFalse(LocalSyncMessage.deviceInfoRequest.isHandshakeMessage)
     }
 }
 

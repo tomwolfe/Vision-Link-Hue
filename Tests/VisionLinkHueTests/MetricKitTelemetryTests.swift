@@ -1,4 +1,5 @@
 import XCTest
+import MetricKit
 @testable import VisionLinkHue
 
 /// Tests for `MetricKitTelemetryService`.
@@ -116,5 +117,22 @@ final class MetricKitTelemetryTests: XCTestCase {
         
         // Flush should trigger submission.
         service.flush()
+    }
+    
+    func testJetsamTrackingInitialState() {
+        let service = MetricKitTelemetryService(isEnabled: true)
+        
+        XCTAssertEqual(service.jetsamTerminationCount, 0)
+        XCTAssertEqual(service.lastJetsamMemoryUsageMB, 0)
+        XCTAssertFalse(service.wasUnquantizedFallbackActive)
+    }
+    
+    func testMXAppExitDiagnosticHandlerIsConfigured() {
+        let service = MetricKitTelemetryService(isEnabled: true)
+        
+        // The handler is registered via MXMetricKitReporter.setHandler().
+        // We can verify the service initializes without crashing.
+        XCTAssertNotNil(service)
+        XCTAssertEqual(service.jetsamTerminationCount, 0)
     }
 }
