@@ -79,28 +79,46 @@ actor HueEventStreamActor {
     /// Connection health metrics for adaptive reconnection tuning.
     private(set) var connectionHealthMetrics = SSEConnectionHealthMetrics()
     
+    /// Sliding-window deduplication cache for light state updates.
+    /// Maps light resource ID to the most recent state hash. When a new event
+    /// arrives with an identical hash, it's skipped to prevent buffer thrashing
+    /// during rapid bridge firmware updates or large ecosystem sync bursts (60+ lights).
+    /// The cache is keyed by light ID, with the hash being a compact representation
+    /// of the light's on/brightness/color state.
+    private var deduplicationCache: [String: UInt64] = [:]
+    
+    /// Maximum size of the deduplication cache to prevent unbounded growth.
+    /// For a 60+ light ecosystem, this provides per-light deduplication without
+    /// consuming excessive memory. Configurable via `Configuration.maxDedupCacheSize`.
+    private var maxDedupCacheSize: Int = 256
+    
     /// Configuration for SSE connection behavior.
     struct Configuration: Sendable {
         /// Maximum consecutive parse failures before entering degraded mode.
         var maxParseFailures: Int = 10
-        
+
         /// Base reconnect delay in seconds.
         var baseReconnectDelay: TimeInterval = 1.0
-        
+
         /// Maximum reconnect delay in seconds.
         var maxReconnectDelay: TimeInterval = 30.0
-        
+
         /// Minimum reconnect delay in seconds.
         var minReconnectDelay: TimeInterval = 1.0
-        
+
         /// Whether to enable connection health metrics tracking.
         var trackHealthMetrics: Bool = true
-        
+
         /// Maximum SSE data buffer length in bytes to prevent OOM crashes.
         /// If the accumulated buffer exceeds this limit, the stream enters
         /// degraded mode to protect against unbounded memory growth.
         var maxSSEBufferLength: Int = 5 * 1024 * 1024
-        
+
+        /// Maximum size of the sliding-window deduplication cache.
+        /// Prevents unbounded memory growth in large ecosystems (60+ lights)
+        /// while still providing effective deduplication for recent events.
+        var maxDedupCacheSize: Int = 256
+
         static let `default` = Configuration()
     }
     
@@ -232,7 +250,8 @@ actor HueEventStreamActor {
         self.maxReconnectDelay = configuration.maxReconnectDelay
         self.minReconnectDelay = configuration.minReconnectDelay
         self.maxSSEBufferLength = configuration.maxSSEBufferLength
-        logger.info("SSE configuration updated: maxParseFailures=\(configuration.maxParseFailures), baseDelay=\(String(format: "%.1f", configuration.baseReconnectDelay))s, maxBuffer=\(configuration.maxSSEBufferLength) bytes")
+        self.maxDedupCacheSize = configuration.maxDedupCacheSize
+        logger.info("SSE configuration updated: maxParseFailures=\(configuration.maxParseFailures), baseDelay=\(String(format: "%.1f", configuration.baseReconnectDelay))s, maxBuffer=\(configuration.maxSSEBufferLength) bytes, dedupCache=\(configuration.maxDedupCacheSize)")
     }
     
     /// Get the current connection health metrics for monitoring.
@@ -332,22 +351,47 @@ actor HueEventStreamActor {
     }
     
     /// Parse an SSE event and dispatch it to the event handler.
+    /// Applies sliding-window deduplication to skip identical state updates
+    /// within the current connection session, preventing buffer thrashing during
+    /// rapid firmware updates or large ecosystem sync bursts.
     private func parseAndDispatchEvent(_ text: String) async throws {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        
+
         if trimmed.isEmpty || trimmed == "ping" {
             return
         }
-        
+
         let decoder = JSONDecoder.hueDecoder
         guard let data = trimmed.data(using: .utf8) else { throw HueError.invalidResponse }
         let update = try decoder.decode(ResourceUpdate.self, from: data)
-        
+
+        // Deduplication check: compute a compact hash of light states and skip
+        // if identical to the most recently seen state for each light. This
+        // prevents redundant UI updates during rapid bridge firmware updates
+        // or large sync bursts (60+ lights) that would otherwise flood the buffer.
+        if let lights = update.lights {
+            guard !areAllLightsDuplicate(lights) else {
+                logger.debug("Skipping duplicate SSE event (all lights unchanged)")
+                return
+            }
+            // Update cache with new state hashes
+            for light in lights {
+                deduplicationCache[light.id] = computeLightStateHash(light)
+                // Evict oldest entries if cache exceeds maximum size
+                if deduplicationCache.count > maxDedupCacheSize {
+                    let keysToEvict = Array(deduplicationCache.keys).prefix(deduplicationCache.count - maxDedupCacheSize)
+                    for key in keysToEvict {
+                        deduplicationCache.removeValue(forKey: key)
+                    }
+                }
+            }
+        }
+
         parseFailures = 0
         connectionHealthMetrics.consecutiveParseFailures = 0
         connectionHealthMetrics.eventsParsed += 1
         connectionHealthMetrics.lastEventTimestamp = Date()
-        
+
         let now = Date()
         if let lastTimestamp = connectionHealthMetrics.lastEventTimestamp,
            connectionHealthMetrics.eventsParsed > 1 {
@@ -356,8 +400,48 @@ actor HueEventStreamActor {
             let weight = 1.0 / Double(connectionHealthMetrics.eventsParsed)
             connectionHealthMetrics.averageEventInterval = currentAvg + (interval - currentAvg) * weight
         }
-        
+
         onEvent?(update)
+    }
+
+    /// Compute a compact hash of a light's state for deduplication.
+    /// Hashes the on state, brightness, and color values to detect
+    /// meaningful state changes while ignoring metadata noise.
+    private func computeLightStateHash(_ light: HueLightResource) -> UInt64 {
+        var hashValue = light.id.hashValue
+        if let on = light.state.on {
+            hashValue ^= on.hashValue & 0x01
+        }
+        if let brightness = light.state.brightness {
+            hashValue ^= brightness.hashValue
+        }
+        if let xy = light.state.xy, xy.count >= 2 {
+            hashValue ^= Int(xy[0] * 65535).hashValue
+            hashValue ^= Int(xy[1] * 65535).hashValue
+        }
+        if let ct = light.state.ct {
+            hashValue ^= ct.hashValue
+        }
+        return UInt64(hashValue)
+    }
+
+    /// Check if all lights in the update have identical state to the cached state.
+    /// Returns true if every light's current state matches the deduplication cache,
+    /// indicating this is a redundant update that can be safely skipped.
+    private func areAllLightsDuplicate(_ lights: [HueLightResource]) -> Bool {
+        guard !lights.isEmpty else { return false }
+
+        for light in lights {
+            let currentHash = computeLightStateHash(light)
+            guard let cachedHash = deduplicationCache[light.id] else {
+                // New light or first seen; not a duplicate
+                return false
+            }
+            if currentHash != cachedHash {
+                return false
+            }
+        }
+        return true
     }
     
     /// Handle stream disconnection with state machine-driven reconnection.
@@ -421,16 +505,19 @@ actor HueEventStreamActor {
         sseTask = nil
         reconnectTask?.cancel()
         reconnectTask = nil
-        
+
         // Explicitly invalidate the URLSession to release internal OS buffers
         // that can leak if the network drops ungracefully.
         urlSession?.invalidateAndCancel()
         urlSession = nil
-        
+
         sseDataBuffer = ""
         reconnectDelay = minReconnectDelay
         parseFailures = 0
         connectionHealthMetrics.consecutiveParseFailures = 0
+        // Clear deduplication cache on disconnect; cached state is no longer valid
+        // after reconnection as the bridge may have processed commands during downtime.
+        deduplicationCache.removeAll()
         state = .idle
         logger.info("SSE stream disconnected")
     }

@@ -313,16 +313,60 @@ final class DetectionEngine: DetectionProvider {
     /// Uses a bundled model that classifies fixtures into architectural categories:
     /// Chandelier, Sconce, Desk Lamp, Pendant, Ceiling Light, Recessed Light, Strip Light.
     /// Asynchronously loads the model with progress reporting to avoid blocking the main thread.
+    ///
+    /// Model loading cascade (optimized for memory-constrained devices):
+    /// 1. Pre-compiled 4-bit quantized `.mlmodelc` bundle (primary, lowest memory)
+    /// 2. Runtime 4-bit quantization of `.mlmodel` (fallback, requires NPU support)
+    /// 3. Full-precision `.mlmodel` (last resort, requires >8GB RAM to avoid Jetsam)
+    /// 4. Rectangle detection only (safe fallback for memory-constrained devices)
     private func loadObjectDetectionModel() async {
         guard !isModelLoading else {
             logger.warning("Model loading already in progress")
             return
         }
-        
+
         isModelLoading = true
         modelLoadingProgress = 0.0
         onModelLoadingProgress?(0.0)
-        
+
+        // Phase 1: Try to load a pre-compiled 4-bit quantized model bundle.
+        // This is the preferred artifact for production deployment, as it:
+        // - Avoids runtime compilation delays (no on-device Neural Engine compilation)
+        // - Uses 4x less memory than the full-precision model (prevents Jetsam)
+        // - Provides optimal inference speed on A17+ and M-series chips
+        // Ship this as the primary artifact using `coremltools` quantization pipeline.
+        let quantizedModelURL = Bundle.main.url(forResource: "LightingArchetype_quantized", withExtension: "mlmodelc")
+
+        if let quantizedURL = quantizedModelURL,
+           let quantizedModel = try? MLModel(contentsOf: quantizedURL, configuration: MLModelConfiguration()) {
+            objectDetectionModel = quantizedModel
+            isCoreMLAvailable = true
+            isObjectModelLoaded = true
+            isModelQuantized = true
+            logger.info("Loaded pre-compiled 4-bit quantized LightingArchetype model (optimal deployment)")
+
+            // Pre-create VNCoreMLRequest for the quantized model
+            do {
+                objectDetectionRequest = VNCoreMLRequest(model: try VNCoreMLModel(for: quantizedModel)) { [weak self] request, error in
+                    if let error {
+                        Logger(subsystem: "com.tomwolfe.visionlinkhue", category: "DetectionEngine")
+                            .warning("CoreML object detection failed: \(error.localizedDescription)")
+                    }
+                }
+                objectDetectionRequest?.imageCropAndScaleOption = .scaleFill
+                logger.info("CoreML compute units: \(self.currentComputeUnits == .all ? ".all" : ".cpuOnly")")
+            } catch {
+                logger.warning("Failed to create VNCoreMLRequest for quantized model: \(error.localizedDescription)")
+                isCoreMLAvailable = false
+            }
+
+            isModelLoading = false
+            modelLoadingProgress = 1.0
+            onModelLoadingProgress?(1.0)
+            return
+        }
+
+        // Phase 2: Fall back to the standard .mlmodel with runtime quantization.
         guard let modelURL = Bundle.main.url(forResource: "LightingArchetype", withExtension: "mlmodel") else {
             logger.warning("CoreML lighting archetype model not found, falling back to rectangle detection")
             isCoreMLAvailable = false
@@ -332,16 +376,16 @@ final class DetectionEngine: DetectionProvider {
             onModelLoadingProgress?(1.0)
             return
         }
-        
+
         modelLoadingProgress = 0.5
         onModelLoadingProgress?(0.5)
-        
+
         do {
             let baseConfig = MLModelConfiguration()
             baseConfig.computeUnits = .all
-            
+
             var skipModelSetup = false
-            
+
             #if targetEnvironment(simulator)
             objectDetectionModel = try MLModel(contentsOf: modelURL, configuration: baseConfig)
             isCoreMLAvailable = true
@@ -350,16 +394,16 @@ final class DetectionEngine: DetectionProvider {
             #else
             let quantizedConfig = MLModelConfiguration()
             quantizedConfig.computeUnits = .all
-            
+
             var loadedModel: MLModel?
             var quantizationApplied = false
-            
+
             do {
                 loadedModel = try MLModel(contentsOf: modelURL, configuration: quantizedConfig)
                 quantizationApplied = true
             } catch {
                 logger.debug("4-bit quantization not available for model, falling back to unquantized: \(error.localizedDescription)")
-                
+
                 // Memory guardrail: On devices with <=8GB RAM (e.g., iPhone 15 Pro),
                 // loading the unquantized 16-bit model during active ARSession can trigger
                 // Jetsam termination. Check physical memory before attempting fallback load.
@@ -377,14 +421,14 @@ final class DetectionEngine: DetectionProvider {
                         )
                         stateStream.reportError(fallbackError, severity: .warning, source: "DetectionEngine.quantization_fallback")
                     }
-                    
+
                     // Pause the ARSession before loading the unquantized model to prevent
                     // a memory spike that could trigger Jetsam termination on A13+ devices.
                     // ARKit Neural Surface Synthesis consumes significant memory, and loading
                     // an unquantized 16-bit model while the session is running can exceed
                     // the available memory budget even on modern devices.
                     onShouldPauseARSession?(true)
-                    
+
                     // Wrap failed model release and fallback load in a single autoreleasepool
                     // to ensure memory from the failed 4-bit CoreML initialization is flushed
                     // before allocating the larger 16-bit model, preventing RAM spikes on
@@ -394,7 +438,7 @@ final class DetectionEngine: DetectionProvider {
                         loadedModel = try MLModel(contentsOf: modelURL, configuration: baseConfig)
                         quantizationApplied = false
                     }
-                    
+
                     // Resume the ARSession after the model is loaded.
                     onShouldPauseARSession?(false)
                 } else {
@@ -417,13 +461,13 @@ final class DetectionEngine: DetectionProvider {
                     skipModelSetup = true
                 }
             }
-            
+
             if !skipModelSetup {
                 objectDetectionModel = loadedModel
                 isCoreMLAvailable = true
                 isObjectModelLoaded = true
                 isModelQuantized = quantizationApplied
-                
+
                 if quantizationApplied {
                     logger.info("CoreML lighting archetype model loaded with 4-bit weight quantization")
                 } else {
@@ -431,7 +475,7 @@ final class DetectionEngine: DetectionProvider {
                 }
             }
             #endif
-            
+
             if !skipModelSetup {
                 // Pre-create the VNCoreMLRequest to avoid per-frame allocation churn.
                 guard let model = objectDetectionModel else {
@@ -444,15 +488,15 @@ final class DetectionEngine: DetectionProvider {
                     }
                 }
                 objectDetectionRequest?.imageCropAndScaleOption = .scaleFill
-                
+
                 logger.info("CoreML compute units: \(self.currentComputeUnits == .all ? ".all" : ".cpuOnly")")
             }
-            
+
         } catch {
             logger.warning("Failed to load CoreML model: \(error.localizedDescription)")
             isCoreMLAvailable = false
         }
-        
+
         isModelLoading = false
         modelLoadingProgress = 1.0
         onModelLoadingProgress?(1.0)

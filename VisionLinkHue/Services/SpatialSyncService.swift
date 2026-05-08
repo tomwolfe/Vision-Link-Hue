@@ -4,18 +4,21 @@ import CloudKit
 import simd
 import os
 
-// MARK: - Vector Clock for CRDT Conflict Resolution
+// MARK: - Vector Clock for CRDT Conflict Resolution (LWW-Register)
 
-/// A vector clock for tracking logical timestamps across distributed devices.
-/// Each entry maps a device identifier to its last known version number for
-/// a specific fixture, enabling proper causal ordering in multi-device sync.
+/// A vector clock entry for a single device in the distributed system.
+/// Tracks the logical timestamp and wall-clock timestamp for LWW-Register resolution.
 struct VectorClockEntry: Sendable, Comparable {
     /// Device identifier this clock entry represents.
     let deviceID: String
-    
+
     /// Version number for this device's last known state.
     let version: Int64
-    
+
+    /// Wall-clock timestamp of this device's last update (Unix epoch seconds).
+    /// Used for LWW-Register tiebreaking when vector clocks are concurrent.
+    let timestamp: TimeInterval
+
     static func < (lhs: VectorClockEntry, rhs: VectorClockEntry) -> Bool {
         lhs.version < rhs.version
     }
@@ -29,7 +32,7 @@ enum CRDTMergeResult: Sendable {
     case remoteWins
     /// Versions are causally equivalent (identical state).
     case equivalent
-    
+
     /// The winning version number.
     var winningVersion: Int64 {
         switch self {
@@ -42,57 +45,99 @@ enum CRDTMergeResult: Sendable {
 /// Conflict resolver using CRDT vector clocks for spatial coordinates.
 /// Handles concurrent updates from multiple devices (Vision Pro + iPhone)
 /// by comparing vector clocks to determine causal ordering and merge conflicts.
+///
+/// Uses an LWW-Register (Last-Writer-Wins) strategy for concurrent updates:
+/// when neither vector clock dominates (concurrent edits from 3+ devices),
+/// the entry with the latest wall-clock timestamp wins. This eliminates the
+/// implicit local-device bias of the previous hybrid version comparison,
+/// providing true causal consistency across multi-device deployments.
 struct CRDTConflictResolver {
-    
+
+    /// LWW-Register timestamp map: device ID -> (version, timestamp).
+    /// Each device tracks its own version counter and the wall-clock time
+    /// of its last update. When resolving concurrent updates, the entry
+    /// with the highest timestamp wins, regardless of local/remote status.
+    typealias LWWClock = [String: (version: Int64, timestamp: TimeInterval)]
+
     /// Compare two vector clocks to determine which is causally ahead.
     /// Returns the merge result based on vector clock comparison.
-    static func merge(localClock: [String: Int64], remoteClock: [String: Int64],
-                      localVersion: Int64, remoteVersion: Int64) -> CRDTMergeResult {
-        
+    /// For concurrent updates (neither clock dominates), uses LWW-Register
+    /// semantics: the entry with the latest wall-clock timestamp wins.
+    ///
+    /// - Parameters:
+    ///   - localClock: Local device's vector clock (device -> version).
+    ///   - remoteClock: Remote device's vector clock (device -> version).
+    ///   - localLWW: Local LWW-Register timestamps (device -> (version, timestamp)).
+    ///   - remoteLWW: Remote LWW-Register timestamps (device -> (version, timestamp)).
+    /// - Returns: The merge result indicating which version should be applied.
+    static func merge(
+        localClock: [String: Int64],
+        remoteClock: [String: Int64],
+        localLWW: LWWClock = [:],
+        remoteLWW: LWWClock = [:]
+    ) -> CRDTMergeResult {
         // Collect all device IDs from both clocks
         let allDevices = Set(localClock.keys).union(remoteClock.keys)
-        
+
         var localAhead = false
         var remoteAhead = false
-        
-        // Check if local is causally ahead of remote
+
+        // Check causal dominance using vector clock comparison
         for deviceID in allDevices {
             let localVal = localClock[deviceID] ?? 0
             let remoteVal = remoteClock[deviceID] ?? 0
-            
+
             if localVal > remoteVal {
                 localAhead = true
             } else if remoteVal > localVal {
                 remoteAhead = true
             }
         }
-        
-        // Add explicit version comparison for the current fixture
-        if localVersion > remoteVersion {
-            localAhead = true
-        } else if remoteVersion > localVersion {
-            remoteAhead = true
-        }
-        
-        // Determine the merge result based on causal ordering
+
+        // Determine merge result based on causal ordering
         if localAhead && !remoteAhead {
+            // Local causally dominates remote
             return .localWins
         } else if remoteAhead && !localAhead {
+            // Remote causally dominates local
             return .remoteWins
         } else if !localAhead && !remoteAhead {
+            // Clocks are equivalent (identical state)
             return .equivalent
-        } else {
-            // Concurrent update: use hybrid strategy
-            // Prefer the device with the higher explicit version,
-            // breaking ties by preferring the local device
-            if localVersion >= remoteVersion {
-                return .localWins
-            } else {
-                return .remoteWins
+        }
+
+        // Concurrent update: use LWW-Register for true causal consistency.
+        // Find the device with the latest timestamp across both clocks.
+        // This eliminates the implicit local-device bias of hybrid version comparison.
+        if localLWW.isEmpty && remoteLWW.isEmpty {
+            // Fallback: no timestamp data available, use local preference
+            // (this should only happen in edge cases during initial sync)
+            return .localWins
+        }
+
+        // Find the winning device by maximum timestamp
+        var maxLocalTimestamp: TimeInterval = 0
+        var maxRemoteTimestamp: TimeInterval = 0
+
+        for (_, entry) in localLWW {
+            if entry.timestamp > maxLocalTimestamp {
+                maxLocalTimestamp = entry.timestamp
             }
         }
+
+        for (_, entry) in remoteLWW {
+            if entry.timestamp > maxRemoteTimestamp {
+                maxRemoteTimestamp = entry.timestamp
+            }
+        }
+
+        if maxLocalTimestamp >= maxRemoteTimestamp {
+            return .localWins
+        } else {
+            return .remoteWins
+        }
     }
-    
+
     /// Merge vector clocks by taking the element-wise maximum.
     /// Used when reconciling clocks after a successful sync.
     static func mergeClocks(_ clockA: [String: Int64], _ clockB: [String: Int64]) -> [String: Int64] {
@@ -102,14 +147,45 @@ struct CRDTConflictResolver {
         }
         return merged
     }
-    
+
+    /// Merge two LWW-Register clocks by taking the maximum timestamp per device.
+    /// Preserves the version counter associated with each timestamp.
+    static func mergeLWCClocks(_ clockA: LWWClock, _ clockB: LWWClock) -> LWWClock {
+        var merged = clockA
+        for (deviceID, entryB) in clockB {
+            if let entryA = clockA[deviceID] {
+                // Keep the entry with the higher timestamp
+                if entryB.timestamp > entryA.timestamp {
+                    merged[deviceID] = entryB
+                }
+            } else {
+                merged[deviceID] = entryB
+            }
+        }
+        return merged
+    }
+
     /// Increment the version for a specific device in a vector clock.
     static func incrementVersion(_ clock: [String: Int64], for deviceID: String) -> [String: Int64] {
         var updated = clock
         updated[deviceID] = (updated[deviceID] ?? 0) + 1
         return updated
     }
-    
+
+    /// Update the LWW-Register entry for a device with the current timestamp.
+    /// Called when a local update is made to record the wall-clock time
+    /// for future LWW conflict resolution.
+    static func updateLWWEntry(
+        _ lwClock: LWWClock,
+        for deviceID: String,
+        version: Int64,
+        timestamp: TimeInterval = Date().timeIntervalSince1970
+    ) -> LWWClock {
+        var updated = lwClock
+        updated[deviceID] = (version: version, timestamp: timestamp)
+        return updated
+    }
+
     /// Prune stale device entries from a vector clock to prevent unbounded metadata growth.
     /// Removes any device that hasn't synchronized within the given maximum age.
     /// Over years of use and device upgrades, vector clocks accumulate device IDs that
@@ -129,20 +205,20 @@ struct CRDTConflictResolver {
         now: Date = Date()
     ) -> [String: Int64] {
         var pruned = clock
-        
+
         for deviceID in clock.keys {
             guard let lastSync = deviceLastSynced[deviceID] else {
                 // No tracked sync time; treat as stale and remove.
                 pruned.removeValue(forKey: deviceID)
                 continue
             }
-            
+
             let secondsSinceSync = now.timeIntervalSince(lastSync)
             if secondsSinceSync > maxAge {
                 pruned.removeValue(forKey: deviceID)
             }
         }
-        
+
         return pruned
     }
 }
@@ -203,6 +279,11 @@ final class SpatialSyncRecord {
     /// Vector clock for CRDT conflict resolution across devices.
     /// Maps device IDs to their last known version numbers.
     var vectorClockJSON: String?
+
+    /// LWW-Register clock for true causal consistency (3+ device sync).
+    /// Maps device IDs to their (version, timestamp) tuples for Last-Writer-Wins
+    /// conflict resolution when vector clocks are concurrent.
+    var lwwClockJSON: String?
     
     /// Whether this record has been successfully synced to CloudKit.
     var isSynced: Bool
@@ -235,6 +316,7 @@ final class SpatialSyncRecord {
         self.lastModifiedByDevice = nil
         self.version = 1
         self.vectorClockJSON = nil
+        self.lwwClockJSON = nil
         self.isSynced = false
         self.lastSyncError = nil
     }
@@ -332,6 +414,12 @@ actor SpatialSyncService {
     /// Vector clock for CRDT-based conflict resolution.
     /// Maps fixture IDs to their vector clock entries (device -> version).
     private var vectorClocks: [String: [String: Int64]] = [:]
+
+    /// LWW-Register timestamp map for true causal consistency across 3+ devices.
+    /// Maps fixture IDs to their LWW-Register clock (device -> (version, timestamp)).
+    /// When resolving concurrent updates where neither vector clock dominates,
+    /// the entry with the latest wall-clock timestamp wins.
+    private var lwwClocks: [String: CRDTConflictResolver.LWWClock] = [:]
 
     /// Tracks the last successful sync timestamp for each device.
     /// Used to prune stale device entries from vector clocks to prevent
@@ -473,6 +561,14 @@ actor SpatialSyncService {
                     let localClock = vectorClocks[fixtureKey] ?? [:]
                     vectorClocks[fixtureKey] = CRDTConflictResolver.mergeClocks(localClock, remoteClock)
 
+                    // Merge the remote LWW-Register clock into our local LWW clock.
+                    // This enables true causal consistency for concurrent updates from 3+ devices.
+                    if let remoteLWWJSON = remoteRecord.lwwClockJSON,
+                       let remoteLWW = deserializeLWWClock(from: remoteLWWJSON) {
+                        let localLWW = lwwClocks[fixtureKey] ?? [:]
+                        lwwClocks[fixtureKey] = CRDTConflictResolver.mergeLWCClocks(localLWW, remoteLWW)
+                    }
+
                     // Track when each device in the remote clock last synced.
                     // This enables pruning of stale device entries.
                     let now = Date()
@@ -506,51 +602,58 @@ actor SpatialSyncService {
         return DownloadResult(success: success, changes: changes)
     }
     
-    /// Resolve conflicts between local and remote records using CRDT vector clocks.
+    /// Resolve conflicts between local and remote records using CRDT vector clocks
+    /// with LWW-Register (Last-Writer-Wins) tiebreaking.
+    ///
     /// Uses element-wise comparison of vector clocks to determine causal ordering.
-    /// For concurrent updates (neither clock dominates), prefers the device with
-    /// the higher explicit version, breaking ties by favoring the local device.
+    /// For concurrent updates (neither clock dominates), uses LWW-Register semantics:
+    /// the entry with the latest wall-clock timestamp wins, regardless of local/remote
+    /// status. This provides true causal consistency across 3+ devices without implicit
+    /// local-device bias.
     private func resolveConflicts() async -> Int {
         var conflictCount = 0
-        
+
         // Load all local records that have pending uploads.
         let pendingRecords = await loadPendingSyncRecords()
-        
+
         for record in pendingRecords {
             let fixtureKey = record.fixtureId.uuidString
             let localClock = vectorClocks[fixtureKey] ?? [:]
+            let localLWW = lwwClocks[fixtureKey] ?? [:]
             let remoteVersion = await getRemoteVersion(for: fixtureKey)
             let localVersion = await getLocalVersion(for: fixtureKey)
-            
+
             // Build a minimal remote clock entry for the merge decision.
             // In production, the remote clock would be stored in the CloudKit record.
             var remoteClock: [String: Int64] = [:]
+            var remoteLWW: CRDTConflictResolver.LWWClock = [:]
             if let remoteDeviceID = record.lastModifiedByDevice {
                 remoteClock[remoteDeviceID] = remoteVersion
+                remoteLWW[remoteDeviceID] = (version: remoteVersion, timestamp: record.lastSyncedAt.timeIntervalSince1970)
             }
-            
+
             let mergeResult = CRDTConflictResolver.merge(
                 localClock: localClock,
                 remoteClock: remoteClock,
-                localVersion: localVersion,
-                remoteVersion: remoteVersion
+                localLWW: localLWW,
+                remoteLWW: remoteLWW
             )
-            
+
             switch mergeResult {
             case .localWins:
                 await markAsSynced(record)
                 conflictCount += 1
-                logger.debug("CRDT conflict resolved for \(fixtureKey): kept local version \(localVersion)")
+                logger.debug("LWW-Register conflict resolved for \(fixtureKey): kept local version \(localVersion)")
             case .remoteWins:
                 await applyRemoteChanges(for: record.fixtureId)
                 conflictCount += 1
-                logger.debug("CRDT conflict resolved for \(fixtureKey): applied remote version \(remoteVersion)")
+                logger.debug("LWW-Register conflict resolved for \(fixtureKey): applied remote version \(remoteVersion)")
             case .equivalent:
                 // No conflict — versions are causally equivalent
                 break
             }
         }
-        
+
         return conflictCount
     }
     
@@ -570,7 +673,8 @@ actor SpatialSyncService {
         
         record.lastModifiedByDevice = deviceIdentifier
         record.vectorClockJSON = serializeVectorClock(for: mapping.fixtureId)
-        
+        record.lwwClockJSON = serializeLWWClock(for: mapping.fixtureId)
+
         return record
     }
     
@@ -603,6 +707,7 @@ actor SpatialSyncService {
         ckRecord["is_synced"] = record.isSynced
         ckRecord["last_sync_error"] = record.lastSyncError
         ckRecord["vector_clock"] = record.vectorClockJSON
+        ckRecord["lww_clock"] = record.lwwClockJSON
         
         try await database.save(ckRecord)
     }
@@ -657,7 +762,7 @@ actor SpatialSyncService {
                 return nil
             }
             
-            return SpatialSyncRecord(
+            let record = SpatialSyncRecord(
                 fixtureId: UUID(uuidString: fixtureId) ?? UUID(),
                 lightId: ckRecord["light_id"] as? String,
                 position: SIMD3<Float>(positionX, positionY, positionZ),
@@ -666,6 +771,12 @@ actor SpatialSyncService {
                 fixtureType: fixtureType,
                 confidence: confidence
             )
+            record.version = version
+            record.lastSyncedAt = lastSyncedAt
+            record.lastModifiedByDevice = ckRecord["last_modified_by_device"] as? String
+            record.vectorClockJSON = ckRecord["vector_clock"] as? String
+            record.lwwClockJSON = ckRecord["lww_clock"] as? String
+            return record
         }
     }
     
@@ -748,7 +859,7 @@ actor SpatialSyncService {
     private func serializeVectorClock(for fixtureId: UUID) -> String? {
         let fixtureKey = fixtureId.uuidString
         guard let clock = vectorClocks[fixtureKey] else { return nil }
-        
+
         do {
             let encoder = JSONEncoder()
             encoder.keyEncodingStrategy = .useDefaultKeys
@@ -759,13 +870,13 @@ actor SpatialSyncService {
             return nil
         }
     }
-    
+
     /// Deserialize a vector clock from JSON string.
     private func deserializeVectorClock(from json: String?) -> [String: Int64]? {
         guard let json = json, !json.isEmpty else { return nil }
-        
+
         guard let jsonData = json.data(using: .utf8) else { return nil }
-        
+
         do {
             let decoder = JSONDecoder()
             return try decoder.decode([String: Int64].self, from: jsonData)
@@ -774,18 +885,76 @@ actor SpatialSyncService {
             return nil
         }
     }
+
+    /// Serialize the LWW-Register clock for a fixture to JSON string.
+    /// The LWW clock stores (version, timestamp) tuples per device for
+    /// true causal consistency during concurrent edit resolution.
+    private func serializeLWWClock(for fixtureId: UUID) -> String? {
+        let fixtureKey = fixtureId.uuidString
+        guard let lwwClock = lwwClocks[fixtureKey] else { return nil }
+
+        // Convert LWWClock to a serializable dictionary format.
+        // Each entry maps deviceID -> {"v": version, "t": timestamp}
+        var serializable: [String: [String: Double]] = [:]
+        for (deviceID, entry) in lwwClock {
+            serializable[deviceID] = ["v": Double(entry.version), "t": entry.timestamp]
+        }
+
+        do {
+            let encoder = JSONEncoder()
+            let jsonData = try encoder.encode(serializable)
+            return String(data: jsonData, encoding: .utf8)
+        } catch {
+            logger.warning("Failed to serialize LWW clock for \(fixtureId): \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    /// Deserialize an LWW-Register clock from JSON string.
+    private func deserializeLWWClock(from json: String?) -> CRDTConflictResolver.LWWClock? {
+        guard let json = json, !json.isEmpty else { return nil }
+
+        guard let jsonData = json.data(using: .utf8) else { return nil }
+
+        do {
+            let decoder = JSONDecoder()
+            let deserialized: [String: [String: Double]] = try decoder.decode([String: [String: Double]].self, from: jsonData)
+
+            var lwwClock: CRDTConflictResolver.LWWClock = [:]
+            for (deviceID, entry) in deserialized {
+                guard let version = entry["v"], let timestamp = entry["t"] else { continue }
+                lwwClock[deviceID] = (version: Int64(version), timestamp: timestamp)
+            }
+            return lwwClock.isEmpty ? nil : lwwClock
+        } catch {
+            logger.warning("Failed to deserialize LWW clock: \(error.localizedDescription)")
+            return nil
+        }
+    }
     
     /// Increment the version number for a fixture using CRDT vector clocks.
-    /// Updates the vector clock for this device and returns the new version.
+    /// Updates both the vector clock and the LWW-Register timestamp for this device.
+    /// The LWW timestamp enables true causal consistency when resolving concurrent
+    /// updates from 3+ devices, eliminating implicit local-device bias.
     private func incrementVersion(for fixtureId: UUID) -> Int64 {
         let fixtureKey = fixtureId.uuidString
         let currentClock = vectorClocks[fixtureKey] ?? [:]
         let updatedClock = CRDTConflictResolver.incrementVersion(currentClock, for: deviceIdentifier)
         vectorClocks[fixtureKey] = updatedClock
-        
+
         // Extract the local device's version from the updated clock
         let newVersion = updatedClock[deviceIdentifier] ?? 1
         localVersionTracker[fixtureKey] = newVersion
+
+        // Update the LWW-Register with the current timestamp for causal ordering
+        let currentLWW = lwwClocks[fixtureKey] ?? [:]
+        lwwClocks[fixtureKey] = CRDTConflictResolver.updateLWWEntry(
+            currentLWW,
+            for: deviceIdentifier,
+            version: newVersion,
+            timestamp: Date().timeIntervalSince1970
+        )
+
         return newVersion
     }
     

@@ -53,6 +53,13 @@ struct NeuralSurfaceMaterialClassifier: Sendable {
     
     /// Number of sample points to use for voting-based material classification.
     private static let sampleRadius: Float = 0.03
+
+    /// Dynamic alpha threshold for low-confidence pixel downweighting.
+    /// When `sceneDepth.confidenceMap < 0.3`, the alpha factor is reduced
+    /// proportionally to prevent "reflection hallucination" where a fixture
+    /// viewed through glass might incorrectly inherit material properties of
+    /// the reflection. Pixels below this threshold are effectively ignored.
+    private static let lowConfidenceThreshold: Float = 0.3
     
     /// Initialize with material mappings from the classification config.
     /// - Parameters:
@@ -220,6 +227,17 @@ struct NeuralSurfaceMaterialClassifier: Sendable {
                     let bytesPerRow = CVPixelBufferGetBytesPerRow(confidenceMap)
                     let byteOffset = py * bytesPerRow + px * MemoryLayout<Float>.stride
                     let confidence = baseAddress.load(fromByteOffset: byteOffset, as: Float.self)
+
+                    // Apply dynamic alpha threshold: downweight pixels with low
+                    // depth confidence to prevent "reflection hallucination" where
+                    // a fixture viewed through glass might incorrectly inherit
+                    // material properties of the reflection.
+                    // When confidence < 0.3, scale the weight proportionally
+                    // (e.g., confidence 0.1 gets weight 0.1 * 0.33 = 0.033).
+                    if confidence < Self.lowConfidenceThreshold {
+                        let alpha = confidence / Self.lowConfidenceThreshold
+                        return max(confidence * alpha, 0.0)
+                    }
                     return max(confidence, 0.0)
                 }()
 

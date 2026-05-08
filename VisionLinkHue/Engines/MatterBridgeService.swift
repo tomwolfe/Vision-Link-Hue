@@ -176,45 +176,43 @@ final class MatterBridgeService: NSObject, @unchecked Sendable {
     /// Refresh device state for a specific accessory when a characteristic update
     /// is received via HMAccessoryDelegate. Avoids a full scan by only re-reading
     /// the changed accessory's characteristics.
+    /// Must be called from MainActor (see delegate implementation for Task.detached).
+    @MainActor
     private func refreshAccessoryState(_ accessory: HMAccessory) {
         guard accessory.isReachable else { return }
-        
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            
-            // Check for lightbulb service using HomeKit constants
-            let isLightService: (HMService) -> Bool = { service in
-                service.serviceType == HMServiceTypeLightbulb
-            }
-            guard let lightbulbService = accessory.services.first(where: isLightService) else {
-                return
-            }
 
-            // Read characteristic values using HomeKit constants
-            let onCharacteristic = lightbulbService.characteristics.first { $0.characteristicType == HMCharacteristicTypePowerState }
-            let isOn = onCharacteristic?.value as? Bool == true
-            let brightnessCharacteristic = lightbulbService.characteristics.first { $0.characteristicType == HMCharacteristicTypeBrightness }
-            let brightness = Int(brightnessCharacteristic?.value as? Double ?? 0)
-            
-            let device = MatterLightDevice(
-                id: accessory.identifier.uuidString,
-                name: accessory.name ?? "Unknown Device",
-                deviceType: .extendedColorLight,
-                manufacturerName: accessory.manufacturer ?? "Unknown",
-                modelIdentifier: accessory.model ?? "Unknown",
-                firmwareVersion: "",
-                isReachable: accessory.isReachable,
-                powerState: isOn,
-                brightness: brightness,
-                colorTemperatureMireds: nil,
-                colorX: nil,
-                colorY: nil,
-                threadNetworkName: nil,
-                commissioningMode: 0
-            )
-            
-            self.onDeviceStateChanged?(device)
+        // Check for lightbulb service using HomeKit constants
+        let isLightService: (HMService) -> Bool = { service in
+            service.serviceType == HMServiceTypeLightbulb
         }
+        guard let lightbulbService = accessory.services.first(where: isLightService) else {
+            return
+        }
+
+        // Read characteristic values using HomeKit constants
+        let onCharacteristic = lightbulbService.characteristics.first { $0.characteristicType == HMCharacteristicTypePowerState }
+        let isOn = onCharacteristic?.value as? Bool == true
+        let brightnessCharacteristic = lightbulbService.characteristics.first { $0.characteristicType == HMCharacteristicTypeBrightness }
+        let brightness = Int(brightnessCharacteristic?.value as? Double ?? 0)
+
+        let device = MatterLightDevice(
+            id: accessory.identifier.uuidString,
+            name: accessory.name ?? "Unknown Device",
+            deviceType: .extendedColorLight,
+            manufacturerName: accessory.manufacturer ?? "Unknown",
+            modelIdentifier: accessory.model ?? "Unknown",
+            firmwareVersion: "",
+            isReachable: accessory.isReachable,
+            powerState: isOn,
+            brightness: brightness,
+            colorTemperatureMireds: nil,
+            colorX: nil,
+            colorY: nil,
+            threadNetworkName: nil,
+            commissioningMode: 0
+        )
+
+        self.onDeviceStateChanged?(device)
     }
     
     /// Check if a specific Matter light is reachable and responsive.
@@ -473,42 +471,57 @@ extension MatterBridgeService: HMAccessoryDelegate {
     /// Called when an accessory's characteristics change (e.g., power state, brightness).
     /// Uses event-driven updates instead of polling to avoid blocking the MainActor
     /// when the Thread network is congested.
+    /// HMAccessoryDelegate callbacks run on arbitrary threads; use Task.detached
+    /// to avoid main-thread blocking during characteristic reads.
     func accessory(_ accessory: HMAccessory, didUpdateCharacteristics characteristics: [HMCharacteristic]) {
         // Only refresh state for light-related accessories to avoid unnecessary work.
         let isLightAccessory: (HMService) -> Bool = { service in
             service.serviceType == HMServiceTypeLightbulb
         }
-        
+
         let hasLightService = accessory.services.contains(where: isLightAccessory)
         guard hasLightService else { return }
-        
-        refreshAccessoryState(accessory)
+
+        // Use Task.detached to offload HomeKit characteristic reads from the
+        // arbitrary delegate thread, preventing main-thread blocking during
+        /// Thread network congestion.
+        Task.detached(priority: .utility) { [weak self] in
+            await MainActor.run { [weak self] in
+                self?.refreshAccessoryState(accessory)
+            }
+        }
     }
-    
+
     /// Called when an accessory's reachability changes (e.g., disconnects from Thread network).
+    /// HMAccessoryDelegate callbacks run on arbitrary threads; use Task.detached
+    /// to preventCharacteristic writes from blocking the delegate thread.
     func accessoryDidUpdateReachability(_ accessory: HMAccessory) {
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            
-            let device = MatterLightDevice(
-                id: accessory.identifier.uuidString,
-                name: accessory.name ?? "Unknown Device",
-                deviceType: .extendedColorLight,
-                manufacturerName: accessory.manufacturer ?? "Unknown",
-                modelIdentifier: accessory.model ?? "Unknown",
-                firmwareVersion: "",
-                isReachable: accessory.isReachable,
-                powerState: false,
-                brightness: 0,
-                colorTemperatureMireds: nil,
-                colorX: nil,
-                colorY: nil,
-                threadNetworkName: nil,
-                commissioningMode: 0
-            )
-            
-            self.onDeviceStateChanged?(device)
-            self.onReachabilityChanged?(accessory.identifier.uuidString, accessory.isReachable)
+        // Offload to a detached task to avoid blocking the arbitrary delegate thread.
+        // HomeKit callbacks should return quickly to prevent internal timeouts.
+        Task.detached(priority: .utility) { [weak self] in
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+
+                let device = MatterLightDevice(
+                    id: accessory.identifier.uuidString,
+                    name: accessory.name ?? "Unknown Device",
+                    deviceType: .extendedColorLight,
+                    manufacturerName: accessory.manufacturer ?? "Unknown",
+                    modelIdentifier: accessory.model ?? "Unknown",
+                    firmwareVersion: "",
+                    isReachable: accessory.isReachable,
+                    powerState: false,
+                    brightness: 0,
+                    colorTemperatureMireds: nil,
+                    colorX: nil,
+                    colorY: nil,
+                    threadNetworkName: nil,
+                    commissioningMode: 0
+                )
+
+                self.onDeviceStateChanged?(device)
+                self.onReachabilityChanged?(accessory.identifier.uuidString, accessory.isReachable)
+            }
         }
     }
 }
