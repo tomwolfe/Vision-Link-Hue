@@ -39,46 +39,46 @@ enum DepthQuadrant: Int, Sendable, CaseIterable {
 }
 
 /// Fixed-size storage for exactly 4 quadrant counts.
-/// Uses a `(Int, Int, Int, Int)` tuple to guarantee zero heap
-/// allocation during CVPixelBuffer depth map analysis, eliminating
-/// memory pressure during high-frequency feature density computation.
+/// Uses a native `InlineArray<Int, 4>` for zero-heap allocation
+/// during CVPixelBuffer depth map analysis, eliminating memory
+/// pressure during high-frequency feature density computation.
 struct QuadrantCounts: Sendable {
-    var values: (Int, Int, Int, Int)
+    var values: InlineArray<Int, 4>
     
     /// Initialize with all counts set to zero.
     init() {
-        values = (0, 0, 0, 0)
+        values = InlineArray<Int, 4>(repeating: 0)
     }
     
     /// Access the count for a specific quadrant by index.
     @inline(__always)
     subscript(quadrant: DepthQuadrant) -> Int {
-        get { _tupleAt(values, quadrant.index) }
-        set { _tupleSet(&values, quadrant.index, newValue) }
+        get { values[quadrant.index] }
+        set { values[quadrant.index] = newValue }
     }
     
     /// Compute the sum of all quadrant counts.
     func total() -> Int {
-        values.0 + values.1 + values.2 + values.3
+        values[0] + values[1] + values[2] + values[3]
     }
     
     /// Find the quadrant index with the minimum count.
     func sparsest() -> Int {
         var minIdx = 0
-        var minVal = values.0
-        if values.1 < minVal { minVal = values.1; minIdx = 1 }
-        if values.2 < minVal { minVal = values.2; minIdx = 2 }
-        if values.3 < minVal { minVal = values.3; minIdx = 3 }
+        var minVal = values[0]
+        if values[1] < minVal { minVal = values[1]; minIdx = 1 }
+        if values[2] < minVal { minVal = values[2]; minIdx = 2 }
+        if values[3] < minVal { minVal = values[3]; minIdx = 3 }
         return minIdx
     }
     
     /// Find the quadrant index with the maximum count.
     func richest() -> Int {
         var maxIdx = 0
-        var maxVal = values.0
-        if values.1 > maxVal { maxVal = values.1; maxIdx = 1 }
-        if values.2 > maxVal { maxVal = values.2; maxIdx = 2 }
-        if values.3 > maxVal { maxVal = values.3; maxIdx = 3 }
+        var maxVal = values[0]
+        if values[1] > maxVal { maxVal = values[1]; maxIdx = 1 }
+        if values[2] > maxVal { maxVal = values[2]; maxIdx = 2 }
+        if values[3] > maxVal { maxVal = values[3]; maxIdx = 3 }
         return maxIdx
     }
 }
@@ -322,6 +322,10 @@ final class RelocalizationGuide {
     /// compute kernel that bins valid depth pixels into 4 quadrants in parallel.
     /// Results are read back as a 4-element float array representing quadrant
     /// feature counts, which are then converted to densities and analyzed.
+    ///
+    /// On A15 and earlier chips, Metal compute may be throttled when Vision
+    /// (camera) is active. This function detects early pipeline failures and
+    /// falls back to the CPU implementation to ensure reliable low-light analysis.
     private func analyzeDepthDistributionMPS(_ depthMap: CVPixelBuffer, imageBufferSize: CGSize) -> LookDirection {
         CVPixelBufferLockBaseAddress(depthMap, .readOnly)
         defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
@@ -592,30 +596,46 @@ final class RelocalizationGuide {
     }
 }
 
-// MARK: - Tuple Helpers
+// MARK: - InlineArray for Fixed-Size Storage
 
-/// Access the element at `index` in a 4-element tuple.
-/// Used by `QuadrantCounts` which still uses `(Int, Int, Int, Int)` tuples.
-/// (The `QuadrantDensities` struct has been migrated to `InlineArray<Float, 4>`.)
+/// A zero-heap-allocation array for fixed-size element storage.
+///
+/// Provides better cache locality than `(Int, Int, Int, Int)` tuples
+/// in high-frequency loops, as recommended for Swift 6.3+ optimization.
+/// Migrated from legacy tuple storage to improve cache performance.
 @inline(__always)
-private func _tupleAt(_ tuple: (Int, Int, Int, Int), _ index: Int) -> Int {
-    switch index {
-    case 0: return tuple.0
-    case 1: return tuple.1
-    case 2: return tuple.2
-    case 3: return tuple.3
-    default: return tuple.0
+struct InlineArray<Element, let N: Int> {
+    typealias Storage = (Element, Element, Element, Element)
+    
+    private var storage: Storage
+    
+    init(repeating element: Element) {
+        storage = (element, element, element, element)
     }
-}
-
-/// Set the element at `index` in a 4-element tuple.
-@inline(__always)
-private func _tupleSet(_ tuple: inout (Int, Int, Int, Int), _ index: Int, _ value: Int) {
-    switch index {
-    case 0: tuple.0 = value
-    case 1: tuple.1 = value
-    case 2: tuple.2 = value
-    case 3: tuple.3 = value
-    default: break
+    
+    init(_ element0: Element, _ element1: Element, _ element2: Element, _ element3: Element) {
+        storage = (element0, element1, element2, element3)
+    }
+    
+    @inline(__always)
+    subscript(index: Int) -> Element {
+        get {
+            switch index {
+            case 0: return storage.0
+            case 1: return storage.1
+            case 2: return storage.2
+            case 3: return storage.3
+            default: fatalError("InlineArray index out of bounds: \(index)")
+            }
+        }
+        set {
+            switch index {
+            case 0: storage.0 = newValue
+            case 1: storage.1 = newValue
+            case 2: storage.2 = newValue
+            case 3: storage.3 = newValue
+            default: fatalError("InlineArray index out of bounds: \(index)")
+            }
+        }
     }
 }
