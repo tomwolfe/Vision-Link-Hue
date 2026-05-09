@@ -1455,7 +1455,8 @@ final class LocalNetworkChannel: Sendable {
         // Each message is prefixed with its byte length for reliable parsing on the receiver side.
         var streamPayload = Data()
         for messageData in encodedMessages {
-            let lengthHeader = Data(bytes: UInt32(messageData.count).littleEndian)
+            var lengthAsUInt32 = UInt32(messageData.count).littleEndian
+            let lengthHeader = Data(bytes: &lengthAsUInt32, count: MemoryLayout<UInt32>.stride)
             streamPayload.append(lengthHeader)
             streamPayload.append(messageData)
         }

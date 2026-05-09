@@ -38,16 +38,61 @@ enum DepthQuadrant: Int, Sendable, CaseIterable {
     }
 }
 
+/// Fixed-size, zero-heap storage for exactly 4 elements.
+/// Provides subscript access similar to an array while avoiding heap allocation.
+struct InlineArray<Element: Sendable>: Sendable {
+    var elements: (Element, Element, Element, Element)
+    
+    init(repeating content: Element, count: Int = 4) {
+        precondition(count == 4, "InlineArray only supports count of 4")
+        elements = (content, content, content, content)
+    }
+    
+    init(_ elements: (Element, Element, Element, Element)) {
+        self.elements = elements
+    }
+    
+    subscript(index: Int) -> Element {
+        get {
+            switch index {
+            case 0: return elements.0
+            case 1: return elements.1
+            case 2: return elements.2
+            case 3: return elements.3
+            default: fatalError("Index out of bounds: \(index)")
+            }
+        }
+        set {
+            switch index {
+            case 0: elements = (newValue, elements.1, elements.2, elements.3)
+            case 1: elements = (elements.0, newValue, elements.2, elements.3)
+            case 2: elements = (elements.0, elements.1, newValue, elements.3)
+            case 3: elements = (elements.0, elements.1, elements.2, newValue)
+            default: fatalError("Index out of bounds: \(index)")
+            }
+        }
+    }
+}
+
+func += (lhs: inout InlineArray<Int>, rhs: Int) {
+    var elements = lhs.elements
+    elements.0 += rhs
+    elements.1 += rhs
+    elements.2 += rhs
+    elements.3 += rhs
+    lhs.elements = elements
+}
+
 /// Fixed-size storage for exactly 4 quadrant counts.
-/// Uses a native `InlineArray<Int, 4>` for zero-heap allocation
-/// during CVPixelBuffer depth map analysis, eliminating memory
+/// Uses a zero-heap allocation structure for efficient
+/// CVPixelBuffer depth map analysis, eliminating memory
 /// pressure during high-frequency feature density computation.
 struct QuadrantCounts: Sendable {
-    var values: InlineArray<Int, 4>
+    var values: InlineArray<Int>
     
     /// Initialize with all counts set to zero.
     init() {
-        values = InlineArray<Int, 4>(repeating: 0)
+        values = InlineArray(repeating: 0)
     }
     
     /// Access the count for a specific quadrant by index.

@@ -383,7 +383,7 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
     
     var preferredControlPath: ControlPath {
         get async {
-            matterService?.preferredControlPath(hueBridgeAvailable: bridgeIP != nil) ?? .none
+            await matterService?.preferredControlPath(hueBridgeAvailable: bridgeIP != nil) ?? .none
         }
     }
     

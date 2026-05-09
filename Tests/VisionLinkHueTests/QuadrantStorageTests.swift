@@ -3,8 +3,7 @@ import XCTest
 
 /// Unit tests for QuadrantCounts and QuadrantDensities, validating
 /// the fixed-size storage used in RelocalizationGuide.
-/// `QuadrantCounts` uses `(Int, Int, Int, Int)` tuples, while
-/// `QuadrantDensities` uses Swift 6.3 `InlineArray<Float, 4>`.
+/// `QuadrantCounts` uses `(Int, Int, Int, Int)` tuples.
 /// Both guarantee zero heap allocation during CVPixelBuffer analysis.
 final class QuadrantStorageTests: XCTestCase {
     
@@ -69,13 +68,13 @@ final class QuadrantStorageTests: XCTestCase {
         
         // Verify the tuple-based storage produces correct results
         // without heap allocation (verified by compile-time tuple type)
-        XCTAssertEqual(counts.values.0, 100)
-        XCTAssertEqual(counts.values.1, 200)
-        XCTAssertEqual(counts.values.2, 300)
-        XCTAssertEqual(counts.values.3, 400)
+        XCTAssertEqual(counts.values[0], 100)
+        XCTAssertEqual(counts.values[1], 200)
+        XCTAssertEqual(counts.values[2], 300)
+        XCTAssertEqual(counts.values[3], 400)
         
         var sum = 0
-        for value in [counts.values.0, counts.values.1, counts.values.2, counts.values.3] {
+        for value in [counts.values[0], counts.values[1], counts.values[2], counts.values[3]] {
             sum += value
         }
         XCTAssertEqual(sum, 1000)
@@ -169,8 +168,8 @@ final class QuadrantStorageTests: XCTestCase {
         densities[.bottomLeft] = 0.3
         densities[.bottomRight] = 0.4
 
-        // Verify the InlineArray-backed storage produces correct results
-        // without heap allocation (verified by compile-time InlineArray type)
+        // Verify the tuple-backed storage produces correct results
+        // without heap allocation (verified by compile-time tuple type)
         XCTAssertEqual(densities.values[0], 0.1, accuracy: 0.001)
         XCTAssertEqual(densities.values[1], 0.2, accuracy: 0.001)
         XCTAssertEqual(densities.values[2], 0.3, accuracy: 0.001)
