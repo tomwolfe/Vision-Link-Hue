@@ -92,7 +92,7 @@ protocol HueClientProtocol: AnyObject {
     var isMatterFallbackAvailable: Bool { get }
     
     /// Get the preferred control path based on current availability.
-    var preferredControlPath: ControlPath { get }
+    var preferredControlPath: ControlPath { get async }
     
     /// Fetch Matter device state when Hue Bridge is unavailable.
     func fetchMatterDevices() async throws -> MatterBridgeState

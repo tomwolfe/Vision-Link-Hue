@@ -382,7 +382,9 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
     }
     
     var preferredControlPath: ControlPath {
-        matterService?.preferredControlPath(hueBridgeAvailable: bridgeIP != nil) ?? .none
+        get async {
+            matterService?.preferredControlPath(hueBridgeAvailable: bridgeIP != nil) ?? .none
+        }
     }
     
     func fetchMatterDevices() async throws -> MatterBridgeState {

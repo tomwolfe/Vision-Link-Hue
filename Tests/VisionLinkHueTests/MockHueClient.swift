@@ -167,7 +167,9 @@ final class MockHueClient: HueClientProtocol {
     // MARK: - Matter Fallback
     
     var isMatterFallbackAvailable: Bool { false }
-    var preferredControlPath: ControlPath { .hue }
+    var preferredControlPath: ControlPath {
+        get async { .hue }
+    }
     
     func fetchMatterDevices() async throws -> MatterBridgeState {
         return MatterBridgeState(lights: [])

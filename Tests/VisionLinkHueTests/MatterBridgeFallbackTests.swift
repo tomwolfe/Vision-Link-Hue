@@ -7,15 +7,15 @@ import simd
 /// Validates that Matter control failures gracefully fall back to the Hue Bridge.
 final class MatterBridgeServiceFallbackTests: XCTestCase {
     
-    func testPreferredControlPathReturnsHueWhenBridgeAvailable() {
+    func testPreferredControlPathReturnsHueWhenBridgeAvailable() async {
         let service = MatterBridgeService(hueClient: nil)
-        let path = service.preferredControlPath(hueBridgeAvailable: true)
+        let path = await service.preferredControlPath(hueBridgeAvailable: true)
         XCTAssertEqual(path, .hue, "Should prefer Hue when bridge is available")
     }
     
-    func testPreferredControlPathReturnsNoneWhenNeitherAvailable() {
+    func testPreferredControlPathReturnsNoneWhenNeitherAvailable() async {
         let service = MatterBridgeService(hueClient: nil)
-        let path = service.preferredControlPath(hueBridgeAvailable: false)
+        let path = await service.preferredControlPath(hueBridgeAvailable: false)
         XCTAssertEqual(path, .none, "Should return .none when neither is available")
     }
     

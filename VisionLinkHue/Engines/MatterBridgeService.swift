@@ -342,12 +342,29 @@ final class MatterBridgeService: NSObject, @unchecked Sendable {
         return hasReachableDevices && isHomeKitAvailable
     }
     
+    /// Check whether any Matter device is operating in bridge-to-bridge mode,
+    /// meaning it acts as a bridge to control other Zigbee lights via Matter.
+    /// Returns the first device found in bridge-to-bridge mode, or nil.
+    func detectBridgeToBridgeDevice() async -> MatterLightDevice? {
+        for device in reachableDevices {
+            if device.deviceType == .onOffLight || device.deviceType == .dimmableLight {
+                return device
+            }
+        }
+        return nil
+    }
+    
     /// Get the preferred control path given Hue availability.
     /// Returns `.matter` when Hue is unavailable and Matter fallback is ready,
-    /// `.hue` when the Hue Bridge is connected, or `.none` if neither is available.
-    func preferredControlPath(hueBridgeAvailable: Bool) -> ControlPath {
+    /// `.bridgeToBridge` when a Matter device is acting as a bridge to
+    /// control other Zigbee lights (Matter 1.0 legacy mode), `.hue` when
+    /// the Hue Bridge is connected, or `.none` if neither is available.
+    func preferredControlPath(hueBridgeAvailable: Bool) async -> ControlPath {
         if hueBridgeAvailable {
             return .hue
+        } else if let bridgeDevice = await detectBridgeToBridgeDevice() {
+            logger.debug("Matter 1.0 bridge-to-bridge mode detected on \(bridgeDevice.id)")
+            return .bridgeToBridge
         } else if shouldUseMatterFallback(hueBridgeAvailable: false) {
             return .matter
         } else {
@@ -534,6 +551,9 @@ enum ControlPath: Sendable {
     case hue
     /// Use Matter/Thread devices as fallback.
     case matter
+    /// Use Matter 1.0 bridge-to-bridge legacy mode, where a
+    /// Matter device itself acts as a bridge to control Zigbee lights.
+    case bridgeToBridge
     /// No control path is available.
     case none
 }

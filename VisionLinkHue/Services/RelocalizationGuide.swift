@@ -596,46 +596,4 @@ final class RelocalizationGuide {
     }
 }
 
-// MARK: - InlineArray for Fixed-Size Storage
 
-/// A zero-heap-allocation array for fixed-size element storage.
-///
-/// Provides better cache locality than `(Int, Int, Int, Int)` tuples
-/// in high-frequency loops, as recommended for Swift 6.3+ optimization.
-/// Migrated from legacy tuple storage to improve cache performance.
-@inline(__always)
-struct InlineArray<Element, let N: Int> {
-    typealias Storage = (Element, Element, Element, Element)
-    
-    private var storage: Storage
-    
-    init(repeating element: Element) {
-        storage = (element, element, element, element)
-    }
-    
-    init(_ element0: Element, _ element1: Element, _ element2: Element, _ element3: Element) {
-        storage = (element0, element1, element2, element3)
-    }
-    
-    @inline(__always)
-    subscript(index: Int) -> Element {
-        get {
-            switch index {
-            case 0: return storage.0
-            case 1: return storage.1
-            case 2: return storage.2
-            case 3: return storage.3
-            default: fatalError("InlineArray index out of bounds: \(index)")
-            }
-        }
-        set {
-            switch index {
-            case 0: storage.0 = newValue
-            case 1: storage.1 = newValue
-            case 2: storage.2 = newValue
-            case 3: storage.3 = newValue
-            default: fatalError("InlineArray index out of bounds: \(index)")
-            }
-        }
-    }
-}
