@@ -14,7 +14,7 @@ struct HueLightResource: Codable, Sendable, Identifiable {
     
     struct Metadata: Codable, Sendable {
         var name: String?
-        private var archetype: String?
+        var archetype: String?
         var archetypeValue: Archetype {
             Archetype(rawValue: archetype ?? "unknown") ?? .unknown
         }

@@ -1,72 +1,85 @@
 import XCTest
-import @testable VisionLinkHue
+@testable import VisionLinkHue
 import simd
 
 /// Unit tests for ObjectAnchorPersistenceService, validating fixture
 /// archetype registration, persistence, and relocalization matching.
+@MainActor
 final class ObjectAnchorPersistenceServiceTests: XCTestCase {
     
     private var service: ObjectAnchorPersistenceService!
     
-    override func setUp() {
-        super.setUp()
-        service = ObjectAnchorPersistenceService()
+    override func setUp() async throws {
+        try await super.setUp()
+        service = await MainActor.run { ObjectAnchorPersistenceService() }
         // Clear any persisted data between tests
-        service.clearAllArchetypes()
+        await MainActor.run { service.clearAllArchetypes() }
     }
     
-    override func tearDown() {
-        service?.clearAllArchetypes()
+    override func tearDown() async throws {
+        await MainActor.run { service?.clearAllArchetypes() }
         service = nil
-        super.tearDown()
+        try await super.tearDown()
     }
     
     // MARK: - Initial State Tests
     
-    func testServiceStartsWithNoArchetypes() {
-        XCTAssertFalse(service.hasActiveAnchors)
-        XCTAssertTrue(service.archetypes.isEmpty)
-        XCTAssertFalse(service.isRelocalized)
-        XCTAssertNil(service.matchedArchetype)
+    func testServiceStartsWithNoArchetypes() async {
+        let hasActiveAnchors = await service.hasActiveAnchors
+        XCTAssertFalse(hasActiveAnchors)
+        let archetypes = await service.archetypes
+        XCTAssertTrue(archetypes.isEmpty)
+        let isRelocalized = await service.isRelocalized
+        XCTAssertFalse(isRelocalized)
+        let matchedArchetype = await service.matchedArchetype
+        XCTAssertNil(matchedArchetype)
     }
     
     // MARK: - Archetype Registration Tests
     
-    func testRegisterArchetypalFixture() {
+    func testRegisterArchetypalFixture() async {
         let position = SIMD3<Float>(1.0, 2.0, 3.0)
         let orientation = simd_quatf(angle: .pi / 4, axis: SIMD3<Float>(0, 1, 0))
         
-        service.registerArchetype(
-            fixtureType: .chandelier,
-            objectAnchorName: "fixture_chandelier_abc12345",
-            position: position,
-            orientation: orientation,
-            confidence: 0.85
-        )
+        await MainActor.run {
+            service.registerArchetype(
+                fixtureType: .chandelier,
+                objectAnchorName: "fixture_chandelier_abc12345",
+                position: position,
+                orientation: orientation,
+                confidence: 0.85
+            )
+        }
         
-        XCTAssertEqual(service.archetypes.count, 1)
-        XCTAssertEqual(service.archetypes[0].fixtureType, .chandelier)
-        XCTAssertEqual(service.archetypes[0].confidence, 0.85)
-        XCTAssertTrue(service.hasActiveAnchors)
+        let archetypes = await service.archetypes
+        XCTAssertEqual(archetypes.count, 1)
+        XCTAssertEqual(archetypes[0].fixtureType, .chandelier)
+        XCTAssertEqual(archetypes[0].confidence, 0.85)
+        let hasActiveAnchors = await service.hasActiveAnchors
+        XCTAssertTrue(hasActiveAnchors)
     }
     
-    func testRegisterNonArchetypalFixtureIsSkipped() {
+    func testRegisterNonArchetypalFixtureIsSkipped() async {
         let position = SIMD3<Float>(1.0, 2.0, 3.0)
         let orientation = simd_quatf(angle: .pi / 4, axis: SIMD3<Float>(0, 1, 0))
         
-        service.registerArchetype(
-            fixtureType: .recessed,
-            objectAnchorName: "fixture_recessed_xyz78901",
-            position: position,
-            orientation: orientation,
-            confidence: 0.90
-        )
+        await MainActor.run {
+            service.registerArchetype(
+                fixtureType: .recessed,
+                objectAnchorName: "fixture_recessed_xyz78901",
+                position: position,
+                orientation: orientation,
+                confidence: 0.90
+            )
+        }
         
-        XCTAssertTrue(service.archetypes.isEmpty)
-        XCTAssertFalse(service.hasActiveAnchors)
+        let archetypes = await service.archetypes
+        XCTAssertTrue(archetypes.isEmpty)
+        let hasActiveAnchors = await service.hasActiveAnchors
+        XCTAssertFalse(hasActiveAnchors)
     }
     
-    func testRegisterMultipleArchetypes() {
+    func testRegisterMultipleArchetypes() async {
         let positions: [SIMD3<Float>] = [
             SIMD3<Float>(1, 2, 3),
             SIMD3<Float>(4, 5, 6),
@@ -75,310 +88,389 @@ final class ObjectAnchorPersistenceServiceTests: XCTestCase {
         let types: [FixtureType] = [.chandelier, .sconce, .deskLamp]
         
         for (i, type) in types.enumerated() {
-            service.registerArchetype(
-                fixtureType: type,
-                objectAnchorName: "fixture_\(type.rawValue)_\(i)",
-                position: positions[i],
-                orientation: simd_quatf.identity,
-                confidence: 0.8
-            )
+            await MainActor.run {
+                service.registerArchetype(
+                    fixtureType: type,
+                    objectAnchorName: "fixture_\(type.rawValue)_\(i)",
+                    position: positions[i],
+                    orientation: simd_quatf(),
+                    confidence: 0.8
+                )
+            }
         }
         
-        XCTAssertEqual(service.archetypes.count, 3)
-        XCTAssertTrue(service.hasActiveAnchors)
+        let archetypes = await service.archetypes
+        XCTAssertEqual(archetypes.count, 3)
+        let hasActiveAnchors = await service.hasActiveAnchors
+        XCTAssertTrue(hasActiveAnchors)
     }
     
-    func testUnarchetypalTypes() {
+    func testUnarchetypalTypes() async {
         let position = SIMD3<Float>(1, 2, 3)
-        let orientation = simd_quatf.identity
+        let orientation = simd_quatf()
         
         // These types should NOT be registered as archetypes
         let nonArchetypalTypes: [FixtureType] = [.lamp, .recessed, .ceiling, .strip]
         
         for type in nonArchetypalTypes {
-            service.registerArchetype(
-                fixtureType: type,
-                objectAnchorName: "test",
-                position: position,
-                orientation: orientation,
-                confidence: 0.9
-            )
+            await MainActor.run {
+                service.registerArchetype(
+                    fixtureType: type,
+                    objectAnchorName: "test",
+                    position: position,
+                    orientation: orientation,
+                    confidence: 0.9
+                )
+            }
         }
         
-        XCTAssertTrue(service.archetypes.isEmpty)
+        let archetypes = await service.archetypes
+        XCTAssertTrue(archetypes.isEmpty)
     }
     
     // MARK: - Archetype Removal Tests
     
-    func testRemoveArchetype() {
-        service.registerArchetype(
-            fixtureType: .chandelier,
-            objectAnchorName: "test_anchor",
-            position: SIMD3<Float>(1, 2, 3),
-            orientation: simd_quatf.identity,
-            confidence: 0.8
-        )
-        
-        let id = service.archetypes[0].id
-        service.removeArchetype(for: id)
-        
-        XCTAssertTrue(service.archetypes.isEmpty)
-        XCTAssertFalse(service.hasActiveAnchors)
-    }
-    
-    func testClearAllArchetypes() {
-        for i in 0..<3 {
+    func testRemoveArchetype() async {
+        await MainActor.run {
             service.registerArchetype(
                 fixtureType: .chandelier,
-                objectAnchorName: "anchor_\(i)",
-                position: SIMD3<Float>(Float(i), 0, 0),
-                orientation: simd_quatf.identity,
+                objectAnchorName: "test_anchor",
+                position: SIMD3<Float>(1, 2, 3),
+                orientation: simd_quatf(),
                 confidence: 0.8
             )
         }
         
-        service.clearAllArchetypes()
+        let archetypes = await service.archetypes
+        let id = archetypes[0].id
+        await MainActor.run { service.removeArchetype(for: id) }
         
-        XCTAssertTrue(service.archetypes.isEmpty)
-        XCTAssertFalse(service.hasActiveAnchors)
-        XCTAssertFalse(service.isRelocalized)
-        XCTAssertNil(service.matchedArchetype)
+        let remaining = await service.archetypes
+        XCTAssertTrue(remaining.isEmpty)
+        let hasActiveAnchors = await service.hasActiveAnchors
+        XCTAssertFalse(hasActiveAnchors)
+    }
+    
+    func testClearAllArchetypes() async {
+        for i in 0..<3 {
+            await MainActor.run {
+                service.registerArchetype(
+                    fixtureType: .chandelier,
+                    objectAnchorName: "anchor_\(i)",
+                    position: SIMD3<Float>(Float(i), 0, 0),
+                    orientation: simd_quatf(),
+                    confidence: 0.8
+                )
+            }
+        }
+        
+        await MainActor.run { service.clearAllArchetypes() }
+        
+        let archetypes = await service.archetypes
+        XCTAssertTrue(archetypes.isEmpty)
+        let hasActiveAnchors = await service.hasActiveAnchors
+        XCTAssertFalse(hasActiveAnchors)
+        let isRelocalized = await service.isRelocalized
+        XCTAssertFalse(isRelocalized)
+        let matchedArchetype = await service.matchedArchetype
+        XCTAssertNil(matchedArchetype)
     }
     
     // MARK: - Relocalization Tests
     
-    func testMatchObjectAnchors() {
-        service.registerArchetype(
-            fixtureType: .chandelier,
-            objectAnchorName: "fixture_chandelier_abc12345",
-            position: SIMD3<Float>(1, 2, 3),
-            orientation: simd_quatf.identity,
-            confidence: 0.85
-        )
+    func testMatchObjectAnchors() async {
+        await MainActor.run {
+            service.registerArchetype(
+                fixtureType: .chandelier,
+                objectAnchorName: "fixture_chandelier_abc12345",
+                position: SIMD3<Float>(1, 2, 3),
+                orientation: simd_quatf(),
+                confidence: 0.85
+            )
+        }
         
-        // Simulate ARKit finding the anchor
-        service.matchObjectAnchors(to: ["fixture_chandelier_abc12345", "other_anchor"])
+        await MainActor.run {
+            service.matchObjectAnchors(to: ["fixture_chandelier_abc12345", "other_anchor"])
+        }
         
-        XCTAssertTrue(service.isRelocalized)
-        XCTAssertNotNil(service.matchedArchetype)
-        XCTAssertEqual(service.matchedArchetype?.fixtureType, .chandelier)
+        let isRelocalized = await service.isRelocalized
+        XCTAssertTrue(isRelocalized)
+        let matchedArchetype = await service.matchedArchetype
+        XCTAssertNotNil(matchedArchetype)
+        XCTAssertEqual(matchedArchetype?.fixtureType, .chandelier)
     }
     
-    func testMatchObjectAnchorsNoMatch() {
-        service.registerArchetype(
-            fixtureType: .sconce,
-            objectAnchorName: "fixture_sconce_xyz78901",
-            position: SIMD3<Float>(1, 2, 3),
-            orientation: simd_quatf.identity,
-            confidence: 0.75
-        )
+    func testMatchObjectAnchorsNoMatch() async {
+        await MainActor.run {
+            service.registerArchetype(
+                fixtureType: .sconce,
+                objectAnchorName: "fixture_sconce_xyz78901",
+                position: SIMD3<Float>(1, 2, 3),
+                orientation: simd_quatf(),
+                confidence: 0.75
+            )
+        }
         
-        // ARKit finds different anchors
-        service.matchObjectAnchors(to: ["other_anchor_1", "other_anchor_2"])
+        await MainActor.run {
+            service.matchObjectAnchors(to: ["other_anchor_1", "other_anchor_2"])
+        }
         
-        XCTAssertFalse(service.isRelocalized)
-        XCTAssertNil(service.matchedArchetype)
+        let isRelocalized = await service.isRelocalized
+        XCTAssertFalse(isRelocalized)
+        let matchedArchetype = await service.matchedArchetype
+        XCTAssertNil(matchedArchetype)
     }
     
-    func testMatchObjectAnchorsAlreadyMatchedSkipped() {
-        service.registerArchetype(
-            fixtureType: .chandelier,
-            objectAnchorName: "anchor_chandelier",
-            position: SIMD3<Float>(1, 2, 3),
-            orientation: simd_quatf.identity,
-            confidence: 0.8
-        )
+    func testMatchObjectAnchorsAlreadyMatchedSkipped() async {
+        await MainActor.run {
+            service.registerArchetype(
+                fixtureType: .chandelier,
+                objectAnchorName: "anchor_chandelier",
+                position: SIMD3<Float>(1, 2, 3),
+                orientation: simd_quatf(),
+                confidence: 0.8
+            )
+            service.registerArchetype(
+                fixtureType: .sconce,
+                objectAnchorName: "anchor_sconce",
+                position: SIMD3<Float>(4, 5, 6),
+                orientation: simd_quatf(),
+                confidence: 0.7
+            )
+        }
         
-        service.registerArchetype(
-            fixtureType: .sconce,
-            objectAnchorName: "anchor_sconce",
-            position: SIMD3<Float>(4, 5, 6),
-            orientation: simd_quatf.identity,
-            confidence: 0.7
-        )
+        await MainActor.run {
+            service.matchObjectAnchors(to: ["anchor_chandelier"])
+        }
+        let isRelocalized1 = await service.isRelocalized
+        XCTAssertTrue(isRelocalized1)
         
-        // Match first archetype
-        service.matchObjectAnchors(to: ["anchor_chandelier"])
-        XCTAssertTrue(service.isRelocalized)
+        await MainActor.run {
+            service.matchObjectAnchors(to: ["anchor_chandelier", "anchor_sconce"])
+        }
         
-        // Try matching again with both anchors - chandelier should be skipped
-        service.matchObjectAnchors(to: ["anchor_chandelier", "anchor_sconce"])
-        
-        // Still only one matched (the sconce should now match)
-        XCTAssertTrue(service.isRelocalized)
+        let isRelocalized2 = await service.isRelocalized
+        XCTAssertTrue(isRelocalized2)
     }
     
-    func testUpdateMatchedAnchorID() {
-        service.registerArchetype(
-            fixtureType: .deskLamp,
-            objectAnchorName: "fixture_desklamp_def45678",
-            position: SIMD3<Float>(1, 2, 3),
-            orientation: simd_quatf.identity,
-            confidence: 0.9
-        )
+    func testUpdateMatchedAnchorID() async {
+        await MainActor.run {
+            service.registerArchetype(
+                fixtureType: .deskLamp,
+                objectAnchorName: "fixture_desklamp_def45678",
+                position: SIMD3<Float>(1, 2, 3),
+                orientation: simd_quatf(),
+                confidence: 0.9
+            )
+        }
         
-        let archetypeID = service.archetypes[0].id
-        service.updateMatchedAnchorID(for: archetypeID, anchorID: "AR_anchor_abc")
+        let archetypes = await service.archetypes
+        let archetypeID = archetypes[0].id
+        await MainActor.run { service.updateMatchedAnchorID(for: archetypeID, anchorID: "AR_anchor_abc") }
         
-        XCTAssertEqual(service.archetypes[0].matchedAnchorID, "AR_anchor_abc")
+        let updated = await service.archetypes
+        XCTAssertEqual(updated[0].matchedAnchorID, "AR_anchor_abc")
     }
     
     // MARK: - Grouping Tests
     
-    func testArchetypesByType() {
-        service.registerArchetype(
-            fixtureType: .chandelier,
-            objectAnchorName: "chandelier_1",
-            position: SIMD3<Float>(1, 2, 3),
-            orientation: simd_quatf.identity,
-            confidence: 0.8
-        )
+    func testArchetypesByType() async {
+        await MainActor.run {
+            service.registerArchetype(
+                fixtureType: .chandelier,
+                objectAnchorName: "chandelier_1",
+                position: SIMD3<Float>(1, 2, 3),
+                orientation: simd_quatf(),
+                confidence: 0.8
+            )
+            service.registerArchetype(
+                fixtureType: .chandelier,
+                objectAnchorName: "chandelier_2",
+                position: SIMD3<Float>(4, 5, 6),
+                orientation: simd_quatf(),
+                confidence: 0.7
+            )
+            service.registerArchetype(
+                fixtureType: .sconce,
+                objectAnchorName: "sconce_1",
+                position: SIMD3<Float>(7, 8, 9),
+                orientation: simd_quatf(),
+                confidence: 0.9
+            )
+        }
         
-        service.registerArchetype(
-            fixtureType: .chandelier,
-            objectAnchorName: "chandelier_2",
-            position: SIMD3<Float>(4, 5, 6),
-            orientation: simd_quatf.identity,
-            confidence: 0.7
-        )
-        
-        service.registerArchetype(
-            fixtureType: .sconce,
-            objectAnchorName: "sconce_1",
-            position: SIMD3<Float>(7, 8, 9),
-            orientation: simd_quatf.identity,
-            confidence: 0.9
-        )
-        
-        let grouped = service.archetypesByType()
+        let grouped = await service.archetypesByType()
         XCTAssertEqual(grouped[.chandelier]?.count, 2)
         XCTAssertEqual(grouped[.sconce]?.count, 1)
     }
     
-    func testUnmatchedCount() {
-        service.registerArchetype(
-            fixtureType: .chandelier,
-            objectAnchorName: "anchor_1",
-            position: SIMD3<Float>(1, 2, 3),
-            orientation: simd_quatf.identity,
-            confidence: 0.8
-        )
+    func testUnmatchedCount() async {
+        await MainActor.run {
+            service.registerArchetype(
+                fixtureType: .chandelier,
+                objectAnchorName: "anchor_1",
+                position: SIMD3<Float>(1, 2, 3),
+                orientation: simd_quatf(),
+                confidence: 0.8
+            )
+            service.registerArchetype(
+                fixtureType: .sconce,
+                objectAnchorName: "anchor_2",
+                position: SIMD3<Float>(4, 5, 6),
+                orientation: simd_quatf(),
+                confidence: 0.7
+            )
+        }
         
-        service.registerArchetype(
-            fixtureType: .sconce,
-            objectAnchorName: "anchor_2",
-            position: SIMD3<Float>(4, 5, 6),
-            orientation: simd_quatf.identity,
-            confidence: 0.7
-        )
+        let unmatched = await service.unmatchedCount
+        XCTAssertEqual(unmatched, 2)
         
-        XCTAssertEqual(service.unmatchedCount, 2)
-        
-        // Match one
-        service.matchObjectAnchors(to: ["anchor_1"])
-        XCTAssertEqual(service.unmatchedCount, 1)
+        await MainActor.run {
+            service.matchObjectAnchors(to: ["anchor_1"])
+        }
+        let unmatched2 = await service.unmatchedCount
+        XCTAssertEqual(unmatched2, 1)
     }
     
     // MARK: - Extended Relocalization Tests
     
-    func testExtendedRelocalizationRegistersRecessedFixtures() {
-        let settings = DetectionSettings()
-        settings.extendedRelocalizationMode = true
-        let extendedService = ObjectAnchorPersistenceService(detectionSettings: settings)
+    func testExtendedRelocalizationRegistersRecessedFixtures() async {
+        let settings = await MainActor.run {
+            DetectionSettings()
+        }
+        await MainActor.run { settings.extendedRelocalizationMode = true }
+        let extendedService = await MainActor.run {
+            ObjectAnchorPersistenceService(detectionSettings: settings)
+        }
         
         let position = SIMD3<Float>(1.0, 2.0, 3.0)
         let orientation = simd_quatf(angle: .pi / 4, axis: SIMD3<Float>(0, 1, 0))
         
-        extendedService.registerArchetype(
-            fixtureType: .recessed,
-            objectAnchorName: "fixture_recessed_extended",
-            position: position,
-            orientation: orientation,
-            confidence: 0.90
-        )
+        await MainActor.run {
+            extendedService.registerArchetype(
+                fixtureType: .recessed,
+                objectAnchorName: "fixture_recessed_extended",
+                position: position,
+                orientation: orientation,
+                confidence: 0.90
+            )
+        }
         
-        XCTAssertEqual(extendedService.archetypes.count, 1)
-        XCTAssertEqual(extendedService.archetypes[0].fixtureType, .recessed)
-        XCTAssertTrue(extendedService.hasActiveAnchors)
+        let archetypes = await extendedService.archetypes
+        XCTAssertEqual(archetypes.count, 1)
+        XCTAssertEqual(archetypes[0].fixtureType, .recessed)
+        let hasActiveAnchors = await extendedService.hasActiveAnchors
+        XCTAssertTrue(hasActiveAnchors)
     }
     
-    func testExtendedRelocalizationRegistersCeilingFixtures() {
-        let settings = DetectionSettings()
-        settings.extendedRelocalizationMode = true
-        let extendedService = ObjectAnchorPersistenceService(detectionSettings: settings)
+    func testExtendedRelocalizationRegistersCeilingFixtures() async {
+        let settings = await MainActor.run {
+            DetectionSettings()
+        }
+        await MainActor.run { settings.extendedRelocalizationMode = true }
+        let extendedService = await MainActor.run {
+            ObjectAnchorPersistenceService(detectionSettings: settings)
+        }
         
-        extendedService.registerArchetype(
-            fixtureType: .ceiling,
-            objectAnchorName: "fixture_ceiling_extended",
-            position: SIMD3<Float>(2, 3, 4),
-            orientation: simd_quatf.identity,
-            confidence: 0.85
-        )
+        await MainActor.run {
+            extendedService.registerArchetype(
+                fixtureType: .ceiling,
+                objectAnchorName: "fixture_ceiling_extended",
+                position: SIMD3<Float>(2, 3, 4),
+                orientation: simd_quatf(),
+                confidence: 0.85
+            )
+        }
         
-        XCTAssertEqual(extendedService.archetypes.count, 1)
-        XCTAssertEqual(extendedService.archetypes[0].fixtureType, .ceiling)
+        let archetypes = await extendedService.archetypes
+        XCTAssertEqual(archetypes.count, 1)
+        XCTAssertEqual(archetypes[0].fixtureType, .ceiling)
     }
     
-    func testExtendedRelocalizationRegistersStripFixtures() {
-        let settings = DetectionSettings()
-        settings.extendedRelocalizationMode = true
-        let extendedService = ObjectAnchorPersistenceService(detectionSettings: settings)
+    func testExtendedRelocalizationRegistersStripFixtures() async {
+        let settings = await MainActor.run {
+            DetectionSettings()
+        }
+        await MainActor.run { settings.extendedRelocalizationMode = true }
+        let extendedService = await MainActor.run {
+            ObjectAnchorPersistenceService(detectionSettings: settings)
+        }
         
-        extendedService.registerArchetype(
-            fixtureType: .strip,
-            objectAnchorName: "fixture_strip_extended",
-            position: SIMD3<Float>(3, 4, 5),
-            orientation: simd_quatf.identity,
-            confidence: 0.80
-        )
+        await MainActor.run {
+            extendedService.registerArchetype(
+                fixtureType: .strip,
+                objectAnchorName: "fixture_strip_extended",
+                position: SIMD3<Float>(3, 4, 5),
+                orientation: simd_quatf(),
+                confidence: 0.80
+            )
+        }
         
-        XCTAssertEqual(extendedService.archetypes.count, 1)
-        XCTAssertEqual(extendedService.archetypes[0].fixtureType, .strip)
+        let archetypes = await extendedService.archetypes
+        XCTAssertEqual(archetypes.count, 1)
+        XCTAssertEqual(archetypes[0].fixtureType, .strip)
     }
     
-    func testStandardModeStillSkipsRecessedFixtures() {
-        let standardSettings = DetectionSettings()
-        standardSettings.extendedRelocalizationMode = false
-        let standardService = ObjectAnchorPersistenceService(detectionSettings: standardSettings)
+    func testStandardModeStillSkipsRecessedFixtures() async {
+        let standardSettings = await MainActor.run {
+            DetectionSettings()
+        }
+        await MainActor.run { standardSettings.extendedRelocalizationMode = false }
+        let standardService = await MainActor.run {
+            ObjectAnchorPersistenceService(detectionSettings: standardSettings)
+        }
         
-        standardService.registerArchetype(
-            fixtureType: .recessed,
-            objectAnchorName: "fixture_recessed_standard",
-            position: SIMD3<Float>(1, 2, 3),
-            orientation: simd_quatf.identity,
-            confidence: 0.90
-        )
+        await MainActor.run {
+            standardService.registerArchetype(
+                fixtureType: .recessed,
+                objectAnchorName: "fixture_recessed_standard",
+                position: SIMD3<Float>(1, 2, 3),
+                orientation: simd_quatf(),
+                confidence: 0.90
+            )
+        }
         
-        XCTAssertTrue(standardService.archetypes.isEmpty)
-        XCTAssertFalse(standardService.hasActiveAnchors)
+        let archetypes = await standardService.archetypes
+        XCTAssertTrue(archetypes.isEmpty)
+        let hasActiveAnchors = await standardService.hasActiveAnchors
+        XCTAssertFalse(hasActiveAnchors)
     }
     
-    func testExtendedModeStillSkipsLampFixtures() {
-        let settings = DetectionSettings()
-        settings.extendedRelocalizationMode = true
-        let extendedService = ObjectAnchorPersistenceService(detectionSettings: settings)
+    func testExtendedModeStillSkipsLampFixtures() async {
+        let settings = await MainActor.run {
+            DetectionSettings()
+        }
+        await MainActor.run { settings.extendedRelocalizationMode = true }
+        let extendedService = await MainActor.run {
+            ObjectAnchorPersistenceService(detectionSettings: settings)
+        }
         
-        extendedService.registerArchetype(
-            fixtureType: .lamp,
-            objectAnchorName: "fixture_lamp_extended",
-            position: SIMD3<Float>(1, 2, 3),
-            orientation: simd_quatf.identity,
-            confidence: 0.85
-        )
+        await MainActor.run {
+            extendedService.registerArchetype(
+                fixtureType: .lamp,
+                objectAnchorName: "fixture_lamp_extended",
+                position: SIMD3<Float>(1, 2, 3),
+                orientation: simd_quatf(),
+                confidence: 0.85
+            )
+        }
         
-        XCTAssertTrue(extendedService.archetypes.isEmpty)
+        let archetypes = await extendedService.archetypes
+        XCTAssertTrue(archetypes.isEmpty)
     }
     
     // MARK: - FixtureArchetype Tests
     
-    func testFixtureArchetypeCreation() {
-        let archetype = FixtureArchetype(
-            fixtureType: .pendant,
-            objectAnchorName: "test_pendant",
-            position: SIMD3<Float>(1, 2, 3),
-            orientation: simd_quatf(angle: .pi / 2, axis: SIMD3<Float>(0, 1, 0)),
-            confidence: 0.75
-        )
+    func testFixtureArchetypeCreation() async {
+        let archetype = await MainActor.run {
+            FixtureArchetype(
+                fixtureType: .pendant,
+                objectAnchorName: "test_pendant",
+                position: SIMD3<Float>(1, 2, 3),
+                orientation: simd_quatf(angle: .pi / 2, axis: SIMD3<Float>(0, 1, 0)),
+                confidence: 0.75
+            )
+        }
         
         XCTAssertNotNil(archetype.id)
         XCTAssertEqual(archetype.fixtureType, .pendant)

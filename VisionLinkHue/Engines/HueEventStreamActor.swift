@@ -55,7 +55,7 @@ actor HueEventStreamActor {
     private var sseDataBuffer = ""
     
     /// Reconnection delay with exponential backoff.
-    private var reconnectDelay: TimeInterval = 1.0
+    var reconnectDelay: TimeInterval = 1.0
     
     /// Maximum reconnect delay.
     private var maxReconnectDelay: TimeInterval = 30.0
@@ -354,7 +354,7 @@ actor HueEventStreamActor {
     /// Applies sliding-window deduplication to skip identical state updates
     /// within the current connection session, preventing buffer thrashing during
     /// rapid firmware updates or large ecosystem sync bursts.
-    private func parseAndDispatchEvent(_ text: String) async throws {
+    func parseAndDispatchEvent(_ text: String) async throws {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if trimmed.isEmpty || trimmed == "ping" {
@@ -445,7 +445,7 @@ actor HueEventStreamActor {
     }
     
     /// Handle stream disconnection with state machine-driven reconnection.
-    private func handleDisconnect(error: any Error) async {
+    func handleDisconnect(error: any Error) async {
         logger.error("SSE stream error: \(error.localizedDescription)")
         
         onError?(error)
@@ -495,7 +495,7 @@ actor HueEventStreamActor {
     }
     
     /// Reset the backoff delay after a successful reconnection attempt.
-    private func resetReconnectDelay() {
+    func resetReconnectDelay() {
         reconnectDelay = minReconnectDelay
     }
     

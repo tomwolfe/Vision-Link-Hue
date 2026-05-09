@@ -1,5 +1,5 @@
 import XCTest
-import @testable VisionLinkHue
+@testable import VisionLinkHue
 import simd
 
 /// Unit tests for the pure spatial math utilities.
@@ -18,10 +18,8 @@ final class SpatialMathTests: XCTestCase {
             SIMD4<Float>(0, 0, 0, 1)
         )
         
-        let intrinsics = cameraIntrinsics(
-            k0: 500.0, k1: 0.0, k2: 320.0,
-            k3: 0.0, k4: 500.0, k5: 240.0,
-            k6: 0.0, k7: 0.0, k8: 1.0
+        let intrinsics = CameraIntrinsics(
+            k0: 500.0, k4: 500.0, k2: 320.0, k5: 240.0
         )
         
         let imageSize = CGSize(width: 640, height: 480)
@@ -38,8 +36,8 @@ final class SpatialMathTests: XCTestCase {
         }
         
         // Center normalized point should produce a ray pointing straight ahead (-Z).
-        XCTAssertEqual(ray.origin, SIMD3<Float>(0, 0, 0), accuracy: 0.001)
-        XCTAssertEqual(ray.direction, SIMD3<Float>(0, 0, -1), accuracy: 0.001)
+        XCTAssertEqual(ray.origin, SIMD3<Float>(0, 0, 0))
+        XCTAssertEqual(ray.direction, SIMD3<Float>(0, 0, -1))
     }
     
     func testCameraRayEdgePoint() {
@@ -50,10 +48,8 @@ final class SpatialMathTests: XCTestCase {
             SIMD4<Float>(0, 0, 0, 1)
         )
         
-        let intrinsics = cameraIntrinsics(
-            k0: 500.0, k1: 0.0, k2: 320.0,
-            k3: 0.0, k4: 500.0, k5: 240.0,
-            k6: 0.0, k7: 0.0, k8: 1.0
+        let intrinsics = CameraIntrinsics(
+            k0: 500.0, k4: 500.0, k2: 320.0, k5: 240.0
         )
         
         let imageSize = CGSize(width: 640, height: 480)
@@ -70,12 +66,14 @@ final class SpatialMathTests: XCTestCase {
         }
         
         // Top-left corner should have a negative X and negative Y direction component.
-        XCTAssertLessThan(ray.direction.x, 0, accuracy: 0.001)
-        XCTAssertLessThan(ray.direction.y, 0, accuracy: 0.001)
-        XCTAssertGreaterThan(ray.direction.z, 0, accuracy: 0.001)
+        XCTAssertLessThan(ray.direction.x, 0)
+        XCTAssertLessThan(ray.direction.y, 0)
+        XCTAssertGreaterThan(ray.direction.z, 0)
         
         // Direction should be normalized.
-        XCTAssertEqual(length(ray.direction), 1.0, accuracy: 0.001)
+        let dirNormalized = ray.direction
+        let dirLength = sqrt(simd_dot(dirNormalized, dirNormalized))
+        XCTAssertEqual(dirLength, 1.0, accuracy: 0.001)
     }
     
     // MARK: - unprojectDirection Tests
@@ -88,10 +86,8 @@ final class SpatialMathTests: XCTestCase {
             SIMD4<Float>(0, 0, 0, 1)
         )
         
-        let intrinsics = cameraIntrinsics(
-            k0: 500.0, k1: 0.0, k2: 320.0,
-            k3: 0.0, k4: 500.0, k5: 240.0,
-            k6: 0.0, k7: 0.0, k8: 1.0
+        let intrinsics = CameraIntrinsics(
+            k0: 500.0, k4: 500.0, k2: 320.0, k5: 240.0
         )
         
         let direction = SpatialMath.unprojectDirection(
@@ -101,7 +97,9 @@ final class SpatialMathTests: XCTestCase {
         )
         
         XCTAssertNotNil(direction)
-        XCTAssertEqual(length(direction!), 1.0, accuracy: 0.001)
+        let dir = direction!
+        let dirLength = sqrt(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z)
+        XCTAssertEqual(dirLength, 1.0, accuracy: 0.001)
     }
     
     func testUnprojectDirectionWithNilIntrinsics() {
@@ -120,7 +118,7 @@ final class SpatialMathTests: XCTestCase {
         
         XCTAssertNotNil(direction)
         // Should fall back to camera's forward direction.
-        XCTAssertEqual(direction!, SIMD3<Float>(0, 0, -1), accuracy: 0.001)
+        XCTAssertEqual(direction!, SIMD3<Float>(0, 0, -1))
     }
     
     // MARK: - depthUnproject Tests
@@ -133,10 +131,8 @@ final class SpatialMathTests: XCTestCase {
             SIMD4<Float>(0, 0, 0, 1)
         )
         
-        let intrinsics = cameraIntrinsics(
-            k0: 500.0, k1: 0.0, k2: 320.0,
-            k3: 0.0, k4: 500.0, k5: 240.0,
-            k6: 0.0, k7: 0.0, k8: 1.0
+        let intrinsics = CameraIntrinsics(
+            k0: 500.0, k4: 500.0, k2: 320.0, k5: 240.0
         )
         
         let position = SpatialMath.depthUnproject(
@@ -151,9 +147,9 @@ final class SpatialMathTests: XCTestCase {
         
         XCTAssertNotNil(position)
         // Center pixel at 2m depth should be at (0, 0, -2) in world space.
-        XCTAssertEqual(position!.z, -2.0, accuracy: 0.001)
-        XCTAssertEqual(position!.x, 0.0, accuracy: 0.001)
-        XCTAssertEqual(position!.y, 0.0, accuracy: 0.001)
+        XCTAssertEqual(position!.z, -2.0)
+        XCTAssertEqual(position!.x, 0.0)
+        XCTAssertEqual(position!.y, 0.0)
     }
     
     func testDepthUnprojectClampsPixelCoordinates() {
@@ -164,10 +160,8 @@ final class SpatialMathTests: XCTestCase {
             SIMD4<Float>(0, 0, 0, 1)
         )
         
-        let intrinsics = cameraIntrinsics(
-            k0: 500.0, k1: 0.0, k2: 320.0,
-            k3: 0.0, k4: 500.0, k5: 240.0,
-            k6: 0.0, k7: 0.0, k8: 1.0
+        let intrinsics = CameraIntrinsics(
+            k0: 500.0, k4: 500.0, k2: 320.0, k5: 240.0
         )
         
         // Out-of-bounds pixel should be clamped, not return nil.
@@ -201,7 +195,7 @@ final class SpatialMathTests: XCTestCase {
         )
         
         // Center point at 2m should be at (0, 0, -2).
-        XCTAssertEqual(position.z, -2.0, accuracy: 0.001)
+        XCTAssertEqual(position.z, -2.0)
     }
     
     // MARK: - lookAtSafe Tests
@@ -217,8 +211,16 @@ final class SpatialMathTests: XCTestCase {
             worldUp: worldUp
         )
         
-        XCTAssertNotNil(quaternion)
-        XCTAssertEqual(length(quaternion!), 1.0, accuracy: 0.001)
+        guard let quat = quaternion else {
+            XCTFail("Quaternion should not be nil")
+            return
+        }
+        let realPartSquared = quat.real * quat.real
+        let axisXPartSquared = quat.axis.x * quat.axis.x
+        let axisYPaitSquared = quat.axis.y * quat.axis.y
+        let axisZPartSquared = quat.axis.z * quat.axis.z
+        let dotProduct = realPartSquared + axisXPartSquared + axisYPaitSquared + axisZPartSquared
+        XCTAssertEqual(dotProduct, 1.0, accuracy: 0.001)
     }
     
     func testLookAtSafeReturnsNilForParallelVectors() {
@@ -235,8 +237,6 @@ final class SpatialMathTests: XCTestCase {
         XCTAssertNil(quaternion, "Expected nil for parallel forward and worldUp vectors")
     }
     
-    // MARK: - rotationMatrix / translation Tests
-    
     func testRotationMatrixExtracts3x3() {
         let transform = simd_float4x4(
             SIMD4<Float>(0, -1, 0, 0),
@@ -248,9 +248,9 @@ final class SpatialMathTests: XCTestCase {
         let rotation = SpatialMath.rotationMatrix(from: transform)
         
         // The 3x3 rotation should match the upper-left 3x3 of the 4x4.
-        XCTAssertEqual(rotation.columns.0, SIMD3<Float>(0, -1, 0), accuracy: 0.001)
-        XCTAssertEqual(rotation.columns.1, SIMD3<Float>(1, 0, 0), accuracy: 0.001)
-        XCTAssertEqual(rotation.columns.2, SIMD3<Float>(0, 0, 1), accuracy: 0.001)
+        XCTAssertEqual(rotation.columns.0, SIMD3<Float>(0, -1, 0))
+        XCTAssertEqual(rotation.columns.1, SIMD3<Float>(1, 0, 0))
+        XCTAssertEqual(rotation.columns.2, SIMD3<Float>(0, 0, 1))
     }
     
     func testTranslationExtractsPosition() {
@@ -263,6 +263,6 @@ final class SpatialMathTests: XCTestCase {
         
         let translation = SpatialMath.translation(from: transform)
         
-        XCTAssertEqual(translation, SIMD3<Float>(3, 4, 5), accuracy: 0.001)
+        XCTAssertEqual(translation, SIMD3<Float>(3, 4, 5))
     }
 }

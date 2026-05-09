@@ -1,9 +1,10 @@
 import XCTest
 import Vision
-import @testable VisionLinkHue
+@testable import VisionLinkHue
 
 /// Unit tests for the GestureManager, validating pinch gesture detection,
 /// brightness delta calculation, EMA smoothing, and fixture targeting.
+@MainActor
 final class GestureManagerTests: XCTestCase {
     
     private var manager: GestureManager!
@@ -55,7 +56,7 @@ final class GestureManagerTests: XCTestCase {
             id: UUID(),
             detection: FixtureDetection(type: .lamp, region: NormalizedRect(x: 0.5, y: 0.5, width: 0.1, height: 0.1), confidence: 0.9),
             position: SIMD3<Float>(0.1, 1.0, -0.5),
-            orientation: simd_quatf.identity,
+            orientation: simd_quatf(angle: 0, axis: SIMD3<Float>(0, 0, 1)),
             distanceMeters: 1.0,
             material: nil
         )
@@ -64,7 +65,7 @@ final class GestureManagerTests: XCTestCase {
             id: UUID(),
             detection: FixtureDetection(type: .ceiling, region: NormalizedRect(x: 0.3, y: 0.1, width: 0.2, height: 0.2), confidence: 0.85),
             position: SIMD3<Float>(2.0, 2.5, -3.0),
-            orientation: simd_quatf.identity,
+            orientation: simd_quatf(angle: 0, axis: SIMD3<Float>(0, 0, 1)),
             distanceMeters: 3.5,
             material: nil
         )
@@ -81,7 +82,7 @@ final class GestureManagerTests: XCTestCase {
             id: UUID(),
             detection: FixtureDetection(type: .lamp, region: NormalizedRect(x: 0.5, y: 0.5, width: 0.1, height: 0.1), confidence: 0.9),
             position: SIMD3<Float>(5.0, 3.0, -4.0),
-            orientation: simd_quatf.identity,
+            orientation: simd_quatf(angle: 0, axis: SIMD3<Float>(0, 0, 1)),
             distanceMeters: 6.4,
             material: nil
         )
@@ -121,7 +122,7 @@ final class GestureManagerTests: XCTestCase {
             id: UUID(),
             detection: FixtureDetection(type: .lamp, region: NormalizedRect(x: 0.5, y: 0.5, width: 0.1, height: 0.1), confidence: 0.9),
             position: SIMD3<Float>(0.1, 1.0, -0.5),
-            orientation: simd_quatf.identity,
+            orientation: simd_quatf(angle: 0, axis: SIMD3<Float>(0, 0, 1)),
             distanceMeters: 1.0,
             material: nil
         )

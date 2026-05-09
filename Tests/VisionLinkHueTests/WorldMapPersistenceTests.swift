@@ -1,19 +1,23 @@
 import XCTest
 import SwiftData
-import @testable VisionLinkHue
+import simd
+@testable import VisionLinkHue
 
 /// Unit tests for the ARWorldMap persistence functionality in FixturePersistence.
 /// Validates save, load, existence check, and deletion of world map data.
+@MainActor
 final class WorldMapPersistenceTests: XCTestCase {
     
     private var persistence: FixturePersistence!
     private var modelContainer: ModelContainer!
     
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         let schema = Schema([FixtureMapping.self])
         modelContainer = try! ModelContainer(for: schema, configurations: [ModelConfiguration(isStoredInMemoryOnly: true)])
-        persistence = FixturePersistence(container: modelContainer)
+        persistence = await MainActor.run {
+            FixturePersistence(container: modelContainer)
+        }
     }
     
     override func tearDown() {
@@ -24,15 +28,16 @@ final class WorldMapPersistenceTests: XCTestCase {
     
     // MARK: - World Map File Existence Tests
     
-    func testHasWorldMapReturnsFalseWhenNoneSaved() {
-        XCTAssertFalse(persistence.hasWorldMap(), "Should return false when no world map exists")
+    func testHasWorldMapReturnsFalseWhenNoneSaved() async {
+        let hasWorld = await persistence.hasWorldMap()
+        XCTAssertFalse(hasWorld, "Should return false when no world map exists")
     }
     
-    func testSaveWorldMapCreatesFile() {
+    func testSaveWorldMapCreatesFile() async {
         // Create a minimal ARWorldMap for testing.
         // In unit tests, we can't create a real ARWorldMap without ARKit hardware,
         // but we can verify the file existence logic.
-        let hasBefore = persistence.hasWorldMap()
+        let hasBefore = await persistence.hasWorldMap()
         XCTAssertFalse(hasBefore, "Should not have world map before saving")
         
         // Note: We can't test actual ARWorldMap save/load in unit tests
@@ -40,10 +45,11 @@ final class WorldMapPersistenceTests: XCTestCase {
         // testable behavior here.
     }
     
-    func testDeleteWorldMapRemovesFile() {
+    func testDeleteWorldMapRemovesFile() async {
         // Verify delete doesn't crash when no file exists.
-        persistence.deleteWorldMap()
-        XCTAssertFalse(persistence.hasWorldMap(), "Should return false after deleting non-existent map")
+        await persistence.deleteWorldMap()
+        let hasWorld = await persistence.hasWorldMap()
+        XCTAssertFalse(hasWorld, "Should return false after deleting non-existent map")
     }
     
     // MARK: - Integration with Fixture Persistence
@@ -54,7 +60,7 @@ final class WorldMapPersistenceTests: XCTestCase {
         let position = SIMD3<Float>(1.0, 1.5, -2.0)
         let orientation = simd_quatf(angle: .pi / 4, axis: SIMD3<Float>(0, 1, 0))
         
-        persistence.saveMapping(
+        await persistence.saveMapping(
             fixtureId: fixtureId,
             lightId: "test-light-id",
             position: position,
@@ -71,11 +77,11 @@ final class WorldMapPersistenceTests: XCTestCase {
     func testWorldMapDoesNotInterfereWithFixtureMappings() async {
         // Save a fixture mapping.
         let fixtureId = UUID()
-        persistence.saveMapping(
+        await persistence.saveMapping(
             fixtureId: fixtureId,
             lightId: "light-1",
             position: SIMD3<Float>(0.5, 1.0, -1.0),
-            orientation: simd_quatf.identity,
+            orientation: simd_quatf(angle: 0, axis: SIMD3<Float>(0, 0, 0)),
             distanceMeters: 1.5,
             fixtureType: "pendant",
             confidence: 0.85

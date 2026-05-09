@@ -1,16 +1,15 @@
 import Foundation
+import simd
+@testable import VisionLinkHue
 
 /// Mock implementation of `HueClientProtocol` for unit testing.
 /// All methods return immediately with no side effects.
-@MainActor
 final class MockHueClient: HueClientProtocol {
     
     var bridgeIP: String?
     var bridgePort: Int = 80
     var apiKey: String?
     
-    /// Mock discovery service.
-    let discoveryService: HueDiscoveryService
     /// Mock spatial service.
     let spatialService: HueSpatialService
     
@@ -31,8 +30,7 @@ final class MockHueClient: HueClientProtocol {
     private(set) var spatialFetchCalls: Int = 0
     
     init() {
-        self.discoveryService = HueDiscoveryService()
-        self.spatialService = HueSpatialService(hueClient: self, stateStream: nil)
+        self.spatialService = HueSpatialService(stateStream: nil)
     }
     
     func discoverBridges() async -> [BridgeInfo] {
@@ -59,15 +57,15 @@ final class MockHueClient: HueClientProtocol {
         recallCalls.append((groupId: groupId, sceneId: sceneId))
     }
     
-    func setBrightness(resourceId: String, brightness: Int, transitionDuration: Int = 4) async throws {
+    func setBrightness(resourceId: String, brightness: Int, transitionDuration: Int) async throws {
         brightnessCalls.append((resourceId: resourceId, brightness: brightness))
     }
     
-    func setColorTemperature(resourceId: String, mireds: Int, transitionDuration: Int = 4) async throws {
+    func setColorTemperature(resourceId: String, mireds: Int, transitionDuration: Int) async throws {
         colorTempCalls.append((resourceId: resourceId, mireds: mireds))
     }
     
-    func setColorXY(resourceId: String, x: Double, y: Double, transitionDuration: Int = 4) async throws {
+    func setColorXY(resourceId: String, x: Double, y: Double, transitionDuration: Int) async throws {
         colorXycalls.append((resourceId: resourceId, x: x, y: y))
     }
     
@@ -79,15 +77,15 @@ final class MockHueClient: HueClientProtocol {
         toggleCalls.append((resourceId: groupId, on: on))
     }
     
-    func setBrightness(groupId: String, brightness: Int, transitionDuration: Int = 4) async throws {
+    func setBrightness(groupId: String, brightness: Int, transitionDuration: Int) async throws {
         brightnessCalls.append((resourceId: groupId, brightness: brightness))
     }
     
-    func setColorTemperature(groupId: String, mireds: Int, transitionDuration: Int = 4) async throws {
+    func setColorTemperature(groupId: String, mireds: Int, transitionDuration: Int) async throws {
         colorTempCalls.append((resourceId: groupId, mireds: mireds))
     }
     
-    func setColorXY(groupId: String, x: Double, y: Double, transitionDuration: Int = 4) async throws {
+    func setColorXY(groupId: String, x: Double, y: Double, transitionDuration: Int) async throws {
         colorXycalls.append((resourceId: groupId, x: x, y: y))
     }
     
@@ -165,4 +163,19 @@ final class MockHueClient: HueClientProtocol {
     func reconnect() async {
         didReconnect = true
     }
+    
+    // MARK: - Matter Fallback
+    
+    var isMatterFallbackAvailable: Bool { false }
+    var preferredControlPath: ControlPath { .hue }
+    
+    func fetchMatterDevices() async throws -> MatterBridgeState {
+        return MatterBridgeState(lights: [])
+    }
+    
+    func setMatterPower(deviceId: String, on: Bool) async throws {}
+    func setMatterBrightness(deviceId: String, brightness: Int, transitionDuration: Int) async throws {}
+    func setMatterColorTemperature(deviceId: String, mireds: Int, transitionDuration: Int) async throws {}
+    func setMatterColorXY(deviceId: String, x: Double, y: Double, transitionDuration: Int) async throws {}
+    func patchMatterLight(deviceId: String, patch: MatterLightStatePatch) async throws {}
 }

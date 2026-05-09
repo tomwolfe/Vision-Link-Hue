@@ -1,10 +1,11 @@
 import XCTest
-import @testable VisionLinkHue
+@testable import VisionLinkHue
 import simd
 
 /// Unit tests for the spatial calibration persistence system.
 /// Verifies that the `SpatialCalibrationEngine` correctly saves,
 /// loads, and clears the transformation matrix via a persistence store.
+@MainActor
 final class CalibrationPersistenceTests: XCTestCase {
     
     private var engine: SpatialCalibrationEngine!
@@ -69,6 +70,7 @@ final class CalibrationPersistenceTests: XCTestCase {
             engine.addCalibrationPoint(arKit: SIMD3<Float>(0, 0, 0), bridge: SIMD3<Float>(0, 0, 0))
             engine.addCalibrationPoint(arKit: SIMD3<Float>(1, 0, 0), bridge: SIMD3<Float>(1, 0, 0))
             engine.addCalibrationPoint(arKit: SIMD3<Float>(0, 1, 0), bridge: SIMD3<Float>(0, 1, 0))
+            return
         }
         
         // Pre-populate the mock store with calibration data
@@ -77,9 +79,9 @@ final class CalibrationPersistenceTests: XCTestCase {
             return
         }
         
-        mockStore.calibrationData = MockCalibrationStore.CalibrationData(
-            rotationData: transform.rotation.data,
-            translationData: transform.translation.data
+        mockStore.calibrationData = CalibrationData(
+            rotationData: withUnsafeBytes(of: transform.rotation) { Data($0) },
+            translationData: withUnsafeBytes(of: transform.translation) { Data($0) }
         )
         
         // Clear the engine's transformation
@@ -143,8 +145,18 @@ final class CalibrationPersistenceTests: XCTestCase {
         
         // Verify the loaded transformation matches the original
         let loadedTransform = newEngine.transformation!
-        XCTAssertEqual(loadedTransform.rotation, originalTransform.rotation, accuracy: 0.001)
-        XCTAssertEqual(loadedTransform.translation, originalTransform.translation, accuracy: 0.001)
+        for i in 0..<12 {
+            let loadedR = loadedTransform.rotation[i]
+            let originalR = originalTransform.rotation[i]
+            XCTAssertEqual(loadedR.x, originalR.x, accuracy: 0.001)
+            XCTAssertEqual(loadedR.y, originalR.y, accuracy: 0.001)
+            XCTAssertEqual(loadedR.z, originalR.z, accuracy: 0.001)
+        }
+        for i in 0..<3 {
+            let loadedT = loadedTransform.translation[i]
+            let originalT = originalTransform.translation[i]
+            XCTAssertEqual(loadedT, originalT, accuracy: 0.001)
+        }
     }
     
     func testSavePersistedCalibrationSavesData() async {
@@ -167,11 +179,6 @@ final class CalibrationPersistenceTests: XCTestCase {
 
 /// Mock implementation of `SpatialCalibrationPersistenceStore` for testing.
 final class MockCalibrationStore: SpatialCalibrationPersistenceStore {
-    
-    struct CalibrationData: SpatialCalibrationPersistenceStore.CalibrationData {
-        let rotationData: Data
-        let translationData: Data
-    }
     
     var calibrationData: CalibrationData?
     var savedRotationData: Data = Data()

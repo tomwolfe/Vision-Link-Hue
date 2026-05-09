@@ -1,13 +1,16 @@
 import XCTest
-import @testable VisionLinkHue
+import ARKit
+@testable import VisionLinkHue
 
 /// Unit tests for the AppContainer factory-based dependency injection pattern.
 /// Validates that factory protocols can be implemented with custom/mock
 /// factories for testability.
+@MainActor
 final class AppContainerTests: XCTestCase {
     
     // MARK: - Factory Protocol Tests
     
+    @MainActor
     func testDefaultHueStateStreamFactoryCreatesStream() {
         let factory = DefaultHueStateStreamFactory()
         let persistence = FixturePersistence.shared
@@ -17,6 +20,7 @@ final class AppContainerTests: XCTestCase {
         XCTAssertTrue(stream is HueStateStream)
     }
     
+    @MainActor
     func testDefaultHueClientFactoryCreatesClient() {
         let factory = DefaultHueClientFactory()
         let persistence = FixturePersistence.shared
@@ -28,6 +32,7 @@ final class AppContainerTests: XCTestCase {
         XCTAssertTrue(client is HueClient)
     }
     
+    @MainActor
     func testDefaultDetectionEngineFactoryCreatesEngine() {
         let factory = DefaultDetectionEngineFactory()
         let persistence = FixturePersistence.shared
@@ -38,6 +43,7 @@ final class AppContainerTests: XCTestCase {
         XCTAssertTrue(engine is DetectionEngine)
     }
     
+    @MainActor
     func testDefaultSpatialProjectorFactoryCreatesProjector() {
         let factory = DefaultSpatialProjectorFactory()
         let projector = factory.create()
@@ -45,6 +51,7 @@ final class AppContainerTests: XCTestCase {
         XCTAssertTrue(projector is SpatialProjector)
     }
     
+    @MainActor
     func testDefaultARSessionManagerFactoryCreatesManager() {
         let factory = DefaultARSessionManagerFactory()
         let persistence = FixturePersistence.shared
@@ -61,7 +68,10 @@ final class AppContainerTests: XCTestCase {
             hueClient: client,
             stateStream: stream,
             fixturePersistence: persistence,
-            detectionSettings: settings
+            objectAnchorService: ObjectAnchorPersistenceService(detectionSettings: settings),
+            clusterEngine: SpatialClusterEngine(),
+            detectionSettings: settings,
+            relocalizationMonitor: RelocalizationMonitoringService()
         )
         XCTAssertNotNil(manager)
         XCTAssertTrue(manager is ARSessionManager)
@@ -72,7 +82,10 @@ final class AppContainerTests: XCTestCase {
     func testCustomFactoryProtocolImplementation() {
         // Verify that a custom factory can conform to the protocol.
         let customFactory = MockHueClientFactory()
-        let client = customFactory.create(stateStream: MockHueClient())
+        let persistence = FixturePersistence.shared
+        let stream = HueStateStream(persistence: persistence)
+        stream.configure()
+        let client = customFactory.create(stateStream: stream)
         XCTAssertNotNil(client)
         XCTAssertTrue(client is HueClient)
     }
@@ -89,8 +102,8 @@ final class AppContainerTests: XCTestCase {
     }
     
     func testAppContainerWithCustomFactories() {
-        let customFactory = MockAllFactory()
-        let container = AppContainer(factories: customFactory)
+        let customFactories = MockAllFactories()
+        let container = AppContainer(factories: customFactories)
         XCTAssertNotNil(container.stateStream)
         XCTAssertNotNil(container.hueClient)
         XCTAssertNotNil(container.detectionEngine)
@@ -106,20 +119,28 @@ final class AppContainerTests: XCTestCase {
         }
     }
     
-    private final class MockAllFactory: DefaultFactories {
+    private final class MockAllFactories: DefaultFactories {
         override init(
             stateStreamFactory: HueStateStreamFactory = MockStateStreamFactory(),
             hueClientFactory: HueClientFactory = MockHueClientFactory(),
             detectionEngineFactory: DetectionEngineFactory = MockDetectionEngineFactory(),
             spatialProjectorFactory: SpatialProjectorFactory = MockSpatialProjectorFactory(),
-            arSessionManagerFactory: ARSessionManagerFactory = MockARSessionManagerFactory()
+            arSessionManagerFactory: ARSessionManagerFactory = MockARSessionManagerFactory(),
+            matterBridgeServiceFactory: MatterBridgeServiceFactory = MockMatterBridgeServiceFactory(),
+            spatialSyncServiceFactory: SpatialSyncServiceFactory = MockSpatialSyncServiceFactory(),
+            metricKitTelemetryFactory: MetricKitTelemetryServiceFactory = MockMetricKitTelemetryFactory(),
+            localSyncActorFactory: LocalSyncActorFactory = MockLocalSyncActorFactory()
         ) {
             super.init(
                 stateStreamFactory: stateStreamFactory,
                 hueClientFactory: hueClientFactory,
                 detectionEngineFactory: detectionEngineFactory,
                 spatialProjectorFactory: spatialProjectorFactory,
-                arSessionManagerFactory: arSessionManagerFactory
+                arSessionManagerFactory: arSessionManagerFactory,
+                matterBridgeServiceFactory: matterBridgeServiceFactory,
+                spatialSyncServiceFactory: spatialSyncServiceFactory,
+                metricKitTelemetryFactory: metricKitTelemetryFactory,
+                localSyncActorFactory: localSyncActorFactory
             )
         }
     }
@@ -151,7 +172,10 @@ final class AppContainerTests: XCTestCase {
             hueClient: HueClient,
             stateStream: HueStateStream,
             fixturePersistence: FixturePersistence,
-            detectionSettings: DetectionSettings
+            objectAnchorService: ObjectAnchorPersistenceService,
+            clusterEngine: SpatialClusterEngine,
+            detectionSettings: DetectionSettings,
+            relocalizationMonitor: RelocalizationMonitoringService
         ) -> ARSessionManager {
             ARSessionManager(
                 detectionEngine: detectionEngine,
@@ -159,8 +183,35 @@ final class AppContainerTests: XCTestCase {
                 hueClient: hueClient,
                 stateStream: stateStream,
                 fixturePersistence: fixturePersistence,
-                detectionSettings: detectionSettings
+                objectAnchorService: objectAnchorService,
+                clusterEngine: clusterEngine,
+                detectionSettings: detectionSettings,
+                relocalizationMonitor: relocalizationMonitor
             )
+        }
+    }
+    
+    private final class MockMatterBridgeServiceFactory: MatterBridgeServiceFactory {
+        func create() -> MatterBridgeService {
+            MatterBridgeService()
+        }
+    }
+    
+    private final class MockSpatialSyncServiceFactory: SpatialSyncServiceFactory {
+        func create() -> SpatialSyncService {
+            SpatialSyncService.shared
+        }
+    }
+    
+    private final class MockMetricKitTelemetryFactory: MetricKitTelemetryServiceFactory {
+        func create() -> MetricKitTelemetryService {
+            MetricKitTelemetryService()
+        }
+    }
+    
+    private final class MockLocalSyncActorFactory: LocalSyncActorFactory {
+        func create() -> LocalSyncActor {
+            LocalSyncActor()
         }
     }
 }

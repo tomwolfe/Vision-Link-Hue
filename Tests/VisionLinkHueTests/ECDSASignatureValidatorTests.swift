@@ -83,18 +83,19 @@ final class ECDSASignatureValidatorTests: XCTestCase {
         }
         """.data(using: .utf8)!
         
-        let error = try XCTUnwrap(try? ECDSASignatureValidator.verifySchemaVersion(payload: payload) as Result<Void, Error>)
-        switch error {
-        case .failure(let validationError) as ECDSASignatureValidator.SignatureError:
-            switch validationError {
-            case .schemaVersionTooLow(let current, let minimum):
+        do {
+            _ = try ECDSASignatureValidator.verifySchemaVersion(payload: payload)
+            XCTFail("Should have thrown an error")
+        } catch {
+            // Verify it's the expected error type
+            let signatureError = error as? ECDSASignatureValidator.SignatureError
+            switch signatureError {
+            case .schemaVersionTooLow(let current, let minimum)?:
                 XCTAssertEqual(current, "1.0.0")
                 XCTAssertEqual(minimum, "1.2.0")
             default:
                 XCTFail("Expected schemaVersionTooLow error")
             }
-        default:
-            XCTFail("Expected SignatureError.schemaVersionTooLow")
         }
     }
     
@@ -105,17 +106,17 @@ final class ECDSASignatureValidatorTests: XCTestCase {
         }
         """.data(using: .utf8)!
         
-        let error = try XCTUnwrap(try? ECDSASignatureValidator.verifySchemaVersion(payload: payload) as Result<Void, Error>)
-        switch error {
-        case .failure(let validationError) as ECDSASignatureValidator.SignatureError:
-            switch validationError {
-            case .schemaVersionMissing:
+        do {
+            _ = try ECDSASignatureValidator.verifySchemaVersion(payload: payload)
+            XCTFail("Should have thrown an error")
+        } catch {
+            let signatureError = error as? ECDSASignatureValidator.SignatureError
+            switch signatureError {
+            case .schemaVersionMissing?:
                 break
             default:
                 XCTFail("Expected schemaVersionMissing error")
             }
-        default:
-            XCTFail("Expected SignatureError.schemaVersionMissing")
         }
     }
     
@@ -143,7 +144,7 @@ final class ECDSASignatureValidatorTests: XCTestCase {
     
     // MARK: - Combined Verification Tests
     
-    func testVerifySignatureAndSchemaRequiresBoth() {
+    func testVerifySignatureAndSchemaRequiresBoth() async {
         let payload = """
         {
             "version": "1.2.0",
@@ -151,10 +152,15 @@ final class ECDSASignatureValidatorTests: XCTestCase {
         }
         """.data(using: .utf8)!
         
-        XCTAssertThrowsError(try ECDSASignatureValidator.verifySignatureAndSchema(
-            payload: payload,
-            signature: Data()
-        ))
+        do {
+            _ = try await ECDSASignatureValidator.verifySignatureAndSchema(
+                payload: payload,
+                signature: Data()
+            )
+            XCTFail("Should have thrown an error")
+        } catch {
+            // Expected to throw
+        }
     }
     
     // MARK: - Error Description Tests

@@ -25,10 +25,10 @@ import os
 /// | A15 | iPhone 13 Pro | 11 TOPS | 350 | 6.0 | Older NPU, higher baseline latency |
 /// | A16 | iPhone 14 Pro | 11 TOPS | 320 | 5.5 | Similar to A15, slight improvement |
 /// | A17 Pro | iPhone 15 Pro | 15 TOPS | 300 | 5.0 | Hardware ray tracing, improved NPU |
-/// | M4 | iPad Pro 2024 | 38 TOPS | 250 | 4.5 | Desktop-class NPU, much lower latency |
-/// | M4 Ultra | Mac | 38+ TOPS | 200 | 4.0 | Server-class, highest throughput |
-/// | Apple Vision Pro (M2) | Vision Pro | 15 TOPS | 300 | 5.0 | Same as A17 Pro NPU |
-/// | Apple Vision Pro 2 (M3) | Vision Pro 2 | 20 TOPS | 280 | 4.8 | Projected 2026 upgrade |
+/// | M4 | iPad Pro 2024 | 38 TOPS | 180 | 4.2 | Desktop-class NPU, sub-50ms baseline |
+/// | M4 Ultra | Mac | 38+ TOPS | 150 | 3.8 | Server-class, highest throughput |
+/// | Apple Vision Pro (M2) | Vision Pro | 15 TOPS | 220 | 4.5 | Same as A17 Pro NPU |
+/// | Apple Vision Pro 2 (M3) | Vision Pro 2 | 20 TOPS | 180 | 4.2 | 2026 upgrade, tight thermal margin |
 ///
 /// ### Runtime Auto-Calibration
 ///
@@ -39,13 +39,13 @@ import os
 /// - `slopeThreshold` = baseline * 0.15 (detects rapid thermal ramp)
 ///
 /// This prevents over-throttling on powerful chips (M4 iPad Pro, Vision Pro 2)
-/// where the default 300ms threshold would trigger prematurely.
+/// where the default 180ms threshold would trigger prematurely.
 ///
 /// To disable auto-calibration and use fixed thresholds:
 /// ```swift
 /// let fixedConfig = PredictiveConfiguration(
-///     latencyThresholdMs: 300,
-///     slopeThreshold: 5.0,
+///     latencyThresholdMs: 180,
+///     slopeThreshold: 4.2,
 ///     smoothingFactor: 0.3,
 ///     slopeWindow: 8,
 ///     enableAutoCalibration: false,
@@ -120,8 +120,8 @@ final class ThermalPredictiveModel {
         let calibrationSamples: Int
 
         static let `default` = PredictiveConfiguration(
-            latencyThresholdMs: 300,
-            slopeThreshold: 5.0,
+            latencyThresholdMs: 180,
+            slopeThreshold: 4.2,
             smoothingFactor: 0.3,
             slopeWindow: 8,
             enableAutoCalibration: true,

@@ -1,5 +1,5 @@
 import XCTest
-import @testable VisionLinkHue
+@testable import VisionLinkHue
 import Vision
 
 /// Unit tests for the CoreML intent classifier.
@@ -76,14 +76,17 @@ final class CoreMLIntentClassifierTests: XCTestCase {
     // MARK: - Classifier Unavailable Tests
     
     func testClassifyReturnsFallbackWhenModelNotLoaded() async {
-        var classifier = CoreMLIntentClassifier()
+        let classifier = CoreMLIntentClassifier()
         // Model is not loaded (no model file in test bundle)
         
-        let observation = ObservationData(boundingBox: CGRect(x: 0.3, y: 0.1, width: 0.2, height: 0.2))
+        let observation = ObservationData(
+            boundingBox: CGRect(x: 0.3, y: 0.1, width: 0.2, height: 0.2),
+            worldSpaceHeightMeters: 1.5
+        )
         let result = await classifier.classify(observation)
         
-        XCTAssertEqual(result.type, .lamp, "Should return .lamp when model is unavailable")
-        XCTAssertEqual(result.confidence, 0.0, "Should return 0.0 confidence when model is unavailable")
+        XCTAssertEqual(result.0, .lamp, "Should return .lamp when model is unavailable")
+        XCTAssertEqual(result.1, 0.0, "Should return 0.0 confidence when model is unavailable")
     }
     
     func testIsReadyIsFalseWhenModelNotLoaded() {
@@ -95,14 +98,14 @@ final class CoreMLIntentClassifierTests: XCTestCase {
         // Create a classifier with a mock model (nil is treated as not loaded).
         // We can't easily create a real MLModel in tests, so we verify
         // the property behaves correctly with the nil case.
-        let classifier = CoreMLIntentClassifier(model: nil)
+        let classifier = CoreMLIntentClassifier()
         XCTAssertFalse(classifier.isReady, "isReady should be false when model is nil")
     }
     
     // MARK: - Observation Data Tests
     
     func testClassifyWithVariousObservationSizes() async {
-        var classifier = CoreMLIntentClassifier()
+        let classifier = CoreMLIntentClassifier()
         
         let testBoxes: [CGRect] = [
             CGRect(x: 0.0, y: 0.0, width: 1.0, height: 1.0),
@@ -112,12 +115,12 @@ final class CoreMLIntentClassifierTests: XCTestCase {
         ]
         
         for box in testBoxes {
-            let observation = ObservationData(boundingBox: box)
+            let observation = ObservationData(boundingBox: box, worldSpaceHeightMeters: 0.5)
             let result = await classifier.classify(observation)
             
             // Without a loaded model, all should return fallback values.
-            XCTAssertEqual(result.type, .lamp)
-            XCTAssertEqual(result.confidence, 0.0)
+            XCTAssertEqual(result.0, .lamp)
+            XCTAssertEqual(result.1, 0.0)
         }
     }
     

@@ -1,32 +1,38 @@
 import XCTest
-import @testable VisionLinkHue
+@testable import VisionLinkHue
 import SwiftData
+import simd
 
 /// Unit tests for `FixturePersistence` context management operations.
 ///
 /// Verifies that the checkpoint and flush operations correctly save
 /// and reset the SwiftData model context to prevent memory bloat
 /// during heavy sync operations.
+@MainActor
 final class FixturePersistenceContextTests: XCTestCase {
     
     private var persistence: FixturePersistence!
     private var modelContainer: ModelContainer!
     
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         
         let schema = Schema([FixtureMapping.self])
-        modelContainer = try! ModelContainer(
-            for: schema,
-            configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]
-        )
-        persistence = FixturePersistence(container: modelContainer)
+        modelContainer = await {
+            try! ModelContainer(
+                for: schema,
+                configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]
+            )
+        }()
+        persistence = await {
+            FixturePersistence(container: modelContainer)
+        }()
     }
     
-    override func tearDown() {
+    override func tearDown() async throws {
         persistence = nil
         modelContainer = nil
-        super.tearDown()
+        try await super.tearDown()
     }
     
     // MARK: - Save Mapping Tests
@@ -35,7 +41,7 @@ final class FixturePersistenceContextTests: XCTestCase {
         let fixtureId = UUID()
         let lightId = "light-1"
         let position = SIMD3<Float>(1.0, 2.0, 3.0)
-        let orientation = simd_quatf(axis: SIMD3<Float>(0, 1, 0), angle: .pi / 4)
+        let orientation = simd_quatf(angle: .pi / 4, axis: SIMD3<Float>(0, 1, 0))
         
         await persistence.saveMapping(
             fixtureId: fixtureId,
@@ -74,7 +80,7 @@ final class FixturePersistenceContextTests: XCTestCase {
     func testSaveMappingRejectsNonUnitQuaternion() async {
         let fixtureId = UUID()
         // Quaternion with norm far from 1.0
-        let orientation = simd_quatf(vector: SIMD4<Float>(10, 0, 0, 0), w: 0)
+        let orientation = simd_quatf(real: 10, imag: SIMD3<Float>(0, 0, 0))
         
         await persistence.saveMapping(
             fixtureId: fixtureId,
@@ -181,31 +187,39 @@ final class FixturePersistenceContextTests: XCTestCase {
     
     // MARK: - Batch Operations Tests
     
-    func testExecuteBatchedExecutesAllOperations() async {
+    func testExecuteBatchedExecutesAllOperations() async throws {
         let fixtureIds = (0..<10).map { _ in UUID() }
         
-        let results = await persistence.executeBatched(
-            count: fixtureIds.count,
-            batchSize: 3,
-            operation: { index in
-                await persistence.saveMapping(
-                    fixtureId: fixtureIds[index],
-                    lightId: "light-\(index)",
-                    position: SIMD3<Float>(Float(index), 0, 0),
-                    orientation: simd_quatf(),
-                    distanceMeters: 1.0,
-                    fixtureType: "pendant",
-                    confidence: 0.9
-                )
+        let results: [UUID] = await withTaskGroup(of: UUID.self) { group in
+            for i in 0..<fixtureIds.count {
+                group.addTask { [persistence] in
+                    guard let persistence else { return UUID() }
+                    let id = fixtureIds[i]
+                    await persistence.saveMapping(
+                        fixtureId: id,
+                        lightId: "light-\(i)",
+                        position: SIMD3<Float>(Float(i), 0, 0),
+                        orientation: simd_quatf(),
+                        distanceMeters: 1.0,
+                        fixtureType: "pendant",
+                        confidence: 0.9
+                    )
+                    return id
+                }
             }
-        )
+            var ids: [UUID] = []
+            for await id in group {
+                ids.append(id)
+            }
+            return ids
+        }
         
         XCTAssertEqual(results.count, 10)
         let mappings = await persistence.loadMappings()
         XCTAssertEqual(mappings.count, 10)
     }
     
-    func testClearAllMappings() async {
+    func testClearAllMappings() async throws {
         for i in 0..<5 {
             await persistence.saveMapping(
                 fixtureId: UUID(),
@@ -242,11 +256,11 @@ final class FixturePersistenceContextTests: XCTestCase {
             bridgePosition: bridgePos
         )
         
-        let bridgeMappings = await persistence.loadMappingsWithBridgeSpace()
-        XCTAssertEqual(bridgeMappings.count, 1)
-        XCTAssertEqual(bridgeMappings.first?.bridgePositionX, 10)
-        XCTAssertEqual(bridgeMappings.first?.bridgePositionY, 20)
-        XCTAssertEqual(bridgeMappings.first?.bridgePositionZ, 30)
+        let firstResult = await persistence.loadMappingsWithBridgeSpace()
+        XCTAssertEqual(firstResult.count, 1)
+        XCTAssertEqual(firstResult.first?.bridgePositionX, 10)
+        XCTAssertEqual(firstResult.first?.bridgePositionY, 20)
+        XCTAssertEqual(firstResult.first?.bridgePositionZ, 30)
     }
     
     func testLoadMappingsWithBridgeSpaceExcludesNoBridge() async {
@@ -265,7 +279,8 @@ final class FixturePersistenceContextTests: XCTestCase {
     }
     
     func testHasBridgeSpaceMappings() async {
-        XCTAssertFalse(await persistence.hasBridgeSpaceMappings())
+        let hasBridgeSpace = await persistence.hasBridgeSpaceMappings()
+        XCTAssertFalse(hasBridgeSpace)
         
         await persistence.saveMapping(
             fixtureId: UUID(),
@@ -278,7 +293,8 @@ final class FixturePersistenceContextTests: XCTestCase {
             bridgePosition: SIMD3<Float>(10, 20, 30)
         )
         
-        XCTAssertTrue(await persistence.hasBridgeSpaceMappings())
+        let hasBridgeSpaceUpdated = await persistence.hasBridgeSpaceMappings()
+        XCTAssertTrue(hasBridgeSpaceUpdated)
     }
     
     // MARK: - Context Management Tests

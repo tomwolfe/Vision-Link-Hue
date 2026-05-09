@@ -1,5 +1,5 @@
 import XCTest
-import @testable VisionLinkHue
+@testable import VisionLinkHue
 
 /// Unit tests for QuadrantCounts and QuadrantDensities, validating
 /// the fixed-size storage used in RelocalizationGuide.
@@ -177,8 +177,8 @@ final class QuadrantStorageTests: XCTestCase {
         XCTAssertEqual(densities.values[3], 0.4, accuracy: 0.001)
 
         var sum: Float = 0.0
-        for density in densities.values {
-            sum += density
+        for i in 0..<4 {
+            sum += densities.values[i]
         }
         XCTAssertEqual(sum, 1.0, accuracy: 0.001)
     }
@@ -193,7 +193,7 @@ final class QuadrantStorageTests: XCTestCase {
         counts[.bottomRight] = 400
         
         let total = Float(counts.total())
-        let samplesPerQuadrant = 1000.0
+        let samplesPerQuadrant: Float = 1000.0
         
         var densities = QuadrantDensities()
         for quadrant in DepthQuadrant.allCases {

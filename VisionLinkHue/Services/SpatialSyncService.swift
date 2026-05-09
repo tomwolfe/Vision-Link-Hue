@@ -333,6 +333,7 @@ final class SpatialSyncRecord {
 }
 
 /// Shared container for the spatial sync SwiftData model.
+@MainActor
 struct SpatialSyncModelContainer {
     static let shared = SpatialSyncModelContainer()
     
@@ -384,12 +385,13 @@ struct SpatialSyncModelContainer {
 ///
 /// The service operates with background isolation to prevent
 /// main-thread blocking during sync operations.
-actor SpatialSyncService {
+@MainActor
+final class SpatialSyncService {
     
     private let modelContainer: ModelContainer
     var modelContext: ModelContext
     
-    nonisolated static let shared: SpatialSyncService = SpatialSyncModelContainer.shared.sharedService
+    static let shared: SpatialSyncService = SpatialSyncModelContainer.shared.sharedService
     
     private let logger = Logger(
         subsystem: "com.tomwolfe.visionlinkhue",
@@ -1055,7 +1057,7 @@ actor SpatialSyncService {
     }
     
     /// Get the persistence reference for fixture mapping operations.
-    nonisolated var persistence: FixturePersistence {
+    var persistence: FixturePersistence {
         FixturePersistence.shared
     }
     

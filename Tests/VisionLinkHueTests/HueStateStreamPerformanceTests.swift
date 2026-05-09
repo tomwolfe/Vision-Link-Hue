@@ -1,9 +1,11 @@
 import XCTest
-import @testable VisionLinkHue
+import SwiftData
+@testable import VisionLinkHue
 
 /// Unit tests for the lazy sorting optimization in `HueStateStream`.
 /// Verifies that the SSE merge logic defers sorting until UI access,
 /// improving performance for large setups (60+ lights).
+@MainActor
 final class HueStateStreamPerformanceTests: XCTestCase {
     
     private var persistence: FixturePersistence!
@@ -35,11 +37,7 @@ final class HueStateStreamPerformanceTests: XCTestCase {
     private func makeLight(id: String, index: Int) -> HueLightResource {
         let metadata = HueLightResource.Metadata(
             name: "Test Light \(index)",
-            archetype: nil,
-            archetypeValue: .ceiling,
-            manufacturerCode: nil,
-            firmwareVersion: nil,
-            hardwarePlatformType: nil
+            archetype: nil
         )
         
         let state = HueLightResource.LightState(

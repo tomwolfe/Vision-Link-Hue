@@ -1,32 +1,36 @@
 import XCTest
-import @testable VisionLinkHue
+@testable import VisionLinkHue
 
 /// Tests for `SpatialDataPurgeService` validating iOS 26 spatial
 /// data purge compliance and point cloud deletion.
+@MainActor
 final class SpatialDataPurgeServiceTests: XCTestCase {
     
     private var purgeService: SpatialDataPurgeService!
     
-    override func setUp() {
-        super.setUp()
-        purgeService = SpatialDataPurgeService()
+    override func setUp() async throws {
+        try await super.setUp()
+        purgeService = await MainActor.run { SpatialDataPurgeService() }
     }
     
-    override func tearDown() {
+    override func tearDown() async throws {
         purgeService = nil
-        super.tearDown()
+        try await super.tearDown()
     }
     
     // MARK: - Initialization Tests
     
-    func testPurgeServiceStartsInactive() {
-        XCTAssertFalse(purgeService.isPurging)
-        XCTAssertTrue(purgeService.purgedTypes.isEmpty)
+    func testPurgeServiceStartsInactive() async {
+        let isPurging = await purgeService.isPurging
+        XCTAssertFalse(isPurging)
+        let purgedTypes = await purgeService.purgedTypes
+        XCTAssertTrue(purgedTypes.isEmpty)
     }
     
-    func testPurgeServiceHasNoPurgedTypesInitially() {
+    func testPurgeServiceHasNoPurgedTypesInitially() async {
         for type in SpatialDataType.allCases {
-            XCTAssertFalse(purgeService.isPurged(type))
+            let isPurged = await purgeService.isPurged(type)
+            XCTAssertFalse(isPurged)
         }
     }
     
@@ -86,7 +90,8 @@ final class SpatialDataPurgeServiceTests: XCTestCase {
         
         // Since we're in a test environment without actual spatial data,
         // the purge should complete without error.
-        XCTAssertFalse(purgeService.isPurging)
+        let isPurging = await purgeService.isPurging
+        XCTAssertFalse(isPurging)
     }
     
     func testConcurrentPurgeRequestsAreSerialized() async throws {
@@ -94,8 +99,10 @@ final class SpatialDataPurgeServiceTests: XCTestCase {
         // is handled gracefully (skipped).
         var purgeCompletionCount = 0
         
-        purgeService.onPurgeComplete = { _ in
-            purgeCompletionCount += 1
+        await MainActor.run {
+            purgeService.onPurgeComplete = { _ in
+                purgeCompletionCount += 1
+            }
         }
         
         // Start a purge.

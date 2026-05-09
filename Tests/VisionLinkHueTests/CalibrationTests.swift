@@ -1,5 +1,5 @@
 import XCTest
-import @testable VisionLinkHue
+@testable import VisionLinkHue
 import simd
 
 /// Unit tests for the spatial calibration system including the Kabsch
@@ -9,6 +9,7 @@ import simd
 /// computed transformation produces expected results. This ensures the
 /// Kabsch algorithm correctly resolves rotation and translation without
 /// drift in room-scale scenarios.
+@MainActor
 final class CalibrationTests: XCTestCase {
     
     private var engine: SpatialCalibrationEngine!
@@ -98,10 +99,22 @@ final class CalibrationTests: XCTestCase {
             SIMD3<Float>(0, 1, 0),
             SIMD3<Float>(0, 0, 1)
         )
-        XCTAssertEqual(transform.rotation, identity, accuracy: 0.001, "Rotation should be identity")
+        // Rotation should be identity
+        XCTAssertEqual(transform.rotation.columns.0.x, 1, accuracy: 0.001)
+        XCTAssertEqual(transform.rotation.columns.0.y, 0, accuracy: 0.001)
+        XCTAssertEqual(transform.rotation.columns.0.z, 0, accuracy: 0.001)
+        XCTAssertEqual(transform.rotation.columns.1.x, 0, accuracy: 0.001)
+        XCTAssertEqual(transform.rotation.columns.1.y, 1, accuracy: 0.001)
+        XCTAssertEqual(transform.rotation.columns.1.z, 0, accuracy: 0.001)
+        XCTAssertEqual(transform.rotation.columns.2.x, 0, accuracy: 0.001)
+        XCTAssertEqual(transform.rotation.columns.2.y, 0, accuracy: 0.001)
+        XCTAssertEqual(transform.rotation.columns.2.z, 1, accuracy: 0.001)
         
         // Translation should be zero
-        XCTAssertEqual(transform.translation, SIMD3<Float>(0, 0, 0), accuracy: 0.001, "Translation should be zero")
+        // Translation should be zero
+        XCTAssertEqual(transform.translation.x, 0, accuracy: 0.001)
+        XCTAssertEqual(transform.translation.y, 0, accuracy: 0.001)
+        XCTAssertEqual(transform.translation.z, 0, accuracy: 0.001)
     }
     
     func testIdentityMappingPreservesPoints() {
@@ -111,7 +124,9 @@ final class CalibrationTests: XCTestCase {
         engine.addCalibrationPoint(arKit: SIMD3<Float>(0, 1, 0), bridge: SIMD3<Float>(0, 1, 0))
         
         let mapped = engine.mapToBridgeSpace(SIMD3<Float>(0.5, 0.5, 0))
-        XCTAssertEqual(mapped, SIMD3<Float>(0.5, 0.5, 0), accuracy: 0.001)
+        XCTAssertEqual(mapped.x, 0.5, accuracy: 0.001)
+        XCTAssertEqual(mapped.y, 0.5, accuracy: 0.001)
+        XCTAssertEqual(mapped.z, 0, accuracy: 0.001)
     }
     
     // MARK: - Translation Transformation Tests
@@ -135,10 +150,22 @@ final class CalibrationTests: XCTestCase {
             SIMD3<Float>(0, 1, 0),
             SIMD3<Float>(0, 0, 1)
         )
-        XCTAssertEqual(transform.rotation, identity, accuracy: 0.01)
+        // Rotation should be identity
+        XCTAssertEqual(transform.rotation.columns.0.x, 1, accuracy: 0.01)
+        XCTAssertEqual(transform.rotation.columns.0.y, 0, accuracy: 0.01)
+        XCTAssertEqual(transform.rotation.columns.0.z, 0, accuracy: 0.01)
+        XCTAssertEqual(transform.rotation.columns.1.x, 0, accuracy: 0.01)
+        XCTAssertEqual(transform.rotation.columns.1.y, 1, accuracy: 0.01)
+        XCTAssertEqual(transform.rotation.columns.1.z, 0, accuracy: 0.01)
+        XCTAssertEqual(transform.rotation.columns.2.x, 0, accuracy: 0.01)
+        XCTAssertEqual(transform.rotation.columns.2.y, 0, accuracy: 0.01)
+        XCTAssertEqual(transform.rotation.columns.2.z, 1, accuracy: 0.01)
         
         // Translation should match the offset
-        XCTAssertEqual(transform.translation, offset, accuracy: 0.01)
+        // Translation should match the offset
+        XCTAssertEqual(transform.translation.x, offset.x, accuracy: 0.01)
+        XCTAssertEqual(transform.translation.y, offset.y, accuracy: 0.01)
+        XCTAssertEqual(transform.translation.z, offset.z, accuracy: 0.01)
     }
     
     func testMapWithTranslation() {
@@ -150,7 +177,9 @@ final class CalibrationTests: XCTestCase {
         
         let mapped = engine.mapToBridgeSpace(SIMD3<Float>(2, 3, 0))
         let expected = SIMD3<Float>(12, 3, 0)
-        XCTAssertEqual(mapped, expected, accuracy: 0.01)
+        XCTAssertEqual(mapped.x, expected.x, accuracy: 0.01)
+        XCTAssertEqual(mapped.y, expected.y, accuracy: 0.01)
+        XCTAssertEqual(mapped.z, expected.z, accuracy: 0.01)
     }
     
     // MARK: - Rotation Transformation Tests
@@ -171,11 +200,15 @@ final class CalibrationTests: XCTestCase {
         
         // Apply rotation to (1, 0, 0) should give (0, 1, 0)
         let result1 = transform.apply(SIMD3<Float>(1, 0, 0))
-        XCTAssertEqual(result1, SIMD3<Float>(0, 1, 0), accuracy: 0.05)
+        XCTAssertEqual(result1.x, 0, accuracy: 0.05)
+        XCTAssertEqual(result1.y, 1, accuracy: 0.05)
+        XCTAssertEqual(result1.z, 0, accuracy: 0.05)
         
         // Apply rotation to (0, 1, 0) should give (-1, 0, 0)
         let result2 = transform.apply(SIMD3<Float>(0, 1, 0))
-        XCTAssertEqual(result2, SIMD3<Float>(-1, 0, 0), accuracy: 0.05)
+        XCTAssertEqual(result2.x, -1, accuracy: 0.05)
+        XCTAssertEqual(result2.y, 0, accuracy: 0.05)
+        XCTAssertEqual(result2.z, 0, accuracy: 0.05)
     }
     
     func testRotationMatrixIsOrthogonal() {
@@ -198,15 +231,14 @@ final class CalibrationTests: XCTestCase {
         }
         
         // Verify rotation matrix columns are unit vectors
-        for i in 0..<3 {
-            let col = transform.rotation.columns[i]
+        let col0 = transform.rotation.columns.0
+        let col1 = transform.rotation.columns.1
+        let col2 = transform.rotation.columns.2
+        for (i, col) in [(0, col0), (1, col1), (2, col2)] {
             XCTAssertEqual(simd_length(col), 1.0, accuracy: 0.01, "Column \(i) should be unit length")
         }
         
         // Verify columns are orthogonal
-        let col0 = transform.rotation.columns[0]
-        let col1 = transform.rotation.columns[1]
-        let col2 = transform.rotation.columns[2]
         XCTAssertEqual(dot(col0, col1), 0.0, accuracy: 0.01, "Columns 0 and 1 should be orthogonal")
         XCTAssertEqual(dot(col1, col2), 0.0, accuracy: 0.01, "Columns 1 and 2 should be orthogonal")
         XCTAssertEqual(dot(col0, col2), 0.0, accuracy: 0.01, "Columns 0 and 2 should be orthogonal")
@@ -235,7 +267,9 @@ final class CalibrationTests: XCTestCase {
         }
         
         // Translation should be close to expected
-        XCTAssertEqual(transform.translation, translation, accuracy: 0.05)
+        XCTAssertEqual(transform.translation.x, translation.x, accuracy: 0.05)
+        XCTAssertEqual(transform.translation.y, translation.y, accuracy: 0.05)
+        XCTAssertEqual(transform.translation.z, translation.z, accuracy: 0.05)
     }
     
     // MARK: - Fallback Behavior Tests

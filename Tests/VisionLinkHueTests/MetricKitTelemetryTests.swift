@@ -5,53 +5,59 @@ import MetricKit
 /// Tests for `MetricKitTelemetryService`.
 final class MetricKitTelemetryTests: XCTestCase {
     
-    func testServiceIsDisabledByDefaultOnSimulator() {
-        let service = MetricKitTelemetryService()
-        #if targetEnvironment(simulator)
-        XCTAssertFalse(service.isAvailable)
-        #else
-        XCTAssertTrue(service.isAvailable)
-        #endif
+    func testServiceIsDisabledByDefaultOnSimulator() async {
+        await MainActor.run {
+            let service = MetricKitTelemetryService()
+            #if targetEnvironment(simulator)
+            XCTAssertFalse(service.isEnabled)
+            #else
+            XCTAssertTrue(service.isEnabled)
+            #endif
+        }
     }
     
     func testRecordInferenceCreatesRecord() async {
-        let service = MetricKitTelemetryService(isEnabled: true)
-        
-        service.recordInference(
-            latencyMs: 50.0,
-            thermalState: .nominal,
-            predictedThermalState: .nominal,
-            ewmaLatency: 50.0,
-            slopeMs: 0.0,
-            sampleCount: 1,
-            inferenceCount: 1,
-            isModelQuantized: true
-        )
-        
-        // Record should be accumulated but not submitted yet (batch size = 10).
-        // We can verify by checking that flush triggers submission.
-        XCTAssertFalse(service.isEnabled == false)
+        await MainActor.run {
+            let service = MetricKitTelemetryService()
+            
+            service.recordInference(
+                latencyMs: 50.0,
+                thermalState: .nominal,
+                predictedThermalState: .nominal,
+                ewmaLatency: 50.0,
+                slopeMs: 0.0,
+                sampleCount: 1,
+                inferenceCount: 1,
+                isModelQuantized: true
+            )
+            
+            // Record should be accumulated but not submitted yet (batch size = 10).
+            // We can verify by checking that flush triggers submission.
+            XCTAssertTrue(service.isEnabled)
+        }
     }
     
     func testDisablePreventsRecording() async {
-        let service = MetricKitTelemetryService(isEnabled: true)
-        
-        service.recordInference(
-            latencyMs: 50.0,
-            thermalState: .nominal,
-            predictedThermalState: .nominal,
-            ewmaLatency: 50.0,
-            slopeMs: 0.0,
-            sampleCount: 1,
-            inferenceCount: 1,
-            isModelQuantized: true
-        )
-        
-        service.disable()
-        
-        // After disabling, no further records should be accumulated.
-        // The service should have flushed any pending records.
-        XCTAssertFalse(service.isEnabled)
+        await MainActor.run {
+            let service = MetricKitTelemetryService()
+            
+            service.recordInference(
+                latencyMs: 50.0,
+                thermalState: .nominal,
+                predictedThermalState: .nominal,
+                ewmaLatency: 50.0,
+                slopeMs: 0.0,
+                sampleCount: 1,
+                inferenceCount: 1,
+                isModelQuantized: true
+            )
+            
+            service.disable()
+            
+            // After disabling, no further records should be accumulated.
+            // The service should have flushed any pending records.
+            XCTAssertFalse(service.isEnabled)
+        }
     }
     
     func testSiliconGenerationInference() {
@@ -67,6 +73,7 @@ final class MetricKitTelemetryTests: XCTestCase {
     }
     
     func testTelemetryRecordPayload() {
+        let processThermalState = ProcessInfo.processInfo.thermalState
         let record = TelemetryRecord(
             timestamp: Date(),
             thermalState: .warning,
@@ -79,7 +86,8 @@ final class MetricKitTelemetryTests: XCTestCase {
             siliconGeneration: "A15",
             isModelQuantized: true,
             inferenceCount: 100,
-            memoryUsedMB: 256.0
+            memoryUsedMB: 256.0,
+            processThermalState: processThermalState
         )
         
         let payload = record.payload
@@ -99,40 +107,46 @@ final class MetricKitTelemetryTests: XCTestCase {
     }
     
     func testBatchSizeTriggersSubmission() async {
-        let service = MetricKitTelemetryService(isEnabled: true)
-        
-        // Record fewer than batch size - should not submit yet.
-        for i in 0..<5 {
-            service.recordInference(
-                latencyMs: Double(50 + i),
-                thermalState: .nominal,
-                predictedThermalState: .nominal,
-                ewmaLatency: Double(50 + i),
-                slopeMs: 0.0,
-                sampleCount: i + 1,
-                inferenceCount: i + 1,
-                isModelQuantized: true
-            )
+        await MainActor.run {
+            let service = MetricKitTelemetryService()
+            
+            // Record fewer than batch size - should not submit yet.
+            for i in 0..<5 {
+                service.recordInference(
+                    latencyMs: Double(50 + i),
+                    thermalState: .nominal,
+                    predictedThermalState: .nominal,
+                    ewmaLatency: Double(50 + i),
+                    slopeMs: 0.0,
+                    sampleCount: i + 1,
+                    inferenceCount: i + 1,
+                    isModelQuantized: true
+                )
+            }
+            
+            // Flush should trigger submission.
+            service.flush()
         }
-        
-        // Flush should trigger submission.
-        service.flush()
     }
     
-    func testJetsamTrackingInitialState() {
-        let service = MetricKitTelemetryService(isEnabled: true)
-        
-        XCTAssertEqual(service.jetsamTerminationCount, 0)
-        XCTAssertEqual(service.lastJetsamMemoryUsageMB, 0)
-        XCTAssertFalse(service.wasUnquantizedFallbackActive)
+    func testJetsamTrackingInitialState() async {
+        await MainActor.run {
+            let service = MetricKitTelemetryService()
+            
+            XCTAssertEqual(service.jetsamTerminationCount, 0)
+            XCTAssertEqual(service.lastJetsamMemoryUsageMB, 0)
+            XCTAssertFalse(service.wasUnquantizedFallbackActive)
+        }
     }
     
-    func testMXAppExitDiagnosticHandlerIsConfigured() {
-        let service = MetricKitTelemetryService(isEnabled: true)
-        
-        // The handler is registered via MXMetricKitReporter.setHandler().
-        // We can verify the service initializes without crashing.
-        XCTAssertNotNil(service)
-        XCTAssertEqual(service.jetsamTerminationCount, 0)
+    func testMXAppExitDiagnosticHandlerIsConfigured() async {
+        await MainActor.run {
+            let service = MetricKitTelemetryService()
+            
+            // The handler is registered via MXMetricKitReporter.setHandler().
+            // We can verify the service initializes without crashing.
+            XCTAssertNotNil(service)
+            XCTAssertEqual(service.jetsamTerminationCount, 0)
+        }
     }
 }

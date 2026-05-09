@@ -1,17 +1,18 @@
 import XCTest
-import @testable VisionLinkHue
+@testable import VisionLinkHue
 import SwiftData
 import simd
 
 /// Unit tests for `SpatialSyncService`, validating CloudKit spatial
 /// persistence sync, conflict resolution, and record management.
+@MainActor
 final class SpatialSyncServiceTests: XCTestCase {
     
     private var syncService: SpatialSyncService!
     private var modelContainer: ModelContainer!
     
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         
         // Create an isolated in-memory ModelContainer for testing
         let schema = Schema([SpatialSyncRecord.self])
@@ -20,7 +21,9 @@ final class SpatialSyncServiceTests: XCTestCase {
             configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]
         )
         
-        syncService = SpatialSyncService(modelContainer: modelContainer, deviceIdentifier: "test-device-1")
+        syncService = await MainActor.run {
+            SpatialSyncService(modelContainer: modelContainer, deviceIdentifier: "test-device-1")
+        }
     }
     
     override func tearDown() {
@@ -34,7 +37,7 @@ final class SpatialSyncServiceTests: XCTestCase {
     func testSpatialSyncRecordCreation() {
         let fixtureId = UUID()
         let position = SIMD3<Float>(1.0, 2.0, 3.0)
-        let orientation = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: Float.pi / 4)
+        let orientation = simd_quatf(angle: Float.pi / 4, axis: SIMD3<Float>(0, 0, 1))
         
         let record = SpatialSyncRecord(
             fixtureId: fixtureId,
@@ -62,7 +65,7 @@ final class SpatialSyncServiceTests: XCTestCase {
     func testSpatialSyncRecordPositionAccessor() {
         let fixtureId = UUID()
         let position = SIMD3<Float>(1.5, 2.5, 3.5)
-        let orientation = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: Float.pi / 4)
+        let orientation = simd_quatf(angle: Float.pi / 4, axis: SIMD3<Float>(0, 0, 1))
         
         let record = SpatialSyncRecord(
             fixtureId: fixtureId,
@@ -82,7 +85,7 @@ final class SpatialSyncServiceTests: XCTestCase {
     func testSpatialSyncRecordOrientationAccessor() {
         let fixtureId = UUID()
         let position = SIMD3<Float>(1.0, 2.0, 3.0)
-        let orientation = simd_quatf(axis: SIMD3<Float>(1, 0, 0), angle: Float.pi / 2)
+        let orientation = simd_quatf(angle: Float.pi / 2, axis: SIMD3<Float>(1, 0, 0))
         
         let record = SpatialSyncRecord(
             fixtureId: fixtureId,
@@ -102,7 +105,7 @@ final class SpatialSyncServiceTests: XCTestCase {
     func testSpatialSyncRecordUUIDAccessor() {
         let fixtureId = UUID()
         let position = SIMD3<Float>(1.0, 2.0, 3.0)
-        let orientation = simd_quatf(axis: SIMD3<Float>(0, 0, 1), angle: 0)
+        let orientation = simd_quatf(angle: 0, axis: SIMD3<Float>(0, 0, 1))
         
         let record = SpatialSyncRecord(
             fixtureId: fixtureId,
@@ -119,16 +122,22 @@ final class SpatialSyncServiceTests: XCTestCase {
     
     // MARK: - SpatialSyncService Tests
     
-    func testServiceStartsWithCloudKitUnavailable() {
-        XCTAssertFalse(syncService.isCloudKitAvailable)
-        XCTAssertFalse(syncService.isSyncing)
-        XCTAssertNil(syncService.lastSuccessfulSync)
+    func testServiceStartsWithCloudKitUnavailable() async {
+        let isCloudKitAvailable = await syncService.isCloudKitAvailable
+        XCTAssertFalse(isCloudKitAvailable)
+        let isSyncing = await syncService.isSyncing
+        XCTAssertFalse(isSyncing)
+        let lastSuccessfulSync = await syncService.lastSuccessfulSync
+        XCTAssertNil(lastSuccessfulSync)
     }
     
-    func testServiceHasCorrectDeviceIdentifier() {
-        let customService = SpatialSyncService(modelContainer: modelContainer, deviceIdentifier: "custom-device-id")
+    func testServiceHasCorrectDeviceIdentifier() async {
+        let customService = await MainActor.run {
+            SpatialSyncService(modelContainer: modelContainer, deviceIdentifier: "custom-device-id")
+        }
         // The device identifier is private but we can verify the service was created.
-        XCTAssertFalse(customService.isSyncing)
+        let isSyncing = await customService.isSyncing
+        XCTAssertFalse(isSyncing)
     }
     
     func testSyncReturnsSkippedWhenCloudKitUnavailable() async {
@@ -149,19 +158,21 @@ final class SpatialSyncServiceTests: XCTestCase {
         let _ = await syncService.sync()
         
         // After sync completes (even skipped), isSyncing should be false.
-        XCTAssertFalse(syncService.isSyncing)
+        let isSyncing = await syncService.isSyncing
+        XCTAssertFalse(isSyncing)
     }
     
     func testForceSyncClearsPendingUploads() async {
-        syncService.clearPendingUploads()
+        await syncService.clearPendingUploads()
         await syncService.forceSync()
         
         // Force sync should have been attempted.
-        XCTAssertFalse(syncService.isSyncing)
+        let isSyncing = await syncService.isSyncing
+        XCTAssertFalse(isSyncing)
     }
     
     func testClearPendingUploadsRemovesAll() async {
-        syncService.clearPendingUploads()
+        await syncService.clearPendingUploads()
         // No pending uploads to verify since they're private, but the method
         // should not crash.
     }
@@ -250,8 +261,8 @@ final class SpatialSyncServiceTests: XCTestCase {
         let result = CRDTConflictResolver.merge(
             localClock: localClock,
             remoteClock: remoteClock,
-            localVersion: 5,
-            remoteVersion: 3
+            localLWW: ["device-1": (5, 0)],
+            remoteLWW: [:]
         )
         
         XCTAssertEqual(result, .localWins, "Local should win when all clock entries are higher")
@@ -264,8 +275,8 @@ final class SpatialSyncServiceTests: XCTestCase {
         let result = CRDTConflictResolver.merge(
             localClock: localClock,
             remoteClock: remoteClock,
-            localVersion: 2,
-            remoteVersion: 4
+            localLWW: [:],
+            remoteLWW: ["device-2": (4, 0)]
         )
         
         XCTAssertEqual(result, .remoteWins, "Remote should win when all clock entries are higher")
@@ -278,8 +289,8 @@ final class SpatialSyncServiceTests: XCTestCase {
         let result = CRDTConflictResolver.merge(
             localClock: localClock,
             remoteClock: remoteClock,
-            localVersion: 3,
-            remoteVersion: 3
+            localLWW: ["device-1": (3, 0), "device-2": (2, 0)],
+            remoteLWW: ["device-1": (3, 0), "device-2": (2, 0)]
         )
         
         XCTAssertEqual(result, .equivalent, "Identical clocks should be equivalent")
@@ -293,8 +304,8 @@ final class SpatialSyncServiceTests: XCTestCase {
         let result = CRDTConflictResolver.merge(
             localClock: localClock,
             remoteClock: remoteClock,
-            localVersion: 5,
-            remoteVersion: 4
+            localLWW: ["device-1": (5, 0)],
+            remoteLWW: ["device-2": (4, 0)]
         )
         
         XCTAssertEqual(result, .localWins, "Local should win concurrent updates with higher explicit version")

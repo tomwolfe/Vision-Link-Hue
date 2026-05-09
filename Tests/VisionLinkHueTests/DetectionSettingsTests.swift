@@ -1,44 +1,62 @@
 import XCTest
-import @testable VisionLinkHue
+@testable import VisionLinkHue
 
 /// Unit tests for DetectionSettings, validating battery saver and
 /// extended relocalization mode toggles.
 final class DetectionSettingsTests: XCTestCase {
     
-    func testDefaultBatterySaverModeIsDisabled() {
-        let settings = DetectionSettings()
-        XCTAssertFalse(settings.batterySaverMode)
+    func testDefaultBatterySaverModeIsDisabled() async {
+        let settings = await DetectionSettings()
+        let batterySaverMode = await settings.batterySaverMode
+        XCTAssertFalse(batterySaverMode)
     }
     
-    func testDefaultExtendedRelocalizationModeIsDisabled() {
-        let settings = DetectionSettings()
-        XCTAssertFalse(settings.extendedRelocalizationMode)
+    func testDefaultExtendedRelocalizationModeIsDisabled() async {
+        let settings = await DetectionSettings()
+        let extendedRelocalizationMode = await settings.extendedRelocalizationMode
+        XCTAssertFalse(extendedRelocalizationMode)
     }
     
-    func testToggleBatterySaverMode() {
-        let settings = DetectionSettings()
-        settings.batterySaverMode = true
-        XCTAssertTrue(settings.batterySaverMode)
+    func testToggleBatterySaverMode() async {
+        let settings = await DetectionSettings()
+        await MainActor.run {
+            settings.batterySaverMode = true
+        }
+        let batterySaverMode = await settings.batterySaverMode
+        XCTAssertTrue(batterySaverMode)
         
-        settings.batterySaverMode = false
-        XCTAssertFalse(settings.batterySaverMode)
+        await MainActor.run {
+            settings.batterySaverMode = false
+        }
+        let batterySaverMode2 = await settings.batterySaverMode
+        XCTAssertFalse(batterySaverMode2)
     }
     
-    func testToggleExtendedRelocalizationMode() {
-        let settings = DetectionSettings()
-        settings.extendedRelocalizationMode = true
-        XCTAssertTrue(settings.extendedRelocalizationMode)
+    func testToggleExtendedRelocalizationMode() async {
+        let settings = await DetectionSettings()
+        await MainActor.run {
+            settings.extendedRelocalizationMode = true
+        }
+        let extendedRelocalizationMode = await settings.extendedRelocalizationMode
+        XCTAssertTrue(extendedRelocalizationMode)
         
-        settings.extendedRelocalizationMode = false
-        XCTAssertFalse(settings.extendedRelocalizationMode)
+        await MainActor.run {
+            settings.extendedRelocalizationMode = false
+        }
+        let extendedRelocalizationMode2 = await settings.extendedRelocalizationMode
+        XCTAssertFalse(extendedRelocalizationMode2)
     }
     
-    func testBothModesCanBeEnabledSimultaneously() {
-        let settings = DetectionSettings()
-        settings.batterySaverMode = true
-        settings.extendedRelocalizationMode = true
+    func testBothModesCanBeEnabledSimultaneously() async {
+        let settings = await DetectionSettings()
+        await MainActor.run {
+            settings.batterySaverMode = true
+            settings.extendedRelocalizationMode = true
+        }
         
-        XCTAssertTrue(settings.batterySaverMode)
-        XCTAssertTrue(settings.extendedRelocalizationMode)
+        let batterySaverMode = await settings.batterySaverMode
+        XCTAssertTrue(batterySaverMode)
+        let extendedRelocalizationMode = await settings.extendedRelocalizationMode
+        XCTAssertTrue(extendedRelocalizationMode)
     }
 }

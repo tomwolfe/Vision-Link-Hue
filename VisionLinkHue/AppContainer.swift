@@ -80,7 +80,7 @@ protocol LocalSyncActorFactory {
 /// Default implementations of all factory protocols.
 /// Used by `AppContainer` for production dependency creation.
 @MainActor
-final class DefaultFactories: @unchecked Sendable {
+class DefaultFactories: @unchecked Sendable {
     
     let stateStreamFactory: HueStateStreamFactory
     let hueClientFactory: HueClientFactory
@@ -237,7 +237,7 @@ final class AppContainer {
     
     private let factories: DefaultFactories
     
-    private init(factories: DefaultFactories = DefaultFactories()) {
+    init(factories: DefaultFactories = DefaultFactories()) {
         self.factories = factories
         
         let persistence = FixturePersistence.shared

@@ -1,5 +1,5 @@
 import XCTest
-import @testable VisionLinkHue
+@testable import VisionLinkHue
 import simd
 
 /// Unit tests for the Gram-Schmidt NaN protection in `SpatialCalibrationEngine`.
@@ -7,6 +7,7 @@ import simd
 /// These tests verify that the orthogonalization step handles degenerate
 /// inputs (zero-length columns, NaN values, collinear points) gracefully
 /// by returning an identity matrix instead of propagating NaN.
+@MainActor
 final class GramSchmidtNaNProtectionTests: XCTestCase {
     
     private var engine: SpatialCalibrationEngine!
@@ -79,8 +80,10 @@ final class GramSchmidtNaNProtectionTests: XCTestCase {
         }
         
         // Verify rotation columns are unit vectors
-        for i in 0..<3 {
-            let col = transform.rotation.columns[i]
+        let col0 = transform.rotation.columns.0
+        let col1 = transform.rotation.columns.1
+        let col2 = transform.rotation.columns.2
+        for (i, col) in [(0, col0), (1, col1), (2, col2)] {
             let length = simd_length(col)
             XCTAssertEqual(length, 1.0, accuracy: 0.01, "Column \(i) length should be ~1.0")
         }
@@ -111,6 +114,8 @@ final class GramSchmidtNaNProtectionTests: XCTestCase {
         }
         
         let result = transform.apply(SIMD3<Float>(1, 0, 0))
-        XCTAssertEqual(result, SIMD3<Float>(0, 1, 0), accuracy: 0.05)
+        XCTAssertEqual(result.x, 0, accuracy: 0.05)
+        XCTAssertEqual(result.y, 1, accuracy: 0.05)
+        XCTAssertEqual(result.z, 0, accuracy: 0.05)
     }
 }

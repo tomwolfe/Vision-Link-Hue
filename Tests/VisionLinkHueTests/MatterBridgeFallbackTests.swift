@@ -1,6 +1,7 @@
 import XCTest
-import @testable VisionLinkHue
+@testable import VisionLinkHue
 import SwiftData
+import simd
 
 /// Unit tests for the MatterBridgeService Hue fallback behavior.
 /// Validates that Matter control failures gracefully fall back to the Hue Bridge.
@@ -49,20 +50,23 @@ final class MatterBridgeServiceFallbackTests: XCTestCase {
 
 /// Unit tests for FixturePersistence executeBatched save-within-boundary fix.
 /// Validates that each operation is saved before rollback to prevent data loss.
+@MainActor
 final class FixturePersistenceBatchedSaveTests: XCTestCase {
     
     private var persistence: FixturePersistence!
     private var modelContainer: ModelContainer!
     
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         
         let schema = Schema([FixtureMapping.self])
         modelContainer = try! ModelContainer(
             for: schema,
             configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]
         )
-        persistence = FixturePersistence(container: modelContainer)
+        persistence = await MainActor.run {
+            FixturePersistence(container: modelContainer)
+        }
     }
     
     override func tearDown() {
@@ -71,14 +75,14 @@ final class FixturePersistenceBatchedSaveTests: XCTestCase {
         super.tearDown()
     }
     
-    func testExecuteBatchedPersistsAllOperations() async {
+    func testExecuteBatchedPersistsAllOperations() async throws {
         let fixtureIds = (0..<20).map { _ in UUID() }
         
-        let results = await persistence.executeBatched(
+        let results = try await persistence.executeBatched(
             count: fixtureIds.count,
             batchSize: 5,
-            operation: { index in
-                await persistence.saveMapping(
+            operation: { [persistence] index in
+                try await persistence.saveMapping(
                     fixtureId: fixtureIds[index],
                     lightId: "light-\(index)",
                     position: SIMD3<Float>(Float(index), 0, 0),
@@ -95,16 +99,16 @@ final class FixturePersistenceBatchedSaveTests: XCTestCase {
         XCTAssertEqual(mappings.count, 20, "All 20 mappings should be persisted despite save/rollback between each operation")
     }
     
-    func testExecuteBatchedRollbackDoesNotCauseDataLoss() async {
+    func testExecuteBatchedRollbackDoesNotCauseDataLoss() async throws {
         // Each operation saves and rolls back. The key assertion is that
         // the saved data persists across rollbacks.
         let fixtureIds = (0..<10).map { _ in UUID() }
         
-        await persistence.executeBatched(
+        _ = try await persistence.executeBatched(
             count: fixtureIds.count,
             batchSize: 3,
-            operation: { index in
-                await persistence.saveMapping(
+            operation: { [persistence] index in
+                try await persistence.saveMapping(
                     fixtureId: fixtureIds[index],
                     lightId: "light-\(index)",
                     position: SIMD3<Float>(Float(index), 0, 0),
@@ -121,7 +125,7 @@ final class FixturePersistenceBatchedSaveTests: XCTestCase {
         XCTAssertEqual(mappings.count, 10, "All mappings should survive save/rollback cycles")
         
         // Verify the light IDs are correct.
-        let lightIds = mappings.map { $0.lightId }.sorted()
+        let lightIds = mappings.map { $0.lightId! }
         for i in 0..<10 {
             XCTAssertEqual(lightIds[i], "light-\(i)", "Light ID \(i) should be persisted")
         }

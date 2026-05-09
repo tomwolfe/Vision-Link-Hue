@@ -95,7 +95,8 @@ enum SchemaMigration {
 /// and spatial coordinates. Provides atomic transactions for all
 /// persistence operations with background isolation to prevent
 /// main-thread blocking as the fixture count grows.
-actor FixturePersistence {
+@MainActor
+final class FixturePersistence {
     
     private let logger = Logger(
         subsystem: "com.tomwolfe.visionlinkhue",

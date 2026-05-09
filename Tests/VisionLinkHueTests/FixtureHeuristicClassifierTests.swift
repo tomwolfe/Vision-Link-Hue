@@ -1,6 +1,6 @@
 import XCTest
 import Vision
-import @testable VisionLinkHue
+@testable import VisionLinkHue
 
 /// Unit tests for the heuristic fixture classifier.
 /// Uses mocked `VNRectangleObservation` objects to validate classification
@@ -16,7 +16,7 @@ final class FixtureHeuristicClassifierTests: XCTestCase {
         minX: Float, minY: Float, width: Float, height: Float
     ) -> VNRectangleObservation {
         let box = CGRect(x: Double(minX), y: Double(minY), width: Double(width), height: Double(height))
-        return VNRectangleObservation(box: box)
+        return VNRectangleObservation(boundingBox: box)
     }
     
     // MARK: - Classification Tests

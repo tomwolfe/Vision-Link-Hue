@@ -4,73 +4,73 @@ import XCTest
 /// Tests for `DetectionEngine` focusing on pure logic:
 /// non-maximum suppression (NMS), IoU calculation, confidence filtering,
 /// and inference throttling.
+@MainActor
 final class DetectionEngineTests: XCTestCase {
     
     private var engine: DetectionEngine!
     
-    override func setUp() {
-        super.setUp()
-        engine = DetectionEngine(stateStream: nil)
+    override func setUp() async throws {
+        try await super.setUp()
+        engine = await DetectionEngine(stateStream: nil)
     }
     
-    override func tearDown() {
-        engine = nil
-        super.tearDown()
+    override func tearDown() async throws {
+	try await super.tearDown()
+	engine = nil
     }
     
     // MARK: - Throttling Tests
     
     func testProcessFrameThrottlingReturnsEmptyWithinInterval() async {
+        guard let engine = engine else {
+            XCTFail("Engine is nil")
+            return
+        }
         engine.start()
-        
-        // Create a minimal pixel buffer for testing.
         guard let pixelBuffer = createTestPixelBuffer() else {
             XCTFail("Failed to create test pixel buffer")
             return
         }
-        
-        // First call should process (returns empty since no Vision framework in tests, but throttling should allow it).
         let firstResult = try? await engine.processFrame(pixelBuffer, timestamp: 0)
         XCTAssertNotNil(firstResult)
-        
-        // Immediate second call should be throttled (return empty).
         let secondResult = try? await engine.processFrame(pixelBuffer, timestamp: 0.001)
         XCTAssertEqual(secondResult?.count, 0, "Second call within interval should be throttled")
     }
     
     func testProcessFrameAllowsAfterInterval() async {
+        guard let engine = engine else {
+            XCTFail("Engine is nil")
+            return
+        }
         engine.start()
-        
         guard let pixelBuffer = createTestPixelBuffer() else {
             XCTFail("Failed to create test pixel buffer")
             return
         }
-        
-        _ = try? await engine.processFrame(pixelBuffer, timestamp: 0)
-        
-        // Wait for the inference interval to pass.
+        let firstResult = try? await engine.processFrame(pixelBuffer, timestamp: 0)
+        XCTAssertNotNil(firstResult)
         try? await Task.sleep(for: .milliseconds(Int(DetectionConstants.inferenceInterval * 1000) + 100))
-        
-        // Should allow processing again.
         let result = try? await engine.processFrame(pixelBuffer, timestamp: DetectionConstants.inferenceInterval + 0.1)
         XCTAssertNotNil(result)
     }
     
     func testProcessFrameReturnsEmptyWhenStopped() async {
+        guard let engine = engine else {
+            XCTFail("Engine is nil")
+            return
+        }
         engine.stop()
-        
         guard let pixelBuffer = createTestPixelBuffer() else {
             XCTFail("Failed to create test pixel buffer")
             return
         }
-        
         let result = try? await engine.processFrame(pixelBuffer, timestamp: 0)
         XCTAssertEqual(result?.count, 0, "Stopped engine should return empty detections")
     }
     
     // MARK: - Confidence Filtering Tests
     
-    func testMinConfidenceFiltersLowConfidenceDetections() {
+    func testMinConfidenceFiltersLowConfidenceDetections() async {
         // DetectionEngine's minConfidence is DetectionConstants.minConfidence (0.6).
         // Create detections with varying confidence levels.
         let lowConfDetection = FixtureDetection(
@@ -217,41 +217,47 @@ final class DetectionEngineTests: XCTestCase {
         XCTAssertEqual(rect.bottomRight.y, 0.8, accuracy: 0.001, "No flip: bottomRight.y matches vision maxY")
     }
     
-    // MARK: - Battery Saver Tests
-    
-    func testDefaultBatterySaverModeIsDisabled() {
-        let engine = DetectionEngine(stateStream: nil)
-        XCTAssertFalse(engine.isBatterySaverMode)
+    func testDefaultBatterySaverModeIsDisabled() async {
+        let engine = await DetectionEngine(stateStream: nil)
+        let isBatterySaverMode = await engine.isBatterySaverMode
+        XCTAssertFalse(isBatterySaverMode)
     }
     
-    func testBatterySaverModeCanBeEnabled() {
-        let settings = DetectionSettings()
-        settings.batterySaverMode = true
-        let engine = DetectionEngine(stateStream: nil, detectionSettings: settings)
-        XCTAssertTrue(engine.isBatterySaverMode)
+    func testBatterySaverModeCanBeEnabled() async {
+        let settings = await DetectionSettings()
+        await MainActor.run {
+            settings.batterySaverMode = true
+        }
+        let engine = await DetectionEngine(stateStream: nil, detectionSettings: settings)
+        let isBatterySaverMode = await engine.isBatterySaverMode
+        XCTAssertTrue(isBatterySaverMode)
     }
     
-    func testBatterySaverModeCanBeDisabled() {
-        let settings = DetectionSettings()
-        settings.batterySaverMode = false
-        let engine = DetectionEngine(stateStream: nil, detectionSettings: settings)
-        XCTAssertFalse(engine.isBatterySaverMode)
+    func testBatterySaverModeCanBeDisabled() async {
+        let settings = await DetectionSettings()
+        await MainActor.run {
+            settings.batterySaverMode = false
+        }
+        let engine = await DetectionEngine(stateStream: nil, detectionSettings: settings)
+        let isBatterySaverMode = await engine.isBatterySaverMode
+        XCTAssertFalse(isBatterySaverMode)
     }
     
-    // MARK: - Model Quantization Tests
-    
-    func testModelQuantizationFlagExists() {
-        let engine = DetectionEngine(stateStream: nil)
-        XCTAssertFalse(engine.isModelQuantized, "Model should not be quantized by default")
+    func testModelQuantizationFlagExists() async {
+        let engine = await DetectionEngine(stateStream: nil)
+        let isModelQuantized = await engine.isModelQuantized
+        XCTAssertFalse(isModelQuantized, "Model should not be quantized by default")
     }
     
-    func testReloadResetsQuantizationFlag() {
-        let engine = DetectionEngine(stateStream: nil)
-        let initialQuantized = engine.isModelQuantized
+    func testReloadResetsQuantizationFlag() async {
+        let engine = await DetectionEngine(stateStream: nil)
+        let initialQuantized = await engine.isModelQuantized
+        _ = initialQuantized
         
-        engine.reloadObjectDetectionModel()
+        await engine.reloadObjectDetectionModel()
         
-        XCTAssertFalse(engine.isModelQuantized, "Reload should reset quantization flag")
+        let isModelQuantized = await engine.isModelQuantized
+        XCTAssertFalse(isModelQuantized, "Reload should reset quantization flag")
     }
     
     // MARK: - Helper Methods

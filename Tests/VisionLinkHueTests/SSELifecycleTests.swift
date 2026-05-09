@@ -1,5 +1,5 @@
 import XCTest
-import @testable VisionLinkHue
+@testable import VisionLinkHue
 
 /// Unit tests for the SSE stream pause/resume lifecycle management in
 /// `HueEventStreamActor`.
@@ -23,39 +23,47 @@ final class SSELifecycleTests: XCTestCase {
     
     // MARK: - Pause/Resume State Tests
     
-    func testInitialStateIsNotPaused() {
-        XCTAssertFalse(actor.isPaused)
-        XCTAssertEqual(actor.state, .idle)
+    func testInitialStateIsNotPaused() async {
+        let paused = await actor.isPaused
+        XCTAssertFalse(paused)
+        let state = await actor.state
+        XCTAssertEqual(state, .idle)
     }
     
     func testPauseSetsPausedStateAndDisconnects() async {
         // Simulate being connected first
-        actor.state = .connected
+        await actor.setTestState(.connected)
         
         await actor.pause()
         
-        XCTAssertTrue(actor.isPaused)
-        XCTAssertEqual(actor.state, .idle)
+        let paused = await actor.isPaused
+        XCTAssertTrue(paused)
+        let state = await actor.state
+        XCTAssertEqual(state, .idle)
     }
     
     func testResumeClearsPausedState() async {
         await actor.pause()
         await actor.resume()
         
-        XCTAssertFalse(actor.isPaused)
+        let paused = await actor.isPaused
+        XCTAssertFalse(paused)
     }
     
     func testPauseWhileAlreadyIdleIsSafe() async {
         await actor.pause()
         
-        XCTAssertTrue(actor.isPaused)
-        XCTAssertEqual(actor.state, .idle)
+        let paused = await actor.isPaused
+        XCTAssertTrue(paused)
+        let state = await actor.state
+        XCTAssertEqual(state, .idle)
     }
     
     func testResumeWhileNotPausedIsSafe() async {
         await actor.resume()
         
-        XCTAssertFalse(actor.isPaused)
+        let paused = await actor.isPaused
+        XCTAssertFalse(paused)
     }
     
     // MARK: - Reconnection Delay Tests
@@ -96,9 +104,11 @@ final class SSELifecycleTests: XCTestCase {
         
         // The scheduleReconnection task should be cancelled by disconnect()
         // and the isPaused flag should prevent any new reconnection attempts
-        XCTAssertTrue(actor.isPaused)
+        let paused = await actor.isPaused
+        XCTAssertTrue(paused)
         // After pause + disconnect, state should be idle
-        XCTAssertEqual(actor.state, .idle)
+        let state = await actor.state
+        XCTAssertEqual(state, .idle)
     }
     
     func testPausedStatePersistsAcrossDisconnects() async {
@@ -106,14 +116,16 @@ final class SSELifecycleTests: XCTestCase {
         await actor.handleDisconnect(error: HueError.sseConnectionLost)
         
         // Even after another disconnect, should still be paused
-        XCTAssertTrue(actor.isPaused)
+        let paused = await actor.isPaused
+        XCTAssertTrue(paused)
     }
     
     func testResumeAllowsReconnectionAfterPause() async {
         await actor.pause()
         await actor.resume()
         
-        XCTAssertFalse(actor.isPaused)
+        let paused = await actor.isPaused
+        XCTAssertFalse(paused)
         
         // Now a disconnect should schedule reconnection normally
         await actor.handleDisconnect(error: HueError.sseConnectionLost)
@@ -134,7 +146,7 @@ final class SSELifecycleTests: XCTestCase {
     
     func testHealthMetricsTrackEvents() async {
         // Simulate parsing some events
-        await actor.parseAndDispatchEvent("data: {\"type\": \"test\"}")
+        try? await actor.parseAndDispatchEvent("data: {\"type\": \"test\"}")
         
         let metrics = await actor.healthMetrics()
         // The event should have been parsed (it's a valid empty update)
@@ -165,5 +177,10 @@ extension HueEventStreamActor {
     /// Internal helper for testing reconnect delay progression.
     func getReconnectDelay() async -> TimeInterval {
         reconnectDelay
+    }
+    
+    /// Test-only helper to set actor state from within the actor's executor.
+    func setTestState(_ newState: SSEReconnectionState) {
+        state = newState
     }
 }

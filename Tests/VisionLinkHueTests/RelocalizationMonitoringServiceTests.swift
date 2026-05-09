@@ -1,5 +1,5 @@
 import XCTest
-import @testable VisionLinkHue
+@testable import VisionLinkHue
 
 /// Unit tests for `RelocalizationMonitoringService`.
 ///
@@ -22,171 +22,201 @@ final class RelocalizationMonitoringServiceTests: XCTestCase {
     
     // MARK: - Initial State Tests
     
-    func testInitialSuccessRatesAreZero() {
-        XCTAssertEqual(monitor.worldMapSuccessRate, 0.0)
-        XCTAssertEqual(monitor.objectAnchorSuccessRate, 0.0)
-        XCTAssertEqual(monitor.worldMapAverageTime, 0.0)
-        XCTAssertEqual(monitor.objectAnchorAverageTime, 0.0)
-        XCTAssertFalse(monitor.objectAnchorPreferred)
+    func testInitialSuccessRatesAreZero() async {
+        let worldMapSuccessRate = await monitor.worldMapSuccessRate
+        XCTAssertEqual(worldMapSuccessRate, 0.0)
+        let objectAnchorSuccessRate = await monitor.objectAnchorSuccessRate
+        XCTAssertEqual(objectAnchorSuccessRate, 0.0)
+        let worldMapAverageTime = await monitor.worldMapAverageTime
+        XCTAssertEqual(worldMapAverageTime, 0.0)
+        let objectAnchorAverageTime = await monitor.objectAnchorAverageTime
+        XCTAssertEqual(objectAnchorAverageTime, 0.0)
+        let objectAnchorPreferred = await monitor.objectAnchorPreferred
+        XCTAssertFalse(objectAnchorPreferred)
     }
     
     // MARK: - ARWorldMap Recording Tests
     
-    func testRecordWorldMapAttemptIncrementsAttempts() {
-        monitor.recordWorldMapAttempt()
-        monitor.recordWorldMapAttempt()
-        monitor.recordWorldMapAttempt()
+    func testRecordWorldMapAttemptIncrementsAttempts() async {
+        await monitor.recordWorldMapAttempt()
+        await monitor.recordWorldMapAttempt()
+        await monitor.recordWorldMapAttempt()
         
-        XCTAssertEqual(monitor.worldMapAttempts, 3)
-        XCTAssertEqual(monitor.worldMapSuccesses, 0)
+        let attempts = await monitor.worldMapAttempts
+        let successes = await monitor.worldMapSuccesses
+        XCTAssertEqual(attempts, 3)
+        XCTAssertEqual(successes, 0)
     }
     
-    func testRecordWorldMapSuccessIncrementsSuccessAndTime() {
-        monitor.recordWorldMapAttempt()
-        monitor.recordWorldMapSuccess(elapsedTime: 2.5)
+    func testRecordWorldMapSuccessIncrementsSuccessAndTime() async {
+        await monitor.recordWorldMapAttempt()
+        await monitor.recordWorldMapSuccess(elapsedTime: 2.5)
         
-        XCTAssertEqual(monitor.worldMapAttempts, 1)
-        XCTAssertEqual(monitor.worldMapSuccesses, 1)
-        XCTAssertEqual(monitor.worldMapTotalTime, 2.5, accuracy: 0.001)
-        XCTAssertEqual(monitor.worldMapSuccessRate, 1.0)
-        XCTAssertEqual(monitor.worldMapAverageTime, 2.5, accuracy: 0.001)
+        let attempts = await monitor.worldMapAttempts
+        XCTAssertEqual(attempts, 1)
+        let successes = await monitor.worldMapSuccesses
+        XCTAssertEqual(successes, 1)
+        let totalTime = await monitor.worldMapTotalTime
+        XCTAssertEqual(totalTime, 2.5, accuracy: 0.001)
+        let successRate = await monitor.worldMapSuccessRate
+        XCTAssertEqual(successRate, 1.0)
+        let averageTime = await monitor.worldMapAverageTime
+        XCTAssertEqual(averageTime, 2.5, accuracy: 0.001)
     }
     
-    func testRecordWorldMapFailureOnlyIncrementsAttempts() {
-        monitor.recordWorldMapAttempt()
-        monitor.recordWorldMapFailure()
+    func testRecordWorldMapFailureOnlyIncrementsAttempts() async {
+        await monitor.recordWorldMapAttempt()
+        await monitor.recordWorldMapFailure()
         
-        XCTAssertEqual(monitor.worldMapAttempts, 1)
-        XCTAssertEqual(monitor.worldMapSuccesses, 0)
-        XCTAssertEqual(monitor.worldMapSuccessRate, 0.0)
+        let attempts = await monitor.worldMapAttempts
+        XCTAssertEqual(attempts, 1)
+        let successes = await monitor.worldMapSuccesses
+        XCTAssertEqual(successes, 0)
+        let successRate = await monitor.worldMapSuccessRate
+        XCTAssertEqual(successRate, 0.0)
     }
     
-    func testMultipleWorldMapSuccessesComputeCorrectAverage() {
-        monitor.recordWorldMapAttempt()
-        monitor.recordWorldMapSuccess(elapsedTime: 2.0)
+    func testMultipleWorldMapSuccessesComputeCorrectAverage() async {
+        await monitor.recordWorldMapAttempt()
+        await monitor.recordWorldMapSuccess(elapsedTime: 2.0)
         
-        monitor.recordWorldMapAttempt()
-        monitor.recordWorldMapSuccess(elapsedTime: 4.0)
+        await monitor.recordWorldMapAttempt()
+        await monitor.recordWorldMapSuccess(elapsedTime: 4.0)
         
-        XCTAssertEqual(monitor.worldMapSuccesses, 2)
-        XCTAssertEqual(monitor.worldMapAverageTime, 3.0, accuracy: 0.001)
+        let successes = await monitor.worldMapSuccesses
+        XCTAssertEqual(successes, 2)
+        let averageTime = await monitor.worldMapAverageTime
+        XCTAssertEqual(averageTime, 3.0, accuracy: 0.001)
     }
     
     // MARK: - ObjectAnchor Recording Tests
     
-    func testRecordObjectAnchorAttemptIncrementsAttempts() {
-        monitor.recordObjectAnchorAttempt()
-        monitor.recordObjectAnchorAttempt()
+    func testRecordObjectAnchorAttemptIncrementsAttempts() async {
+        await monitor.recordObjectAnchorAttempt()
+        await monitor.recordObjectAnchorAttempt()
         
-        XCTAssertEqual(monitor.objectAnchorAttempts, 2)
-        XCTAssertEqual(monitor.objectAnchorSuccesses, 0)
+        let attempts = await monitor.objectAnchorAttempts
+        XCTAssertEqual(attempts, 2)
+        let successes = await monitor.objectAnchorSuccesses
+        XCTAssertEqual(successes, 0)
     }
     
-    func testRecordObjectAnchorSuccessIncrementsSuccessAndTime() {
-        monitor.recordObjectAnchorAttempt()
-        monitor.recordObjectAnchorSuccess(elapsedTime: 1.5)
+    func testRecordObjectAnchorSuccessIncrementsSuccessAndTime() async {
+        await monitor.recordObjectAnchorAttempt()
+        await monitor.recordObjectAnchorSuccess(elapsedTime: 1.5)
         
-        XCTAssertEqual(monitor.objectAnchorAttempts, 1)
-        XCTAssertEqual(monitor.objectAnchorSuccesses, 1)
-        XCTAssertEqual(monitor.objectAnchorSuccessRate, 1.0)
-        XCTAssertEqual(monitor.objectAnchorAverageTime, 1.5, accuracy: 0.001)
+        let attempts = await monitor.objectAnchorAttempts
+        XCTAssertEqual(attempts, 1)
+        let successes = await monitor.objectAnchorSuccesses
+        XCTAssertEqual(successes, 1)
+        let successRate = await monitor.objectAnchorSuccessRate
+        XCTAssertEqual(successRate, 1.0)
+        let averageTime = await monitor.objectAnchorAverageTime
+        XCTAssertEqual(averageTime, 1.5, accuracy: 0.001)
     }
     
-    func testRecordObjectAnchorFailureOnlyIncrementsAttempts() {
-        monitor.recordObjectAnchorAttempt()
-        monitor.recordObjectAnchorFailure()
+    func testRecordObjectAnchorFailureOnlyIncrementsAttempts() async {
+        await monitor.recordObjectAnchorAttempt()
+        await monitor.recordObjectAnchorFailure()
         
-        XCTAssertEqual(monitor.objectAnchorAttempts, 1)
-        XCTAssertEqual(monitor.objectAnchorSuccesses, 0)
+        let attempts = await monitor.objectAnchorAttempts
+        XCTAssertEqual(attempts, 1)
+        let successes = await monitor.objectAnchorSuccesses
+        XCTAssertEqual(successes, 0)
     }
     
     // MARK: - Mixed Scenario Tests
     
-    func testMixedRelocalizationAttemptsComputeCorrectRates() {
+    func testMixedRelocalizationAttemptsComputeCorrectRates() async {
         // ARWorldMap: 3 successes out of 5 attempts (60%)
         for _ in 0..<5 {
-            monitor.recordWorldMapAttempt()
+            await monitor.recordWorldMapAttempt()
         }
-        monitor.recordWorldMapSuccess(elapsedTime: 2.0)
-        monitor.recordWorldMapFailure()
-        monitor.recordWorldMapSuccess(elapsedTime: 3.0)
-        monitor.recordWorldMapFailure()
-        monitor.recordWorldMapSuccess(elapsedTime: 2.5)
+        await monitor.recordWorldMapSuccess(elapsedTime: 2.0)
+        await monitor.recordWorldMapFailure()
+        await monitor.recordWorldMapSuccess(elapsedTime: 3.0)
+        await monitor.recordWorldMapFailure()
+        await monitor.recordWorldMapSuccess(elapsedTime: 2.5)
         
         // ObjectAnchor: 4 successes out of 5 attempts (80%)
         for _ in 0..<5 {
-            monitor.recordObjectAnchorAttempt()
+            await monitor.recordObjectAnchorAttempt()
         }
-        monitor.recordObjectAnchorSuccess(elapsedTime: 1.0)
-        monitor.recordObjectAnchorSuccess(elapsedTime: 1.5)
-        monitor.recordObjectAnchorFailure()
-        monitor.recordObjectAnchorSuccess(elapsedTime: 0.8)
-        monitor.recordObjectAnchorSuccess(elapsedTime: 1.2)
+        await monitor.recordObjectAnchorSuccess(elapsedTime: 1.0)
+        await monitor.recordObjectAnchorSuccess(elapsedTime: 1.5)
+        await monitor.recordObjectAnchorFailure()
+        await monitor.recordObjectAnchorSuccess(elapsedTime: 0.8)
+        await monitor.recordObjectAnchorSuccess(elapsedTime: 1.2)
         
-        XCTAssertEqual(monitor.worldMapSuccessRate, 0.6, accuracy: 0.01)
-        XCTAssertEqual(monitor.objectAnchorSuccessRate, 0.8, accuracy: 0.01)
+        let worldMapSuccessRate = await monitor.worldMapSuccessRate
+        XCTAssertEqual(worldMapSuccessRate, 0.6, accuracy: 0.01)
+        let objectAnchorSuccessRate = await monitor.objectAnchorSuccessRate
+        XCTAssertEqual(objectAnchorSuccessRate, 0.8, accuracy: 0.01)
     }
     
-    func testObjectAnchorPreferredReturnsTrueWhenRateDiffExceedsThreshold() {
+    func testObjectAnchorPreferredReturnsTrueWhenRateDiffExceedsThreshold() async {
         // Need at least 5 attempts of each type
         for _ in 0..<5 {
-            monitor.recordWorldMapAttempt()
-            monitor.recordWorldMapFailure()
+            await monitor.recordWorldMapAttempt()
+            await monitor.recordWorldMapFailure()
         }
         
         for _ in 0..<5 {
-            monitor.recordObjectAnchorAttempt()
-            monitor.recordObjectAnchorSuccess(elapsedTime: 1.0)
+            await monitor.recordObjectAnchorAttempt()
+            await monitor.recordObjectAnchorSuccess(elapsedTime: 1.0)
         }
         
         // ObjectAnchor has 100% success vs 0% for WorldMap, diff = 1.0 > 0.1
-        XCTAssertTrue(monitor.objectAnchorPreferred)
+        let preferred = await monitor.objectAnchorPreferred
+        XCTAssertTrue(preferred)
     }
     
-    func testObjectAnchorPreferredReturnsFalseWhenInsufficientData() {
-        monitor.recordWorldMapAttempt()
-        monitor.recordWorldMapSuccess(elapsedTime: 2.0)
+    func testObjectAnchorPreferredReturnsFalseWhenInsufficientData() async {
+        await monitor.recordWorldMapAttempt()
+        await monitor.recordWorldMapSuccess(elapsedTime: 2.0)
         
-        monitor.recordObjectAnchorAttempt()
-        monitor.recordObjectAnchorSuccess(elapsedTime: 1.0)
+        await monitor.recordObjectAnchorAttempt()
+        await monitor.recordObjectAnchorSuccess(elapsedTime: 1.0)
         
         // Only 1 attempt each, need >= 5
-        XCTAssertFalse(monitor.objectAnchorPreferred)
+        let preferred2 = await monitor.objectAnchorPreferred
+        XCTAssertFalse(preferred2)
     }
     
-    func testObjectAnchorPreferredReturnsFalseWhenWorldMapIsBetter() {
+    func testObjectAnchorPreferredReturnsFalseWhenWorldMapIsBetter() async {
         for _ in 0..<5 {
-            monitor.recordWorldMapAttempt()
+            await monitor.recordWorldMapAttempt()
         }
         for _ in 0..<4 {
-            monitor.recordWorldMapSuccess(elapsedTime: 2.0)
+            await monitor.recordWorldMapSuccess(elapsedTime: 2.0)
         }
-        monitor.recordWorldMapFailure()
+        await monitor.recordWorldMapFailure()
         
         for _ in 0..<5 {
-            monitor.recordObjectAnchorAttempt()
+            await monitor.recordObjectAnchorAttempt()
         }
         for _ in 0..<2 {
-            monitor.recordObjectAnchorSuccess(elapsedTime: 1.0)
+            await monitor.recordObjectAnchorSuccess(elapsedTime: 1.0)
         }
         for _ in 0..<3 {
-            monitor.recordObjectAnchorFailure()
+            await monitor.recordObjectAnchorFailure()
         }
         
         // WorldMap 80% > ObjectAnchor 40%, diff = -0.4 < 0.1
-        XCTAssertFalse(monitor.objectAnchorPreferred)
+        let preferred3 = await monitor.objectAnchorPreferred
+        XCTAssertFalse(preferred3)
     }
     
     // MARK: - Summary Tests
     
-    func testSummaryContainsAllMetrics() {
-        monitor.recordWorldMapAttempt()
-        monitor.recordWorldMapSuccess(elapsedTime: 2.0)
+    func testSummaryContainsAllMetrics() async {
+        await monitor.recordWorldMapAttempt()
+        await monitor.recordWorldMapSuccess(elapsedTime: 2.0)
         
-        monitor.recordObjectAnchorAttempt()
-        monitor.recordObjectAnchorSuccess(elapsedTime: 1.0)
+        await monitor.recordObjectAnchorAttempt()
+        await monitor.recordObjectAnchorSuccess(elapsedTime: 1.0)
         
-        let summary = monitor.summary
+        let summary = await monitor.summary
         XCTAssertTrue(summary.contains("ARWorldMap"))
         XCTAssertTrue(summary.contains("ObjectAnchor"))
         XCTAssertTrue(summary.contains("Recommended"))

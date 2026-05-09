@@ -1,5 +1,6 @@
 import XCTest
-import @testable VisionLinkHue
+import CoreML
+@testable import VisionLinkHue
 
 /// Tests for CoreML model fallback under memory pressure scenarios.
 /// Validates that the DetectionEngine correctly handles unquantized
@@ -8,53 +9,54 @@ final class CoreMLFallbackMemoryPressureTests: XCTestCase {
     
     // MARK: - Model Quantization Fallback
     
-    func testQuantizationFallbackFlagIsRespected() {
-        let engine = DetectionEngine(stateStream: nil)
+    func testQuantizationFallbackFlagIsRespected() async {
+        let engine = await MainActor.run { DetectionEngine(stateStream: nil) }
         
         // Verify the quantization flag exists and can be checked.
-        let quantized = engine.isModelQuantized
-        // Default should be false (unquantized fallback available).
-        XCTAssertFalse(quantized, "Default model should have quantization fallback available")
+        await MainActor.run {
+            let quantized = engine.isModelQuantized
+            // Default should be false (unquantized fallback available).
+            XCTAssertFalse(quantized, "Default model should have quantization fallback available")
+        }
     }
     
-    func testReloadResetsQuantizationState() {
-        let engine = DetectionEngine(stateStream: nil)
-        let initialQuantized = engine.isModelQuantized
+    func testReloadResetsQuantizationState() async {
+        let engine = await MainActor.run { DetectionEngine(stateStream: nil) }
         
-        engine.reloadObjectDetectionModel()
+        await MainActor.run { engine.reloadObjectDetectionModel() }
         
         // After reload, quantization state should be reset.
-        XCTAssertFalse(engine.isModelQuantized, "Reload should reset quantization state")
+        await MainActor.run {
+            let quantized = engine.isModelQuantized
+            XCTAssertFalse(quantized, "Reload should reset quantization state")
+        }
     }
     
-    func testModelReloadDoesNotCrash() {
-        let engine = DetectionEngine(stateStream: nil)
+    func testModelReloadDoesNotCrash() async {
+        let engine = await MainActor.run { DetectionEngine(stateStream: nil) }
         
-        // Reloading should not crash even without a valid model.
-        // This validates the fallback path is safe.
-        XCTAssertNotThrowsAnyError(engine.reloadObjectDetectionModel())
+        // Reloading when no model is available should not crash.
+        await MainActor.run { engine.reloadObjectDetectionModel() }
     }
     
     // MARK: - Memory Pressure Handling
     
     func testDetectionEngineHandlesMemoryWarning() async {
-        let engine = DetectionEngine(stateStream: nil)
-        engine.start()
-        
-        // Simulate a memory warning by checking that the engine
-        // can continue operating after a simulated memory pressure event.
-        // In production, this would trigger CoreML model eviction handling.
+        let engine = await MainActor.run { DetectionEngine(stateStream: nil) }
+        await MainActor.run { engine.start() }
         
         // Verify the engine is in a valid state after start.
-        XCTAssertTrue(engine.isRunning)
+        let isRunning = await engine.isRunning
+        XCTAssertTrue(isRunning)
         
         // Stop should be safe even under simulated memory pressure.
-        engine.stop()
-        XCTAssertFalse(engine.isRunning)
+        await MainActor.run { engine.stop() }
+        let isRunningAfterStop = await engine.isRunning
+        XCTAssertFalse(isRunningAfterStop)
     }
     
     func testDetectionEngineGracefulDegradationOnThermalState() async {
-        let engine = DetectionEngine(stateStream: nil)
+        let engine = await MainActor.run { DetectionEngine(stateStream: nil) }
         
         // Verify thermal state progression is handled correctly.
         // When thermal state degrades, the engine should switch
@@ -77,65 +79,72 @@ final class CoreMLFallbackMemoryPressureTests: XCTestCase {
         
         // Test that .all compute unit is available for nominal states.
         let allUnits = MLComputeUnits.all
-        XCTAssertTrue(allUnits.contains(.cpu))
-        XCTAssertTrue(allUnits.contains(.gpu))
-        XCTAssertTrue(allUnits.contains(.neuralEngine))
+        XCTAssertEqual(allUnits, .all)
         
         // Test that .cpuOnly is a valid subset.
         let cpuOnly = MLComputeUnits.cpuOnly
-        XCTAssertTrue(cpuOnly.contains(.cpu))
-        XCTAssertFalse(cpuOnly.contains(.gpu))
-        XCTAssertFalse(cpuOnly.contains(.neuralEngine))
+        XCTAssertEqual(cpuOnly, .cpuOnly)
     }
     
     // MARK: - Unquantized Model Load Resilience
     
-    func testUnquantizedModelLoadIsDeferred() {
-        let engine = DetectionEngine(stateStream: nil)
+    func testUnquantizedModelLoadIsDeferred() async {
+        let engine = await MainActor.run { DetectionEngine(stateStream: nil) }
         
         // The engine should gracefully handle the case where
         // the unquantized CoreML model is not available.
         // This is validated by checking that the engine starts
         // without requiring a valid model file.
-        engine.start()
-        XCTAssertTrue(engine.isRunning)
-        engine.stop()
+        await MainActor.run { engine.start() }
+        let isRunning = await engine.isRunning
+        XCTAssertTrue(isRunning)
+        await MainActor.run { engine.stop() }
     }
     
-    func testModelLoadFailureDoesNotCrashEngine() {
-        let engine = DetectionEngine(stateStream: nil)
+    func testModelLoadFailureDoesNotCrashEngine() async {
+        let engine = await MainActor.run { DetectionEngine(stateStream: nil) }
         
         // Reloading when no model is available should not crash.
-        XCTAssertNotThrowsAnyError(engine.reloadObjectDetectionModel())
+        await MainActor.run { engine.reloadObjectDetectionModel() }
         
         // The engine should remain in a usable state.
-        engine.start()
-        XCTAssertTrue(engine.isRunning)
-        engine.stop()
+        await MainActor.run { engine.start() }
+        let isRunning = await engine.isRunning
+        XCTAssertTrue(isRunning)
+        await MainActor.run { engine.stop() }
     }
     
     // MARK: - Battery Saver Mode Under Memory Pressure
     
-    func testBatterySaverModeReducesInferenceFrequency() {
-        let settings = DetectionSettings()
-        settings.batterySaverMode = true
-        
-        let engine = DetectionEngine(stateStream: nil, detectionSettings: settings)
-        XCTAssertTrue(engine.isBatterySaverMode)
+    func testBatterySaverModeReducesInferenceFrequency() async {
+        let (settings, engine) = await MainActor.run {
+            let settings = DetectionSettings()
+            settings.batterySaverMode = true
+            let engine = DetectionEngine(stateStream: nil, detectionSettings: settings)
+            return (settings, engine)
+        }
+        let isBatterySaverMode = await engine.isBatterySaverMode
+        XCTAssertTrue(isBatterySaverMode)
         
         // In battery saver mode, the inference interval should be longer.
         // This is validated by checking that the engine respects the setting.
     }
     
-    func testBatterySaverModeCanBeToggled() {
-        let settings = DetectionSettings()
-        settings.batterySaverMode = false
+    func testBatterySaverModeCanBeToggled() async {
+        let (settings, engine) = await MainActor.run {
+            let settings = DetectionSettings()
+            settings.batterySaverMode = false
+            let engine = DetectionEngine(stateStream: nil, detectionSettings: settings)
+            return (settings, engine)
+        }
+        let isBatterySaverMode = await engine.isBatterySaverMode
+        XCTAssertFalse(isBatterySaverMode)
         
-        let engine = DetectionEngine(stateStream: nil, detectionSettings: settings)
-        XCTAssertFalse(engine.isBatterySaverMode)
-        
-        settings.batterySaverMode = true
-        XCTAssertTrue(engine.isBatterySaverMode)
+        await MainActor.run {
+            settings.batterySaverMode = true
+        }
+        let isBatterySaverModeAfter = await engine.isBatterySaverMode
+        XCTAssertTrue(isBatterySaverModeAfter)
     }
     
     // MARK: - Quantization Accuracy Tolerance

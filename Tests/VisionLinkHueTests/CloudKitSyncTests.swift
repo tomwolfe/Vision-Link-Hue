@@ -1,5 +1,5 @@
 import XCTest
-import @testable VisionLinkHue
+@testable import VisionLinkHue
 import SwiftData
 import simd
 import CloudKit
@@ -7,26 +7,31 @@ import CloudKit
 /// Unit tests for CloudKit spatial sync operations.
 /// Validates upload/download logic, conflict resolution, and
 /// sync result types using mocked CloudKit responses.
+@MainActor
 final class CloudKitSyncTests: XCTestCase {
     
     private var modelContainer: ModelContainer!
     private var persistence: FixturePersistence!
     
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         
         let schema = Schema([FixtureMapping.self, SpatialSyncRecord.self])
-        modelContainer = try! ModelContainer(
-            for: schema,
-            configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]
-        )
-        persistence = FixturePersistence(container: modelContainer)
+        modelContainer = await MainActor.run {
+            try! ModelContainer(
+                for: schema,
+                configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]
+            )
+        }
+        persistence = await MainActor.run {
+            FixturePersistence(container: modelContainer)
+        }
     }
     
-    override func tearDown() {
+    override func tearDown() async throws {
         persistence = nil
         modelContainer = nil
-        super.tearDown()
+        try await super.tearDown()
     }
     
     // MARK: - SpatialSyncError Tests
@@ -139,7 +144,7 @@ final class CloudKitSyncTests: XCTestCase {
         let fixtureId = UUID()
         
         let ckRecordID = CKRecord.ID(recordName: "fixture:\(fixtureId.uuidString)")
-        var ckRecord = CKRecord(recordID: ckRecordID)
+        var ckRecord = CKRecord(recordType: "SpatialSyncRecord", recordID: ckRecordID)
         
         ckRecord["fixture_id"] = fixtureId.uuidString
         ckRecord["light_id"] = "hue-light-123"
@@ -177,7 +182,7 @@ final class CloudKitSyncTests: XCTestCase {
         let fixtureId = UUID()
         
         let ckRecordID = CKRecord.ID(recordName: "fixture:\(fixtureId.uuidString)")
-        var ckRecord = CKRecord(recordID: ckRecordID)
+        var ckRecord = CKRecord(recordType: "SpatialSyncRecord", recordID: ckRecordID)
         ckRecord["fixture_id"] = fixtureId.uuidString
         ckRecord["last_modified_by_device"] = "test-device"
         
@@ -275,14 +280,12 @@ final class CloudKitSyncTests: XCTestCase {
     // MARK: - CKContainer Availability Check
     
     func testCKContainerAvailabilityCheck() {
-        // Verify CKContainer.isCloudKitAvailable() can be called without crashing.
-        // In the test environment, this may return false, but should not throw.
+        // Verify CKContainer can be initialized with an identifier.
+        // In the test environment, this should not throw.
         let container = CKContainer(identifier: "iCloud.com.visionlinkhue.spatial")
-        let available = container.isCloudKitAvailable()
         
-        // The result can be true or false depending on the test environment.
-        // We just verify the call succeeds.
-        XCTAssertTrue(available == true || available == false)
+        // The container should be created successfully.
+        XCTAssertNotNil(container)
     }
 }
 

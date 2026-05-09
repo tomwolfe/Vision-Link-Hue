@@ -440,15 +440,17 @@ final class LocalSyncEncryption: Sendable {
     /// Complete the handshake after receiving the responder's message.
     /// Computes all four DH shares and derives session keys.
     ///
-    /// - Parameter response: The `HandshakeResponsePayload` from the remote device.
+    /// - Parameters:
+    ///   - response: The `HandshakeResponsePayload` from the remote device.
+    ///   - remoteDeviceID: The remote device's identifier (used for session key lookup).
     /// - Returns: `true` if the session was established successfully.
-    func completeHandshake(_ response: HandshakeResponsePayload) async -> Bool {
+    func completeHandshake(_ response: HandshakeResponsePayload, remoteDeviceID: String) async -> Bool {
         guard configuration.protocol.providesEncryption else {
             return true
         }
         
-        guard let ourEphemeral = pendingHandshakeEphemeralKeys[response.messageId] else {
-            logger.error("No pending ephemeral key for handshake response \(response.messageId)")
+        guard let ourEphemeral = pendingHandshakeEphemeralKeys[remoteDeviceID] else {
+            logger.error("No pending ephemeral key for handshake response from \(remoteDeviceID)")
             return false
         }
         
@@ -466,11 +468,11 @@ final class LocalSyncEncryption: Sendable {
         }
 
         return finalizeSession(
-            remoteDeviceID: response.messageId,
+            remoteDeviceID: remoteDeviceID,
             ourEphemeral: ourEphemeral.publicKey,
             ourStatic: staticKeyPair.publicKey,
             remoteEphemeral: remoteEphemeral,
-            remoteStatic: pendingRemoteStaticKeys[response.messageId] ?? staticKeyPair.publicKey
+            remoteStatic: pendingRemoteStaticKeys[remoteDeviceID] ?? staticKeyPair.publicKey
         )
     }
     
@@ -1046,8 +1048,8 @@ final class LocalSyncActor {
     ///   - senderID: The device ID of the handshake responder.
     private func handleHandshakeResponse(_ responsePayload: HandshakeResponsePayload, from senderID: String) async {
         guard let channel = networkChannel, let encryption = channel.encryption else { return }
-        
-        let success = await encryption.completeHandshake(responsePayload)
+
+        let success = await encryption.completeHandshake(responsePayload, remoteDeviceID: senderID)
         if success {
             logger.info("Noise_XX handshake completed with \(senderID): forward-secure session established")
         } else {
@@ -1196,17 +1198,21 @@ final class LocalNetworkChannel: Sendable {
     /// in plaintext to allow key exchange before encryption is active.
     ///
     /// - Parameters:
-    ///   - data: The plaintext or encrypted payload.
+    ///   - data: The plaintext payload to send.
     ///   - peerID: The recipient's device ID.
-    ///   - isHandshake: Whether this is a handshake message.
-    func sendRaw(data: Data, to peerID: String, isHandshake: Bool = false) {
+    ///   - isHandshake: Whether this is a handshake message (sent in plaintext).
+    ///   - isPreEncrypted: Whether the data has already been encrypted by the caller.
+    func sendRaw(data: Data, to peerID: String, isHandshake: Bool = false, isPreEncrypted: Bool = false) {
         guard isActive else { return }
-        
+
         let targetDevice = discoveredDevices.first(where: { $0.id == peerID })
         guard let device = targetDevice else { return }
-        
+
         let payload: Data
-        if isHandshake {
+        if isPreEncrypted {
+            // Data was already encrypted by the caller (send method).
+            payload = data
+        } else if isHandshake {
             // Handshake messages are sent in plaintext.
             payload = data
         } else if let encryption,
@@ -1216,8 +1222,8 @@ final class LocalNetworkChannel: Sendable {
             // Fallback to plaintext if encryption is unavailable.
             payload = data
         }
-        
-        logger.debug("Sending \(payload.count) bytes to \(device.name) (encrypted: \(!isHandshake && encryption != nil))")
+
+        logger.debug("Sending \(payload.count) bytes to \(device.name) (encrypted: \(isPreEncrypted || (!isHandshake && encryption != nil)))")
     }
     
     /// Decrypt an incoming message from a peer.
@@ -1339,20 +1345,36 @@ final class LocalNetworkChannel: Sendable {
             ))
         }
         
-        // Determine if this is a handshake message.
-        let isHandshake = false
+        // Determine if this is a handshake message by attempting to decode
+        // as LocalSyncMessage. Handshake messages must be sent in plaintext
+        // to allow key exchange before encryption is active.
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let isHandshake: Bool
+        do {
+            if let syncMessage = try? decoder.decode(LocalSyncMessage.self, from: data) {
+                isHandshake = syncMessage.isHandshakeMessage
+            } else {
+                isHandshake = false
+            }
+        } catch {
+            isHandshake = false
+        }
         
         // Encrypt if we have an active session and this isn't a handshake.
         let payload: Data
+        let isPreEncrypted: Bool
         if !isHandshake, let encryption = self.encryption,
            let encrypted = encryption.encrypt(data, for: peerID) {
             payload = encrypted
+            isPreEncrypted = true
         } else {
             payload = data
+            isPreEncrypted = false
         }
-        
-        // Send via TCP socket to the peer's port.
-        logger.debug("Sending \(payload.count) bytes to \(device.name) at \(device.ipAddress ?? "unknown")")
+
+        // Transmit via the raw channel.
+        sendRaw(data: payload, to: peerID, isPreEncrypted: isPreEncrypted)
     }
     
     /// Broadcast a message to all known peers.

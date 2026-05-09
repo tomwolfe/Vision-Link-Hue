@@ -125,7 +125,7 @@ final class GazeTargetingSystem: SpatialInputHandler, Sendable {
     private var currentGazeTarget: TrackedFixture?
     
     /// Time when gaze fixation began on the current target.
-    fileprivate var gazeFixationStart: ContinuousClock.Instant?
+    var gazeFixationStart: ContinuousClock.Instant?
     
     /// Last gaze direction vector (normalized).
     private var lastGazeDirection: SIMD3<Float>?
