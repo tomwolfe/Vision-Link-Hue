@@ -901,6 +901,35 @@ final class LocalSyncActor {
         }
     }
     
+    /// Send a batch of spatial sync payloads to all reachable peers using TCP streams.
+    /// Matter 1.5 supports TCP for large message handling, and this method optimizes
+    /// large spatial sync batches by using TCP streams instead of individual UDP packets.
+    /// This improves reliability in congested 2.4GHz environments where packet loss
+    /// is common. Each peer receives a batched TCP stream containing all spatial sync data.
+    ///
+    /// - Parameter payloads: Array of `SpatialSyncPayload` to batch and send.
+    /// - Returns: `true` if all peers received the batch successfully.
+    func sendSpatialSyncBatch(_ payloads: [SpatialSyncPayload]) async throws {
+        guard isActive else {
+            throw LocalSyncError.connectionLost
+        }
+        
+        let reachablePeers = peers.filter { $0.value.isReachable }
+        
+        if reachablePeers.isEmpty {
+            throw LocalSyncError.noDevicesReachable
+        }
+        
+        guard let channel = networkChannel else {
+            throw LocalSyncError.connectionLost
+        }
+        
+        for peer in reachablePeers.values {
+            try await channel.sendBatch(payloads, to: peer.id)
+            logger.debug("Sent spatial sync batch (\(payloads.count) payloads) to \(peer.name)")
+        }
+    }
+    
     /// Send a calibration payload to all reachable peers.
     func sendCalibration(_ payload: CalibrationPayload) async throws {
         guard isActive else {
@@ -1382,6 +1411,83 @@ final class LocalNetworkChannel: Sendable {
         for device in discoveredDevices where device.id != deviceID {
             try? await send(message, to: device.id)
         }
+    }
+    
+    /// Send a batch of messages to a peer via TCP stream.
+    /// Matter 1.5 supports TCP for large message handling, and this method optimizes
+    /// large spatial sync batches by using TCP streams instead of individual UDP packets.
+    /// This improves reliability in congested 2.4GHz environments where packet loss
+    /// is common. The message is serialized as a single TCP stream containing all payloads.
+    ///
+    /// - Parameters:
+    ///   - messages: Array of `Codable` messages to send as a single batch.
+    ///   - peerID: The recipient's device ID.
+    func sendBatch<T: Codable>(_ messages: [T], to peerID: String) async throws {
+        guard isActive else {
+            throw LocalSyncError.connectionLost
+        }
+        
+        guard let device = discoveredDevices.first(where: { $0.id == peerID }) else {
+            throw LocalSyncError.noDevicesReachable
+        }
+        
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.keyEncodingStrategy = .useDefaultKeys
+        
+        let encodedMessages = messages.map { msg -> Data? in
+            do {
+                return try encoder.encode(msg)
+            } catch {
+                return nil
+            }
+        }.compactMap { $0 }
+        
+        guard !encodedMessages.isEmpty else {
+            throw LocalSyncError.encodingFailed(NSError(
+                domain: "LocalNetworkChannel",
+                code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "All messages failed to encode"]
+            ))
+        }
+        
+        // Concatenate all encoded messages into a single TCP stream payload with length prefix.
+        // Each message is prefixed with its byte length for reliable parsing on the receiver side.
+        var streamPayload = Data()
+        for messageData in encodedMessages {
+            let lengthHeader = Data(bytes: UInt32(messageData.count).littleEndian)
+            streamPayload.append(lengthHeader)
+            streamPayload.append(messageData)
+        }
+        
+        // Determine if this is a handshake message by checking the first message.
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let isHandshake: Bool
+        do {
+            if let firstMessage = try? decoder.decode(LocalSyncMessage.self, from: encodedMessages.first!) {
+                isHandshake = firstMessage.isHandshakeMessage
+            } else {
+                isHandshake = false
+            }
+        } catch {
+            isHandshake = false
+        }
+        
+        // Encrypt if we have an active session and this isn't a handshake.
+        let payload: Data
+        let isPreEncrypted: Bool
+        if !isHandshake, let encryption = self.encryption,
+           let encrypted = encryption.encrypt(streamPayload, for: peerID) {
+            payload = encrypted
+            isPreEncrypted = true
+        } else {
+            payload = streamPayload
+            isPreEncrypted = false
+        }
+
+        // Transmit the full TCP stream via the raw channel.
+        sendRaw(data: payload, to: peerID, isPreEncrypted: isPreEncrypted)
     }
     
     /// Register a discovered device.

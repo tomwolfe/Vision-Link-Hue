@@ -756,22 +756,30 @@ final class SpatialCalibrationEngine {
     /// Gram-Schmidt re-orthogonalization corrects these issues with minimal
     /// computational cost.
     ///
-    /// ## NaN Guard
+    /// ## Singularity Guard
     ///
-    /// Before normalizing the first column, the length is checked against a
-    /// minimum threshold (`1e-6`). If the column length is effectively zero
-    /// (which can occur from a highly degenerate covariance matrix despite
-    /// the `det(HTH)` check), the function returns the identity matrix to
-    /// prevent NaN from poisoning the transformation.
+    /// Before normalizing each column, the length is checked against a
+    /// minimum threshold (`1e-6`). If all three columns are effectively
+    /// degenerate (lengths below threshold), the function returns the identity
+    /// matrix to prevent NaN propagation throughout the transformation pipeline.
+    /// This acts as a final safeguard against ill-conditioned covariance matrices
+    /// that may have slipped through the initial determinant check.
     ///
     /// - Parameter M: A 3×3 matrix with approximately orthogonal columns.
     /// - Returns: A strictly orthogonal 3×3 rotation matrix, or identity
     ///   if the input is degenerate.
     private func orthogonalize(_ M: simd_float3x3) -> simd_float3x3 {
         let col0Length = simd_length(M.columns.0)
-        guard col0Length > 1e-6 else {
+        let col1Length = simd_length(M.columns.1)
+        let col2Length = simd_length(M.columns.2)
+        
+        let allDegenerate = col0Length <= 1e-6
+            && col1Length <= 1e-6
+            && col2Length <= 1e-6
+        
+        if allDegenerate {
             logger.warning(
-                "Gram-Schmidt orthogonalization: first column length \(col0Length) is effectively zero. Returning identity matrix to prevent NaN propagation. This may indicate a degenerate covariance matrix from collinear calibration points."
+                "Gram-Schmidt orthogonalization: all three columns are degenerate (lengths: \(col0Length), \(col1Length), \(col2Length)). Returning identity matrix to prevent NaN propagation. This indicates a fully degenerate covariance matrix from collinear or identical calibration points."
             )
             return simd_float3x3(
                 SIMD3<Float>(1, 0, 0),
@@ -780,11 +788,13 @@ final class SpatialCalibrationEngine {
             )
         }
         
-        let c0 = normalize(M.columns.0)
-        var c1 = M.columns.1 - c0 * dot(c0, M.columns.1)
-        c1 = normalize(c1)
-        var c2 = cross(M.columns.0, M.columns.1)
-        c2 = normalize(c2)
+        let c0 = col0Length > 1e-6 ? normalize(M.columns.0) : SIMD3<Float>(1, 0, 0)
+        var c1 = col0Length > 1e-6
+            ? M.columns.1 - c0 * dot(c0, M.columns.1)
+            : M.columns.1
+        c1 = simd_length(c1) > 1e-6 ? normalize(c1) : SIMD3<Float>(0, 1, 0)
+        var c2 = cross(c0, c1)
+        c2 = simd_length(c2) > 1e-6 ? normalize(c2) : SIMD3<Float>(0, 0, 1)
         
         return simd_float3x3(c0, c1, c2)
     }
