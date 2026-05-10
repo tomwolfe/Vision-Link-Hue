@@ -206,10 +206,8 @@ struct NeuralSurfaceMaterialClassifier: Sendable {
         CVPixelBufferLockBaseAddress(materialLabel, .readOnly)
         defer { CVPixelBufferUnlockBaseAddress(materialLabel, .readOnly) }
 
-        var confidenceLock: Bool = false
         if let confidenceMap {
             CVPixelBufferLockBaseAddress(confidenceMap, .readOnly)
-            confidenceLock = true
             defer { CVPixelBufferUnlockBaseAddress(confidenceMap, .readOnly) }
         }
 

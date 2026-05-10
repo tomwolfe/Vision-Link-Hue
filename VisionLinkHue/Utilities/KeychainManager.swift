@@ -41,7 +41,7 @@ final class KeychainManager: @unchecked Sendable {
     ///   - hash: The SHA-256 hash of the certificate's public key.
     /// - Throws: `KeychainError.addFailed` if the operation fails.
     func saveCertPin(to keychainKey: String, hash: Data) async throws {
-        try await queue.sync {
+        try queue.sync {
             let query: [String: Any] = [
                 kSecClass as String: kSecClassKey,
                 kSecAttrService as String: KeychainKeys.service,
@@ -79,7 +79,7 @@ final class KeychainManager: @unchecked Sendable {
     /// Delete a certificate pin hash from the Keychain.
     /// - Parameter keychainKey: The account key for this bridge's pin.
     func deleteCertPin(from keychainKey: String) async {
-        await queue.sync {
+        queue.sync {
             let query: [String: Any] = [
                 kSecClass as String: kSecClassKey,
                 kSecAttrService as String: KeychainKeys.service,
@@ -147,7 +147,7 @@ final class KeychainManager: @unchecked Sendable {
     ///   - forKey: The account key for this item.
     /// - Throws: `KeychainError.addFailed` if the operation fails.
     func setItem(_ data: Data, forKey key: String) async throws {
-        try await queue.sync {
+        try queue.sync {
             let query: [String: Any] = [
                 kSecClass as String: kSecClassKey,
                 kSecAttrService as String: KeychainKeys.service,
@@ -167,7 +167,7 @@ final class KeychainManager: @unchecked Sendable {
     /// - Returns: The stored Data, or `nil` if not found.
     /// - Throws: `KeychainError.queryFailed` if the query fails unexpectedly.
     func getItem(forKey key: String) async throws -> Data? {
-        try await queue.sync {
+        try queue.sync {
             let query: [String: Any] = [
                 kSecClass as String: kSecClassKey,
                 kSecAttrService as String: KeychainKeys.service,
@@ -186,7 +186,7 @@ final class KeychainManager: @unchecked Sendable {
     /// Delete an arbitrary Data item from the Keychain.
     /// - Parameter key: The account key for this item.
     func removeItem(forKey key: String) async {
-        await queue.sync {
+        queue.sync {
             let query: [String: Any] = [
                 kSecClass as String: kSecClassKey,
                 kSecAttrService as String: KeychainKeys.service,

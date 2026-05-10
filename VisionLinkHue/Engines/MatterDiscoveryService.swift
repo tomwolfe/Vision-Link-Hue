@@ -315,63 +315,68 @@ extension MatterDiscoveryService: NetServiceBrowserDelegate {
 
 extension MatterDiscoveryService: NetServiceDelegate {
     
-    func netService(_ sender: NetService, didResolve _: NetService) {
-        // Extract needed data before entering async context to avoid data races
-        let name = sender.name
-        let port = sender.port
-        let type = sender.type
-        let addresses = sender.addresses
-        
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            
-            var displayName = String(name.dropLast(type.count + 1)) ?? "Unknown Device"
-            var manufacturer: String?
-            var model: String?
-            var threadNetworkName: String?
-            var areaMetadata: MatterAreaMetadata?
-            
-            if let addresses, !addresses.isEmpty {
-                if let addrData = addresses.first {
-                    var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-                    addrData.withUnsafeBytes { ptr in
-                        let addrPtr = ptr.baseAddress?.assumingMemoryBound(to: sockaddr.self)
-                        if let addrPtr {
-                            let result = getnameinfo(
-                                addrPtr,
-                                socklen_t(addrData.count),
-                                &hostname,
-                                socklen_t(hostname.count),
-                                nil,
-                                0,
-                                NI_NUMERICHOST
-                            )
-                            if result == 0 {
-                                displayName = String(cString: hostname)
-                            }
-                        }
-                    }
-                }
-            }
-            
-            let info = RouterInfo(
-                name: name,
-                displayName: displayName,
-                manufacturer: manufacturer ?? "Unknown",
-                model: model ?? "Unknown",
-                threadNetworkName: threadNetworkName,
-                areaMetadata: areaMetadata
-            )
-            
-            await self.addOrUpdateRouter(info)
-        }
-    }
-    
     func netServiceDidStop(_ sender: NetService) {
         logger.debug("mDNS service stopped: \(sender.name)")
     }
     
     func netService(_ sender: NetService, didNotResolve _: NetService) {
         logger.debug("Failed to resolve mDNS service: \(sender.name)")
+    }
+}
+
+extension MatterDiscoveryService {
+    func netService(_ sender: NetService, didResolve _: NetService) {
+        // Extract needed data before entering async context to avoid data races
+        let name = sender.name
+        let type = sender.type
+        let addresses = sender.addresses
+        
+        Task {
+            await self.handleResolvedService(name: name, type: type, addresses: addresses)
+        }
+    }
+    
+    private func handleResolvedService(name: String, type: String, addresses: [Data]?) async {
+        guard let firstAddress = addresses?.first else { return }
+        
+        let displayName = String(name.dropLast(type.count + 1))
+        let manufacturer: String? = nil
+        let model: String? = nil
+        let threadNetworkName: String? = nil
+        let areaMetadata: MatterAreaMetadata? = nil
+        
+        let hostname = convertToHostname(firstAddress)
+        
+        let info = RouterInfo(
+            name: name,
+            displayName: displayName,
+            manufacturer: manufacturer ?? "Unknown",
+            model: model ?? "Unknown",
+            threadNetworkName: threadNetworkName,
+            areaMetadata: areaMetadata
+        )
+        
+        await addOrUpdateRouter(info)
+    }
+    
+    private func convertToHostname(_ addrData: Data) -> String? {
+        var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+        let result = addrData.withUnsafeBytes { ptr -> Int in
+            let addrPtr = ptr.baseAddress?.assumingMemoryBound(to: sockaddr.self)
+            if let addrPtr {
+                getnameinfo(
+                    addrPtr,
+                    socklen_t(addrData.count),
+                    &hostname,
+                    socklen_t(hostname.count),
+                    nil,
+                    0,
+                    NI_NUMERICHOST
+                )
+            }
+            return 0
+        }
+        guard result == 0 else { return nil }
+        return String(cString: hostname)
     }
 }

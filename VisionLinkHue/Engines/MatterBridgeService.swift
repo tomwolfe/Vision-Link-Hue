@@ -456,7 +456,9 @@ extension MatterBridgeService: HMHomeManagerDelegate {
             onHomeListChanged?()
         }
     }
-    
+}
+
+extension MatterBridgeService {
     func homeManager(_ manager: HMHomeManager, didAdd homes: [HMHome]) {
         Task { @MainActor [weak self] in
             self?.homes = manager.homes

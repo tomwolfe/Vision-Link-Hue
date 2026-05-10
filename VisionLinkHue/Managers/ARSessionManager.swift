@@ -185,7 +185,7 @@ final class ARSessionManager {
         }
         
         // Attempt to load and use a persisted world map for relocalization
-        if let worldMapData = await fixturePersistence.loadWorldMapData() {
+        if let worldMapData = fixturePersistence.loadWorldMapData() {
             if let savedWorldMap = try? NSKeyedUnarchiver.unarchivedObject(
                 ofClass: ARWorldMap.self,
                 from: worldMapData
@@ -241,7 +241,7 @@ final class ARSessionManager {
     /// Displays a "Connecting" indicator while relocalization is in progress.
     /// Also configures object anchor tracking for faster fixture-specific relocalization.
     private func attemptRelocalization(using worldMap: ARWorldMap, in arView: ARView) async {
-        guard let session = arView.session as? ARSession else { return }
+        let session = arView.session
         
         // Reset relocalization guide state for the new attempt.
         relocalizationGuide.reset()
@@ -257,9 +257,6 @@ final class ARSessionManager {
         // Record ARWorldMap relocalization attempt for monitoring.
         relocalizationMonitor.recordWorldMapAttempt()
         worldMapStartTime = ContinuousClock.now
-        
-        // Configure session with the saved world map for initial pose
-        let config = arView.session.configuration
         
         // Enable object anchor tracking for fixture-specific relocalization.
         // As of iOS 26, object anchors provide faster relocalization than
@@ -451,7 +448,7 @@ final class ARSessionManager {
     /// This should be called after a fixture has been successfully linked
     /// to save the spatial anchor for future sessions.
     func captureAndSaveWorldMap() async {
-        guard let session = arView?.session as? ARSession else { return }
+        guard let _ = arView?.session else { return }
         
         await MainActor.run {
             self.worldMapAvailable = false
@@ -460,8 +457,8 @@ final class ARSessionManager {
     
     /// Clear the persisted world map and reset relocalization state.
     func clearSavedWorldMap() async {
-        await fixturePersistence.deleteWorldMap()
-        await fixturePersistence.deleteObjectAnchors()
+        fixturePersistence.deleteWorldMap()
+        fixturePersistence.deleteObjectAnchors()
         objectAnchorService.clearAllArchetypes()
         isRelocalizing = false
         relocalizationProgress = 0.0
@@ -477,16 +474,16 @@ final class ARSessionManager {
             self.frameTimestamp = frame.timestamp
             #if !targetEnvironment(simulator)
             self.worldMapAvailable = false
-            let trackingState = frame.camera.trackingState
-            if trackingState == .limited {
-                self.trackingState = .limited
-            } else if trackingState == .normal {
+            let cameraTrackingState = frame.camera.trackingState
+            if cameraTrackingState == .normal {
                 self.trackingState = .tracking
+            } else {
+                self.trackingState = .limited
             }
             
             // Update relocalization state based on frame tracking state
             if self.isRelocalizing {
-                if trackingState == .normal {
+                if cameraTrackingState == .normal {
                     self.isRelocalizing = false
                     self.relocalizationState = .relocalized
                     self.relocalizationProgress = 1.0
@@ -539,7 +536,7 @@ final class ARSessionManager {
                 guard !Task.isCancelled else { return }
                 
                 if let anchor {
-                    let material = await detectionEngine.classifyMaterial(from: frame, at: detection.region)
+                    let material = detectionEngine.classifyMaterial(from: frame, at: detection.region)
                     
                     let fixture = await processDetectionOffMain(detection, in: frame, anchor: anchor, material: material)
                     
@@ -587,7 +584,7 @@ final class ARSessionManager {
         // SpatialProjector is @MainActor isolated; calling from background
         // task automatically crosses the actor boundary.
         guard !Task.isCancelled else { return nil }
-        let result = await spatialProjector.project(
+        let result = spatialProjector.project(
             region: detection.region,
             inFrame: frame,
             anchor: anchor
@@ -727,7 +724,7 @@ final class ARSessionManager {
         }
         
         var validCount = 0
-        let totalPixels = width * height
+        _ = width * height
         
         // Sample a subset of pixels for performance (every 4th pixel).
         let sampleStride = 4

@@ -177,8 +177,8 @@ final class DefaultMatterLightController: MatterLightController {
     func refreshState() async throws {
         let onChar = try onCharacteristic()
         let brightnessChar = try brightnessCharacteristic()
-        _ = try onChar.value
-        _ = try brightnessChar.value
+        _ = onChar.value
+        _ = brightnessChar.value
         isReachable = accessory.isReachable
     }
 }

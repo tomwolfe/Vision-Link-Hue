@@ -99,7 +99,7 @@ final class HueDiscoveryService {
 // MARK: - mDNS Delegate
 
 /// Simple NetServiceBrowser delegate for Hue bridge discovery.
-private final class MDNSDelegate: NSObject, NetServiceBrowserDelegate, NetServiceDelegate {
+private final class MDNSDelegate: NSObject, NetServiceBrowserDelegate {
     let onFound: (String, String, Int) -> Void
     let onFinished: () -> Void
     
@@ -112,11 +112,9 @@ private final class MDNSDelegate: NSObject, NetServiceBrowserDelegate, NetServic
         service.delegate = self
         service.resolve(withTimeout: 2.0)
     }
-    
-    func netServiceBrowser(_ browser: NetServiceBrowser, didNotSearch errorDict: [String: Int]) {
-        onFinished()
-    }
-    
+}
+
+extension MDNSDelegate: NetServiceDelegate {
     func netService(_ service: NetService, didResolve address: NetService) {
         if let addresses = service.addresses, !addresses.isEmpty {
             let addrData = addresses[0]
@@ -140,5 +138,9 @@ private final class MDNSDelegate: NSObject, NetServiceBrowserDelegate, NetServic
                 }
             }
         }
+    }
+    
+    func netServiceBrowser(_ browser: NetServiceBrowser, didNotSearch errorDict: [String: Int]) {
+        onFinished()
     }
 }

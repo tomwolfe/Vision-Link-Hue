@@ -590,7 +590,7 @@ final class DetectionEngine: DetectionProvider {
         pixelBuffer: CVPixelBuffer,
         displayTransform: CGAffineTransform
     ) async throws -> [FixtureDetection] {
-        guard let objectDetectionModel else { return [] }
+        guard let objectDetectionModel, objectDetectionModel != nil else { return [] }
         guard let coreMLRequest = objectDetectionRequest else { return [] }
         
         let priority: TaskPriority = .userInitiated

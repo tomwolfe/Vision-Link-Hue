@@ -291,7 +291,7 @@ final class HueStateStream {
         }
         
         Task { [persistence] in
-            if await persistence.isUsingInMemoryStorage {
+            if persistence.isUsingInMemoryStorage {
                 let inMemoryError = NSError(
                     domain: "FixturePersistence",
                     code: 1,
@@ -399,7 +399,7 @@ final class HueStateStream {
     func linkFixture(_ fixtureId: UUID, toLight lightId: String) {
         fixtureLightMapping[fixtureId] = lightId
         Task {
-            await persistence.linkFixture(fixtureId, toLight: lightId)
+            persistence.linkFixture(fixtureId, toLight: lightId)
         }
     }
     
@@ -408,7 +408,7 @@ final class HueStateStream {
     func unlinkFixture(_ fixtureId: UUID) {
         fixtureLightMapping.removeValue(forKey: fixtureId)
         Task {
-            await persistence.unlinkFixture(fixtureId)
+            persistence.unlinkFixture(fixtureId)
         }
     }
     
@@ -472,7 +472,7 @@ final class HueStateStream {
         confidence: Double
     ) {
         Task {
-            await persistence.saveMapping(
+            persistence.saveMapping(
                 fixtureId: fixtureId,
                 lightId: lightId,
                 position: position,
@@ -487,14 +487,14 @@ final class HueStateStream {
     /// Mark a fixture mapping as synced to the Hue Bridge.
     func markFixtureSynced(_ fixtureId: UUID) {
         Task {
-            await persistence.markSynced(fixtureId)
+            persistence.markSynced(fixtureId)
         }
     }
     
     /// Clear all persisted fixture mappings.
     func clearPersistedState() {
         Task {
-            await persistence.clearAllMappings()
+            persistence.clearAllMappings()
         }
         fixtureLightMapping.removeAll()
     }

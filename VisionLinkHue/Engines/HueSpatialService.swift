@@ -28,8 +28,7 @@ final class HueSpatialService {
     
     /// Check if the connected bridge supports SpatialAware features.
     var isSpatialAwareSupported: Bool {
-        guard let bridgeState = stateStream?.bridgeConfig else { return false }
-        return true // Checked at sync time via API response
+        stateStream?.bridgeConfig != nil
     }
     
     // MARK: - Manual Placement Mode
