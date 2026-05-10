@@ -1508,7 +1508,7 @@ final class LocalNetworkChannel: Sendable {
     /// Assign a port for a device based on its ID hash.
     private static func assignedPort(for deviceID: String) -> UInt16 {
         let hash = abs(deviceID.hashValue) & 0xFFFF
-        let port = 50000 + UInt16(hash)
+        let port = (50000 &+ UInt16(hash)) & 0xFFFF
         return port
     }
 }
