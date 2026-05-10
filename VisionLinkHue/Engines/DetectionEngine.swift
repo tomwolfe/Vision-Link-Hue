@@ -347,7 +347,7 @@ final class DetectionEngine: DetectionProvider {
 
             // Pre-create VNCoreMLRequest for the quantized model
             do {
-                objectDetectionRequest = VNCoreMLRequest(model: try VNCoreMLModel(for: quantizedModel)) { [weak self] request, error in
+                objectDetectionRequest = VNCoreMLRequest(model: try VNCoreMLModel(for: quantizedModel)) { _, error in
                     if let error {
                         Logger(subsystem: "com.tomwolfe.visionlinkhue", category: "DetectionEngine")
                             .warning("CoreML object detection failed: \(error.localizedDescription)")
@@ -433,7 +433,7 @@ final class DetectionEngine: DetectionProvider {
                     // to ensure memory from the failed 4-bit CoreML initialization is flushed
                     // before allocating the larger 16-bit model, preventing RAM spikes on
                     // older A-series/M-series chips.
-                    autoreleasepool {
+                    try autoreleasepool {
                         loadedModel = nil
                         loadedModel = try MLModel(contentsOf: modelURL, configuration: baseConfig)
                         quantizationApplied = false
@@ -481,7 +481,7 @@ final class DetectionEngine: DetectionProvider {
                 guard let model = objectDetectionModel else {
                     throw NSError(domain: "DetectionEngine", code: 1, userInfo: [NSLocalizedDescriptionKey: "Model was nil after loading"])
                 }
-                objectDetectionRequest = VNCoreMLRequest(model: try VNCoreMLModel(for: model)) { [weak self] request, error in
+                objectDetectionRequest = VNCoreMLRequest(model: try VNCoreMLModel(for: model)) { _, error in
                     if let error {
                         Logger(subsystem: "com.tomwolfe.visionlinkhue", category: "DetectionEngine")
                             .warning("CoreML object detection failed: \(error.localizedDescription)")
@@ -525,16 +525,13 @@ final class DetectionEngine: DetectionProvider {
     /// This is called automatically when the thermal monitor detects a state change.
     func updateComputeUnitsForThermalState() {
         let effectiveState = thermalMonitor.effectiveThermalState
-        let newState: MLComputeUnits
         
         if thermalMonitor.isPredictiveThrottlingActive || effectiveState >= .warning {
-            newState = .cpuOnly
             if currentComputeUnits != .cpuOnly {
                 logger.info("Switching CoreML to .cpuOnly due to thermal state: \(effectiveState.description)")
                 currentComputeUnits = .cpuOnly
             }
         } else {
-            newState = .all
             if currentComputeUnits != .all {
                 logger.info("Restoring CoreML to .all compute units (thermal state: \(effectiveState.description))")
                 currentComputeUnits = .all
@@ -551,7 +548,7 @@ final class DetectionEngine: DetectionProvider {
     /// Runs in parallel with the object detection model loading.
     private func loadIntentClassifierModel() async {
         do {
-            var classifier = intentClassifier
+            let classifier = intentClassifier
             try await classifier.loadModel()
             intentClassifier = classifier
             logger.info("Intent classifier model loaded successfully")
@@ -593,7 +590,7 @@ final class DetectionEngine: DetectionProvider {
         pixelBuffer: CVPixelBuffer,
         displayTransform: CGAffineTransform
     ) async throws -> [FixtureDetection] {
-        guard let model = objectDetectionModel else { return [] }
+        guard let objectDetectionModel else { return [] }
         guard let coreMLRequest = objectDetectionRequest else { return [] }
         
         let priority: TaskPriority = .userInitiated
@@ -755,7 +752,7 @@ final class DetectionEngine: DetectionProvider {
     ) -> [FixtureDetection] {
         guard !detections.isEmpty else { return [] }
         
-        var sorted = detections.sorted { $0.confidence > $1.confidence }
+        let sorted = detections.sorted { $0.confidence > $1.confidence }
         var keep: [FixtureDetection] = []
         var suppressed = Set<UUID>()
         

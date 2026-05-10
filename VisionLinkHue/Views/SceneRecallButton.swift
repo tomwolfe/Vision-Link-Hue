@@ -22,7 +22,7 @@ struct SceneRecallButton: View {
                                 sceneId: scene.id
                             )
                         } catch {
-                            await stateStream.reportError(error, severity: .error, source: "SceneRecallButton")
+                            stateStream.reportError(error, severity: .error, source: "SceneRecallButton")
                         }
                         onRecall(scene.id)
                     }

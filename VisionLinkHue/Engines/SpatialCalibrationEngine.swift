@@ -681,7 +681,7 @@ final class SpatialCalibrationEngine {
         let cosA = Float(cos(angle))
         let sinA = Float(sin(angle))
         
-        var rotation = simd_float3x3(
+        let rotation = simd_float3x3(
             SIMD3<Float>(cosA, 0, -sinA),
             SIMD3<Float>(0, 1, 0),
             SIMD3<Float>(sinA, 0, cosA)

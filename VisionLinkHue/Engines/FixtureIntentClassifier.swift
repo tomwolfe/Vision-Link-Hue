@@ -97,7 +97,7 @@ final class CoreMLIntentClassifier: @unchecked Sendable, FixtureIntentClassifier
             }
             coreMLRequest.imageCropAndScaleOption = .scaleFill
 
-            try await handler.perform([coreMLRequest])
+            await try handler.perform([coreMLRequest])
 
             guard let results = coreMLRequest.results as? [VNRecognizedObjectObservation],
                   let topObservation = results.first,
@@ -176,8 +176,6 @@ final class CoreMLIntentClassifier: @unchecked Sendable, FixtureIntentClassifier
 
     /// Create a CVPixelBufferPool for the given dimensions.
     private func createPixelBufferPool() -> CVPixelBufferPool? {
-        let width = 224
-        let height = 224
         let poolAttributes: [String: Any] = [
             "CVPixelBufferPoolAllocationLimit": 8
         ]

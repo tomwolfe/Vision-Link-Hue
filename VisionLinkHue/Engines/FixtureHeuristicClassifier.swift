@@ -287,10 +287,10 @@ struct FixtureHeuristicClassifier {
     /// - Returns: The loaded rules array.
     /// - Throws: `ClassificationConfigError` if the config is invalid or cannot be loaded.
     mutating func loadRules(from url: URL, signature: Data? = nil, keyID: String? = nil) async throws {
-        let (data, response): (Data, URLResponse)
+        let data: Data
         
         if url.scheme == "http" || url.scheme == "https" {
-            (data, response) = try await URLSession.shared.data(from: url)
+            data = try await URLSession.shared.data(from: url).0
         } else {
             data = try await Task.detached { try Data(contentsOf: url) }.value
         }

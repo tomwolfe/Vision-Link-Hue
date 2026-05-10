@@ -34,7 +34,7 @@ struct ScenePickerView: View {
                                     )
                                 } catch {
                                     Self.logger.error("Scene recall failed: \(error.localizedDescription)")
-                                    await stateStream?.reportError(error, severity: .error, source: "ScenePickerView.recall")
+                                    stateStream?.reportError(error, severity: .error, source: "ScenePickerView.recall")
                                 }
                             }
                         } label: {
