@@ -193,7 +193,7 @@
 		AD02212544A6B61F0EAC61CA /* LocalSyncActor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalSyncActor.swift; sourceTree = "<group>"; };
 		B170F7B2DE2BA142375D566A /* DepthAnalysis.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = DepthAnalysis.metal; sourceTree = "<group>"; };
 		B1A3088B6BD175CE1AE5D13D /* HueEventStreamActor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueEventStreamActor.swift; sourceTree = "<group>"; };
-		B6CC7C6072CFA6D940C3DBA3 /* VisionLinkHueTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = VisionLinkHueTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B6CC7C6072CFA6D940C3DBA3 /* VisionLinkHueTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VisionLinkHueTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B908D5AA1D7FF12E6183A179 /* CloudKitSyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitSyncTests.swift; sourceTree = "<group>"; };
 		BCC4DF9289B0317D2328C8D0 /* NetworkPartitionSimulationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPartitionSimulationTests.swift; sourceTree = "<group>"; };
 		BCD263062DA119E21F6562DC /* HueSpatialService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueSpatialService.swift; sourceTree = "<group>"; };
@@ -205,7 +205,7 @@
 		D7A6864D4800313E5E637629 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		D99BF40CD00706299667D92F /* HueNetworkClientProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueNetworkClientProtocol.swift; sourceTree = "<group>"; };
 		DA918F1B394BBC49BD3E7292 /* HueClientProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HueClientProtocol.swift; sourceTree = "<group>"; };
-		DAFFF1902C936FFC20B66AAD /* VisionLinkHue.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = VisionLinkHue.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		DAFFF1902C936FFC20B66AAD /* VisionLinkHue.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VisionLinkHue.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DCCF3CBE0E6613D3E9DF0DFB /* FixturePersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixturePersistence.swift; sourceTree = "<group>"; };
 		DF9FF5ED8521E57492B18C2B /* SpatialMathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialMathTests.swift; sourceTree = "<group>"; };
 		E22DA283EADA6F8F003B91F7 /* SpatialClusterEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialClusterEngine.swift; sourceTree = "<group>"; };
@@ -497,8 +497,6 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1700;
-				TargetAttributes = {
-				};
 			};
 			buildConfigurationList = E6C8BBA3F05C332272A66BAF /* Build configuration list for PBXProject "VisionLinkHue" */;
 			developmentRegion = en;
@@ -661,6 +659,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				DEVELOPMENT_TEAM = YBXGDD5754;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -680,6 +679,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = YBXGDD5754;
 				ENTITLEMENTS_DIRECTORY = .;
 				ENTITLEMENTS_FILENAME = VisionLinkHue.entitlements;
 				INFOPLIST_FILE = Info.plist;
@@ -813,10 +813,11 @@
 			};
 			name = Debug;
 		};
-			D1697B277BEECB23C8CDEC31 /* Release */ = {
+		D1697B277BEECB23C8CDEC31 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				DEVELOPMENT_TEAM = YBXGDD5754;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -836,6 +837,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = YBXGDD5754;
 				ENTITLEMENTS_DIRECTORY = .;
 				ENTITLEMENTS_FILENAME = VisionLinkHue.entitlements;
 				INFOPLIST_FILE = Info.plist;
