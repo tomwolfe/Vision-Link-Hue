@@ -1,9 +1,0 @@
-Target dependency graph (4 targets)
-Target 'VisionLinkHue' in project 'VisionLinkHue'
-➜ Explicit dependency on target 'Crypto' in project 'swift-crypto'
-Target 'Crypto' in project 'swift-crypto'
-➜ Explicit dependency on target 'Crypto' in project 'swift-crypto'
-➜ Explicit dependency on target 'swift-crypto_Crypto' in project 'swift-crypto'
-Target 'Crypto' in project 'swift-crypto'
-➜ Explicit dependency on target 'swift-crypto_Crypto' in project 'swift-crypto'
-Target 'swift-crypto_Crypto' in project 'swift-crypto' (no dependencies)
