@@ -48,25 +48,7 @@ final class MatterBridgeServiceFallbackTests: XCTestCase {
     }
 }
 
-/// Unit tests for FixturePersistence executeBatched save-within-boundary fix.
-/// Validates that each operation is saved before rollback to prevent data loss.
-@MainActor
-final class FixturePersistenceBatchedSaveTests: XCTestCase {
-    
-    private var persistence: FixturePersistence!
-    private var modelContainer: ModelContainer!
-    
-    override func setUp() async throws {
-        try await super.setUp()
-        
-        let schema = Schema([FixtureMapping.self])
-        modelContainer = try! ModelContainer(
-            for: schema,
-            configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]
-        )
-        persistence = await MainActor.run {
-            FixturePersistence(container: modelContainer)
-        }
+
     }
     
     override func tearDown() {

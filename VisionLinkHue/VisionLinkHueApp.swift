@@ -34,10 +34,11 @@ struct VisionLinkHueApp: App {
             forName: UIApplication.didEnterBackgroundNotification,
             object: nil,
             queue: .main
-        ) { _ in
-            // Stop local sync actor to conserve resources.
-            Task {
-                await AppContainer.shared.localSyncActor.stop()
+        ) { [weak container = AppContainer.shared] _ in
+            guard let container else { return }
+            // Stop telemetry when the app enters the background.
+            Task { @MainActor in
+                container.telemetryService.flush()
             }
         }
         
@@ -45,11 +46,11 @@ struct VisionLinkHueApp: App {
             forName: UIApplication.willEnterForegroundNotification,
             object: nil,
             queue: .main
-        ) { _ in
-            // Restart local sync actor when returning to foreground.
-            Task {
-                try? await AppContainer.shared.localSyncActor.start()
-                await AppContainer.shared.localSyncActor.discoverPeers()
+        ) { [weak container = AppContainer.shared] _ in
+            guard let container else { return }
+            // Restart telemetry when returning to foreground.
+            Task { @MainActor in
+                container.telemetryService.flush()
             }
         }
     }

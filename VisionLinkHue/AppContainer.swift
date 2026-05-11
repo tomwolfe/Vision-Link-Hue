@@ -42,10 +42,13 @@ protocol ARSessionManagerFactory {
         hueClient: HueClient,
         stateStream: HueStateStream,
         fixturePersistence: FixturePersistence,
+        hudFactory: FixtureHUDFactory,
+        provider: CameraConfigurationProvider,
+        relocalizationGuide: RelocalizationGuide,
+        relocalizationMonitor: RelocalizationMonitoringService,
         objectAnchorService: ObjectAnchorPersistenceService,
         clusterEngine: SpatialClusterEngine,
-        detectionSettings: DetectionSettings,
-        relocalizationMonitor: RelocalizationMonitoringService
+        detectionSettings: DetectionSettings
     ) -> ARSessionManager
 }
 
@@ -56,25 +59,11 @@ protocol MatterBridgeServiceFactory {
     func create() -> MatterBridgeService
 }
 
-/// Protocol for creating `SpatialSyncService` instances.
-/// Enables dependency injection of mock sync services in tests.
-@MainActor
-protocol SpatialSyncServiceFactory {
-    func create() -> SpatialSyncService
-}
-
 /// Protocol for creating `MetricKitTelemetryService` instances.
 /// Enables dependency injection of mock telemetry services in tests.
 @MainActor
 protocol MetricKitTelemetryServiceFactory {
     func create() -> MetricKitTelemetryService
-}
-
-/// Protocol for creating `LocalSyncActor` instances.
-/// Enables dependency injection of mock local sync actors in tests.
-@MainActor
-protocol LocalSyncActorFactory {
-    func create() -> LocalSyncActor
 }
 
 /// Default implementations of all factory protocols.
@@ -88,9 +77,7 @@ class DefaultFactories: @unchecked Sendable {
     let spatialProjectorFactory: SpatialProjectorFactory
     let arSessionManagerFactory: ARSessionManagerFactory
     let matterBridgeServiceFactory: MatterBridgeServiceFactory
-    let spatialSyncServiceFactory: SpatialSyncServiceFactory
     let metricKitTelemetryFactory: MetricKitTelemetryServiceFactory
-    let localSyncActorFactory: LocalSyncActorFactory
     
     init(
         stateStreamFactory: HueStateStreamFactory = DefaultHueStateStreamFactory(),
@@ -99,9 +86,7 @@ class DefaultFactories: @unchecked Sendable {
         spatialProjectorFactory: SpatialProjectorFactory = DefaultSpatialProjectorFactory(),
         arSessionManagerFactory: ARSessionManagerFactory = DefaultARSessionManagerFactory(),
         matterBridgeServiceFactory: MatterBridgeServiceFactory = DefaultMatterBridgeServiceFactory(),
-        spatialSyncServiceFactory: SpatialSyncServiceFactory = DefaultSpatialSyncServiceFactory(),
-        metricKitTelemetryFactory: MetricKitTelemetryServiceFactory = DefaultMetricKitTelemetryServiceFactory(),
-        localSyncActorFactory: LocalSyncActorFactory = DefaultLocalSyncActorFactory()
+        metricKitTelemetryFactory: MetricKitTelemetryServiceFactory = DefaultMetricKitTelemetryServiceFactory()
     ) {
         self.stateStreamFactory = stateStreamFactory
         self.hueClientFactory = hueClientFactory
@@ -109,9 +94,7 @@ class DefaultFactories: @unchecked Sendable {
         self.spatialProjectorFactory = spatialProjectorFactory
         self.arSessionManagerFactory = arSessionManagerFactory
         self.matterBridgeServiceFactory = matterBridgeServiceFactory
-        self.spatialSyncServiceFactory = spatialSyncServiceFactory
         self.metricKitTelemetryFactory = metricKitTelemetryFactory
-        self.localSyncActorFactory = localSyncActorFactory
     }
 }
 
@@ -160,10 +143,13 @@ final class DefaultARSessionManagerFactory: ARSessionManagerFactory {
         hueClient: HueClient,
         stateStream: HueStateStream,
         fixturePersistence: FixturePersistence,
+        hudFactory: FixtureHUDFactory,
+        provider: CameraConfigurationProvider,
+        relocalizationGuide: RelocalizationGuide,
+        relocalizationMonitor: RelocalizationMonitoringService,
         objectAnchorService: ObjectAnchorPersistenceService,
         clusterEngine: SpatialClusterEngine,
-        detectionSettings: DetectionSettings,
-        relocalizationMonitor: RelocalizationMonitoringService
+        detectionSettings: DetectionSettings
     ) -> ARSessionManager {
         ARSessionManager(
             detectionEngine: detectionEngine,
@@ -171,10 +157,13 @@ final class DefaultARSessionManagerFactory: ARSessionManagerFactory {
             hueClient: hueClient,
             stateStream: stateStream,
             fixturePersistence: fixturePersistence,
+            hudFactory: hudFactory,
+            provider: provider,
+            relocalizationGuide: relocalizationGuide,
+            relocalizationMonitor: relocalizationMonitor,
             objectAnchorService: objectAnchorService,
             clusterEngine: clusterEngine,
-            detectionSettings: detectionSettings,
-            relocalizationMonitor: relocalizationMonitor
+            detectionSettings: detectionSettings
         )
     }
 }
@@ -187,27 +176,11 @@ final class DefaultMatterBridgeServiceFactory: MatterBridgeServiceFactory {
     }
 }
 
-/// Default factory for `SpatialSyncService`.
-@MainActor
-final class DefaultSpatialSyncServiceFactory: SpatialSyncServiceFactory {
-    func create() -> SpatialSyncService {
-        SpatialSyncService.shared
-    }
-}
-
 /// Default factory for `MetricKitTelemetryService`.
 @MainActor
 final class DefaultMetricKitTelemetryServiceFactory: MetricKitTelemetryServiceFactory {
     func create() -> MetricKitTelemetryService {
         MetricKitTelemetryService()
-    }
-}
-
-/// Default factory for `LocalSyncActor`.
-@MainActor
-final class DefaultLocalSyncActorFactory: LocalSyncActorFactory {
-    func create() -> LocalSyncActor {
-        LocalSyncActor()
     }
 }
 
@@ -229,11 +202,8 @@ final class AppContainer {
     let spatialProjector: SpatialProjector
     let gestureManager: GestureManager
     let matterService: MatterBridgeService
-    let spatialSyncService: SpatialSyncService
     let telemetryService: MetricKitTelemetryService
-    let localSyncActor: LocalSyncActor
     let detectionSettings: DetectionSettings
-    let relocalizationMonitor: RelocalizationMonitoringService
     
     private let factories: DefaultFactories
     
@@ -244,6 +214,7 @@ final class AppContainer {
         let detectionSettings = DetectionSettings()
         self.detectionSettings = detectionSettings
         let objectAnchorService = ObjectAnchorPersistenceService(detectionSettings: detectionSettings)
+        let relocalizationGuide = RelocalizationGuide()
         let relocalizationMonitor = RelocalizationMonitoringService()
         
         // Create dependencies through factories for testability.
@@ -253,16 +224,22 @@ final class AppContainer {
         let projector = factories.spatialProjectorFactory.create()
         let clusterEngine = SpatialClusterEngine()
         
+        let hudFactory = FixtureHUDFactory()
+        let cameraProvider = DefaultCameraConfigurationProvider()
+        
         let manager = factories.arSessionManagerFactory.create(
             detectionEngine: detector,
             spatialProjector: projector,
             hueClient: client,
             stateStream: stream,
             fixturePersistence: persistence,
+            hudFactory: hudFactory,
+            provider: cameraProvider,
+            relocalizationGuide: relocalizationGuide,
+            relocalizationMonitor: relocalizationMonitor,
             objectAnchorService: objectAnchorService,
             clusterEngine: clusterEngine,
-            detectionSettings: detectionSettings,
-            relocalizationMonitor: relocalizationMonitor
+            detectionSettings: detectionSettings
         )
         
         // Wire the ARSession pause/resume callback to the detection engine.
@@ -296,31 +273,8 @@ final class AppContainer {
         let matterService = factories.matterBridgeServiceFactory.create()
         client.matterService = matterService
         
-        let spatialSyncService = factories.spatialSyncServiceFactory.create()
-        
         let telemetryService = factories.metricKitTelemetryFactory.create()
-        let localSyncActor = factories.localSyncActorFactory.create()
-        
-        // Wire up telemetry service to detection engine for inference latency reporting.
-        // Telemetry records are collected periodically and submitted via MetricKit
-        // for correlation with real-world device thermals across A15-M4 chips.
         detector.configureTelemetryService(telemetryService)
-        
-        // Wire up local sync actor for P2P spatial data sharing.
-        // Provides real-time coordinate sharing between Vision Pro and iPhone
-        // on the local network, bypassing CloudKit latency.
-        localSyncActor.onSpatialSyncReceived = { [weak spatialSyncService] payload in
-            guard let syncService = spatialSyncService else { return }
-            Task {
-                await syncService.applyRemoteSpatialSync(payload)
-            }
-        }
-        
-        // Start local sync actor for P2P discovery.
-        Task {
-            try? await localSyncActor.start()
-            await localSyncActor.discoverPeers()
-        }
         
         self.stateStream = stream
         self.hueClient = client
@@ -329,9 +283,6 @@ final class AppContainer {
         self.spatialProjector = projector
         self.gestureManager = gestureManager
         self.matterService = matterService
-        self.spatialSyncService = spatialSyncService
         self.telemetryService = telemetryService
-        self.localSyncActor = localSyncActor
-        self.relocalizationMonitor = relocalizationMonitor
     }
 }

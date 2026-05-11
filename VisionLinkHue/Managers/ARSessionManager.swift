@@ -144,10 +144,10 @@ final class ARSessionManager {
         hudFactory: FixtureHUDFactory = FixtureHUDFactory(),
         provider: CameraConfigurationProvider = DefaultCameraConfigurationProvider(),
         relocalizationGuide: RelocalizationGuide = RelocalizationGuide(),
+        relocalizationMonitor: RelocalizationMonitoringService,
         objectAnchorService: ObjectAnchorPersistenceService = ObjectAnchorPersistenceService(),
         clusterEngine: SpatialClusterEngine = SpatialClusterEngine(),
-        detectionSettings: DetectionSettings = DetectionSettings(),
-        relocalizationMonitor: RelocalizationMonitoringService = RelocalizationMonitoringService()
+        detectionSettings: DetectionSettings = DetectionSettings()
     ) {
         self.detectionEngine = detectionEngine
         self.spatialProjector = spatialProjector
@@ -157,10 +157,10 @@ final class ARSessionManager {
         self.hudFactory = hudFactory
         self.provider = provider
         self.relocalizationGuide = relocalizationGuide
+        self.relocalizationMonitor = relocalizationMonitor
         self.objectAnchorService = objectAnchorService
         self.clusterEngine = clusterEngine
         self.detectionSettings = detectionSettings
-        self.relocalizationMonitor = relocalizationMonitor
         
         clusterEngine.onClustersChange = { [weak self] _ in
             self?.stateStream.clusters = self?.clusterEngine.clusters ?? []

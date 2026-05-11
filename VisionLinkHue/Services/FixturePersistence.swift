@@ -6,20 +6,9 @@ import os
 
 // MARK: - Schema Migration
 
-/// Current schema version for FixtureMapping and SpatialSyncRecord models.
-/// Increment this value when adding new attributes or changing existing ones.
-enum SchemaVersion: Int {
-    case v1 = 1
-    case v2 = 2
-    case v3 = 3
-}
-
-/// Migration configuration for SwiftData schema evolution.
-/// Handles incremental migrations between schema versions.
+/// Schema migration for FixtureMapping model.
+/// Handles migration from older schema versions to the current version.
 enum SchemaMigration {
-    
-    /// The current schema version.
-    static let currentVersion: SchemaVersion = .v3
     
     /// Migrate data from an older schema version to the current version.
     /// Note: This custom migration block is only invoked when using a custom
@@ -57,34 +46,9 @@ enum SchemaMigration {
                 newMapping.bridgePositionZ = bz
             }
             
-            newMapping.isSyncedToBridge = oldMapping.isSyncedToBridge
             newMapping.updatedAt = oldMapping.updatedAt
             
             newContext.insert(newMapping)
-        }
-        
-        // Fetch all existing SpatialSyncRecord records
-        let syncDescriptor = FetchDescriptor<SpatialSyncRecord>()
-        let oldRecords = try oldContext.fetch(syncDescriptor)
-        
-        for oldRecord in oldRecords {
-            let newRecord = SpatialSyncRecord(
-                fixtureId: oldRecord.fixtureId,
-                lightId: oldRecord.lightId,
-                position: oldRecord.position,
-                orientation: oldRecord.orientation,
-                distanceMeters: oldRecord.distanceMeters,
-                fixtureType: oldRecord.fixtureType,
-                confidence: oldRecord.confidence
-            )
-            
-            newRecord.lastSyncedAt = oldRecord.lastSyncedAt
-            newRecord.lastModifiedByDevice = oldRecord.lastModifiedByDevice
-            newRecord.version = oldRecord.version
-            newRecord.isSynced = oldRecord.isSynced
-            newRecord.lastSyncError = oldRecord.lastSyncError
-            
-            newContext.insert(newRecord)
         }
         
         try newContext.save()
@@ -133,7 +97,7 @@ final class FixturePersistence {
     static let shared: FixturePersistence = {
         FixturePersistence.cleanupCorruptedStores()
         
-        let schema = Schema([FixtureMapping.self, SpatialSyncRecord.self])
+        let schema = Schema([FixtureMapping.self])
         let modelConfiguration = ModelConfiguration(schema: schema)
         
         var isUsingInMemoryStorage: Bool = false
@@ -235,91 +199,7 @@ final class FixturePersistence {
         }
     }
     
-    /// Load fixture mappings that need syncing for CloudKit upload.
-    /// Returns serializable snapshots suitable for crossing actor boundaries.
-    func loadMappingsNeedingSync() async -> [FixtureMappingUploadData] {
-        let descriptor = FetchDescriptor<FixtureMapping>()
-        
-        do {
-            let mappings = try modelContext.fetch(descriptor)
-            return mappings
-                .filter { !$0.isSyncedToBridge }
-                .map { mapping in
-                    FixtureMappingUploadData(
-                        fixtureId: mapping.fixtureId,
-                        lightId: mapping.lightId,
-                        position: mapping.position,
-                        orientation: mapping.orientation,
-                        distanceMeters: mapping.distanceMeters,
-                        fixtureType: mapping.fixtureType,
-                        confidence: mapping.confidence
-                    )
-                }
-        } catch {
-            logger.error("Failed to load mappings needing sync: \(error.localizedDescription)")
-            return []
-        }
-    }
-    
-    /// Mark a fixture mapping as synced to CloudKit.
-    func markMappingSynced(_ fixtureId: UUID) {
-        do {
-            let descriptor = FetchDescriptor<FixtureMapping>(
-                predicate: #Predicate<FixtureMapping> { $0.fixtureId == fixtureId }
-            )
-            
-            let results = try modelContext.fetch(descriptor)
-            if let mapping = results.first {
-                mapping.isSyncedToBridge = true
-                mapping.updatedAt = Date()
-                try modelContext.save()
-                logger.debug("Marked fixture \(fixtureId) as synced for CloudKit")
-            }
-        } catch {
-            logger.error("Failed to mark fixture as synced: \(error.localizedDescription)")
-        }
-    }
-    
-    /// Apply remote spatial data to a fixture mapping.
-    /// Updates position, orientation, distance, and confidence from
-    /// remote sync records to maintain consistency across devices.
-    func applyRemoteSpatialData(
-        fixtureId: UUID,
-        position: SIMD3<Float>,
-        orientation: simd_quatf,
-        distanceMeters: Float,
-        confidence: Double
-    ) {
-        guard validateSpatialData(position: position, orientation: orientation, distanceMeters: distanceMeters) else {
-            logger.error("Rejected malformed remote spatial data for fixture \(fixtureId)")
-            return
-        }
-        
-        do {
-            let descriptor = FetchDescriptor<FixtureMapping>(
-                predicate: #Predicate<FixtureMapping> { $0.fixtureId == fixtureId }
-            )
-            
-            let results = try modelContext.fetch(descriptor)
-            if let mapping = results.first {
-                mapping.positionX = position.x
-                mapping.positionY = position.y
-                mapping.positionZ = position.z
-                mapping.orientationX = orientation.vector.x
-                mapping.orientationY = orientation.vector.y
-                mapping.orientationZ = orientation.vector.z
-                mapping.orientationW = orientation.vector.w
-                mapping.distanceMeters = distanceMeters
-                mapping.confidence = confidence
-                mapping.updatedAt = Date()
-                try modelContext.save()
-                logger.debug("Applied remote spatial data for fixture \(fixtureId)")
-            }
-        } catch {
-            logger.error("Failed to apply remote spatial data for fixture \(fixtureId): \(error.localizedDescription)")
-        }
-    }
-    
+
     /// Save a fixture-light mapping with spatial coordinates atomically.
     /// Validates the spatial data before persisting to prevent malformed
     /// coordinate data from being stored in SwiftData.
@@ -518,24 +398,6 @@ final class FixturePersistence {
         }
     }
     
-    /// Mark a mapping as synced to the Hue Bridge.
-    func markSynced(_ fixtureId: UUID) {
-        do {
-            let descriptor = FetchDescriptor<FixtureMapping>(
-                predicate: #Predicate<FixtureMapping> { $0.fixtureId == fixtureId }
-            )
-            
-            let results = try modelContext.fetch(descriptor)
-            if let mapping = results.first {
-                mapping.isSyncedToBridge = true
-                mapping.updatedAt = Date()
-                try modelContext.save()
-            }
-        } catch {
-            logger.error("Failed to mark fixture as synced: \(error.localizedDescription)")
-        }
-    }
-    
     /// Clear all persisted fixture mappings.
     func clearAllMappings() {
         do {
@@ -678,20 +540,6 @@ final class FixturePersistence {
         }
     }
     
-    // MARK: - CloudKit Spatial Sync
-    
-    /// Trigger a CloudKit spatial sync operation via the SpatialSyncService.
-    /// This is called from the UI to initiate bidirectional sync of
-    /// fixture mappings across the user's devices.
-    func triggerSpatialSync() async -> SpatialSyncResult {
-        await SpatialSyncService.shared.sync()
-    }
-    
-    /// Check if CloudKit spatial sync is available.
-    func checkSpatialSyncAvailability() async -> Bool {
-        await SpatialSyncService.shared.checkCloudKitAvailability()
-    }
-    
     // MARK: - Manual Placement Persistence
     
     /// Save a manual room assignment for a fixture (for older Bridge hardware).
@@ -761,32 +609,7 @@ final class FixturePersistence {
         }
     }
     
-    // MARK: - Context Management
-    
-    /// Periodically save and reset the model context to prevent memory bloat
-    /// during heavy operations like CloudKit spatial sync.
-    ///
-    /// When processing large batches of fixture mappings (e.g., 50+ fixtures
-    /// during initial spatial sync), the SwiftData context accumulates tracked
-    /// objects that can consume significant memory. This method creates an
-    /// isolated background context to save pending changes, then rolls it back.
-    /// The main context automatically merges the persisted changes, avoiding
-    /// the risk of dropping concurrent modifications that may have been made
-    /// by other parts of the app during async boundaries.
-    ///
-    /// - Parameter batchSize: The number of operations after which to trigger
-    ///   a context save and reset. Defaults to 50.
-    func checkpointContext(batchSize: Int = 50) async {
-        do {
-            modelContext.processPendingChanges()
-            let isolatedContext = ModelContext(modelContainer)
-            try isolatedContext.save()
-            logger.debug("Model context checkpointed via isolated context and memory reclaimed")
-        } catch {
-            logger.error("Failed to checkpoint model context: \(error.localizedDescription)")
-        }
-    }
-    
+
     /// Save and reset the context immediately, regardless of operation count.
     /// Useful at the end of a heavy sync operation to ensure all changes are
     /// persisted and memory is reclaimed.

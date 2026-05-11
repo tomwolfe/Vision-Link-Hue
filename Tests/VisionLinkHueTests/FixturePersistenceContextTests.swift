@@ -297,45 +297,5 @@ final class FixturePersistenceContextTests: XCTestCase {
         XCTAssertTrue(hasBridgeSpaceUpdated)
     }
     
-    // MARK: - Context Management Tests
-    
-    func testCheckpointContextDoesNotCrash() async {
-        // Save a mapping first to ensure there are pending changes.
-        await persistence.saveMapping(
-            fixtureId: UUID(),
-            lightId: "light-1",
-            position: SIMD3<Float>(1, 2, 3),
-            orientation: simd_quatf(),
-            distanceMeters: 2.5,
-            fixtureType: "pendant",
-            confidence: 0.95
-        )
-        
-        // Checkpoint should succeed without crashing.
-        // The processPendingChanges() call ensures UI responsiveness
-        // during large CloudKit downloads.
-        await persistence.checkpointContext(batchSize: 50)
-        
-        // Verify the mapping is still accessible after checkpoint.
-        let mappings = await persistence.loadMappings()
-        XCTAssertEqual(mappings.count, 1)
-    }
-    
-    func testFlushContextDoesNotCrash() async {
-        await persistence.saveMapping(
-            fixtureId: UUID(),
-            lightId: "light-1",
-            position: SIMD3<Float>(1, 2, 3),
-            orientation: simd_quatf(),
-            distanceMeters: 2.5,
-            fixtureType: "pendant",
-            confidence: 0.95
-        )
-        
-        // Flush should succeed without crashing.
-        await persistence.flushContext()
-        
-        let mappings = await persistence.loadMappings()
-        XCTAssertEqual(mappings.count, 1)
-    }
-}
+
+

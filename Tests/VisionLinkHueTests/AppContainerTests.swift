@@ -127,9 +127,7 @@ final class AppContainerTests: XCTestCase {
             spatialProjectorFactory: SpatialProjectorFactory = MockSpatialProjectorFactory(),
             arSessionManagerFactory: ARSessionManagerFactory = MockARSessionManagerFactory(),
             matterBridgeServiceFactory: MatterBridgeServiceFactory = MockMatterBridgeServiceFactory(),
-            spatialSyncServiceFactory: SpatialSyncServiceFactory = MockSpatialSyncServiceFactory(),
-            metricKitTelemetryFactory: MetricKitTelemetryServiceFactory = MockMetricKitTelemetryFactory(),
-            localSyncActorFactory: LocalSyncActorFactory = MockLocalSyncActorFactory()
+            metricKitTelemetryFactory: MetricKitTelemetryServiceFactory = MockMetricKitTelemetryFactory()
         ) {
             super.init(
                 stateStreamFactory: stateStreamFactory,
@@ -138,9 +136,7 @@ final class AppContainerTests: XCTestCase {
                 spatialProjectorFactory: spatialProjectorFactory,
                 arSessionManagerFactory: arSessionManagerFactory,
                 matterBridgeServiceFactory: matterBridgeServiceFactory,
-                spatialSyncServiceFactory: spatialSyncServiceFactory,
-                metricKitTelemetryFactory: metricKitTelemetryFactory,
-                localSyncActorFactory: localSyncActorFactory
+                metricKitTelemetryFactory: metricKitTelemetryFactory
             )
         }
     }
@@ -197,21 +193,9 @@ final class AppContainerTests: XCTestCase {
         }
     }
     
-    private final class MockSpatialSyncServiceFactory: SpatialSyncServiceFactory {
-        func create() -> SpatialSyncService {
-            SpatialSyncService.shared
-        }
-    }
-    
     private final class MockMetricKitTelemetryFactory: MetricKitTelemetryServiceFactory {
         func create() -> MetricKitTelemetryService {
             MetricKitTelemetryService()
-        }
-    }
-    
-    private final class MockLocalSyncActorFactory: LocalSyncActorFactory {
-        func create() -> LocalSyncActor {
-            LocalSyncActor()
         }
     }
 }

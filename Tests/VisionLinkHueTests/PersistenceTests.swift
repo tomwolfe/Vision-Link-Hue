@@ -420,31 +420,7 @@ final class PersistenceTests: XCTestCase {
         XCTAssertNil(mappings.first?.lightId, "Light ID should be nil after unlink")
     }
     
-    func testMarkSyncedUpdatesIsSyncedToBridge() async {
-        let fixtureId = UUID()
-        let position = SIMD3<Float>(1.0, 2.0, 3.0)
-        let orientation = simd_quatf(angle: Float.pi / 4, axis: SIMD3<Float>(0, 0, 1))
-        
-        await persistence.saveMapping(
-            fixtureId: fixtureId,
-            lightId: "test-light",
-            position: position,
-            orientation: orientation,
-            distanceMeters: 2.0,
-            fixtureType: "ceiling",
-            confidence: 0.9
-        )
-        
-        let allMappings = await persistence.loadMappingsWithBridgeSpace()
-        XCTAssertFalse(allMappings.first?.isSyncedToBridge ?? true, "Should start as not synced")
-        
-        // Mark as synced
-        await persistence.markSynced(fixtureId)
-        
-        let updatedMappings = await persistence.loadMappingsWithBridgeSpace()
-        XCTAssertTrue(updatedMappings.first?.isSyncedToBridge ?? false, "Should be marked as synced after calling markSynced")
-    }
-    
+
     func testRemoveMappingRemovesEntirely() async {
         let fixtureId = UUID()
         let position = SIMD3<Float>(1.0, 2.0, 3.0)

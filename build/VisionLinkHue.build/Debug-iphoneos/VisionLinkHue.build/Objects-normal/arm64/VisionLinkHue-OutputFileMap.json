@@ -1,0 +1,609 @@
+{
+  "" : {
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/VisionLinkHue-primary.dia",
+    "emit-module-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/VisionLinkHue-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/VisionLinkHue-primary-emit-module.dia",
+    "pch" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/VisionLinkHue-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/VisionLinkHue-primary.swiftdeps"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/AppContainer.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/AppContainer.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/AppContainer.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/AppContainer.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/AppContainer.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/AppContainer.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/AppContainer.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/AppContainer.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/AppContainer~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Engines/DetectionEngine.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/DetectionEngine.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/DetectionEngine.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/DetectionEngine.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/DetectionEngine.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/DetectionEngine.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/DetectionEngine.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/DetectionEngine.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/DetectionEngine~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Engines/FixtureHeuristicClassifier.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureHeuristicClassifier.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureHeuristicClassifier.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureHeuristicClassifier.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureHeuristicClassifier.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureHeuristicClassifier.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureHeuristicClassifier.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureHeuristicClassifier.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureHeuristicClassifier~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Engines/FixtureIntentClassifier.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureIntentClassifier.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureIntentClassifier.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureIntentClassifier.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureIntentClassifier.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureIntentClassifier.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureIntentClassifier.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureIntentClassifier.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureIntentClassifier~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Engines/HueClient.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueClient.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueClient.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueClient.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueClient.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueClient.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueClient.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueClient.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueClient~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Engines/HueDiscoveryService.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueDiscoveryService.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueDiscoveryService.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueDiscoveryService.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueDiscoveryService.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueDiscoveryService.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueDiscoveryService.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueDiscoveryService.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueDiscoveryService~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Engines/HueEventStreamActor.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueEventStreamActor.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueEventStreamActor.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueEventStreamActor.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueEventStreamActor.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueEventStreamActor.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueEventStreamActor.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueEventStreamActor.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueEventStreamActor~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Engines/HueSpatialService.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueSpatialService.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueSpatialService.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueSpatialService.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueSpatialService.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueSpatialService.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueSpatialService.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueSpatialService.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueSpatialService~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Engines/KeychainCalibrationStore.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/KeychainCalibrationStore.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/KeychainCalibrationStore.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/KeychainCalibrationStore.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/KeychainCalibrationStore.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/KeychainCalibrationStore.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/KeychainCalibrationStore.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/KeychainCalibrationStore.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/KeychainCalibrationStore~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Engines/MatterBridgeService.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterBridgeService.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterBridgeService.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterBridgeService.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterBridgeService.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterBridgeService.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterBridgeService.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterBridgeService.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterBridgeService~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Engines/MatterDiscoveryService.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterDiscoveryService.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterDiscoveryService.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterDiscoveryService.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterDiscoveryService.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterDiscoveryService.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterDiscoveryService.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterDiscoveryService.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterDiscoveryService~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Engines/MatterLightController.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterLightController.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterLightController.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterLightController.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterLightController.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterLightController.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterLightController.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterLightController.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterLightController~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Engines/NeuralSurfaceMaterialClassifier.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/NeuralSurfaceMaterialClassifier.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/NeuralSurfaceMaterialClassifier.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/NeuralSurfaceMaterialClassifier.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/NeuralSurfaceMaterialClassifier.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/NeuralSurfaceMaterialClassifier.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/NeuralSurfaceMaterialClassifier.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/NeuralSurfaceMaterialClassifier.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/NeuralSurfaceMaterialClassifier~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Engines/SpatialCalibrationEngine.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialCalibrationEngine.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialCalibrationEngine.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialCalibrationEngine.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialCalibrationEngine.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialCalibrationEngine.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialCalibrationEngine.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialCalibrationEngine.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialCalibrationEngine~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Engines/SpatialCalibrationPersistenceStore.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialCalibrationPersistenceStore.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialCalibrationPersistenceStore.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialCalibrationPersistenceStore.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialCalibrationPersistenceStore.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialCalibrationPersistenceStore.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialCalibrationPersistenceStore.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialCalibrationPersistenceStore.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialCalibrationPersistenceStore~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Engines/SpatialClusterEngine.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialClusterEngine.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialClusterEngine.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialClusterEngine.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialClusterEngine.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialClusterEngine.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialClusterEngine.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialClusterEngine.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialClusterEngine~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Engines/SpatialProjector.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialProjector.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialProjector.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialProjector.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialProjector.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialProjector.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialProjector.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialProjector.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialProjector~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Engines/ThermalMonitor.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ThermalMonitor.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ThermalMonitor.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ThermalMonitor.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ThermalMonitor.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ThermalMonitor.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ThermalMonitor.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ThermalMonitor.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ThermalMonitor~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Engines/ThermalPredictiveModel.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ThermalPredictiveModel.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ThermalPredictiveModel.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ThermalPredictiveModel.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ThermalPredictiveModel.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ThermalPredictiveModel.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ThermalPredictiveModel.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ThermalPredictiveModel.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ThermalPredictiveModel~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Managers/ARSessionManager.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ARSessionManager.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ARSessionManager.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ARSessionManager.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ARSessionManager.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ARSessionManager.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ARSessionManager.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ARSessionManager.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ARSessionManager~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Managers/GestureManager.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/GestureManager.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/GestureManager.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/GestureManager.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/GestureManager.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/GestureManager.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/GestureManager.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/GestureManager.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/GestureManager~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Managers/SpatialInputHandler.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialInputHandler.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialInputHandler.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialInputHandler.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialInputHandler.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialInputHandler.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialInputHandler.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialInputHandler.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialInputHandler~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Models/DetectionSettings.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/DetectionSettings.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/DetectionSettings.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/DetectionSettings.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/DetectionSettings.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/DetectionSettings.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/DetectionSettings.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/DetectionSettings.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/DetectionSettings~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Models/FixtureMapping.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureMapping.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureMapping.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureMapping.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureMapping.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureMapping.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureMapping.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureMapping.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureMapping~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Models/FixtureModels.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureModels.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureModels.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureModels.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureModels.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureModels.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureModels.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureModels.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureModels~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Models/HueModels.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueModels.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueModels.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueModels.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueModels.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueModels.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueModels.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueModels.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueModels~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Models/HueStateStream.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueStateStream.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueStateStream.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueStateStream.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueStateStream.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueStateStream.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueStateStream.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueStateStream.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueStateStream~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Models/MatterModels.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterModels.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterModels.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterModels.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterModels.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterModels.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterModels.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterModels.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MatterModels~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Network/CertificatePinningDelegate.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/CertificatePinningDelegate.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/CertificatePinningDelegate.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/CertificatePinningDelegate.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/CertificatePinningDelegate.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/CertificatePinningDelegate.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/CertificatePinningDelegate.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/CertificatePinningDelegate.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/CertificatePinningDelegate~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Protocols/HueClientProtocol.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueClientProtocol.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueClientProtocol.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueClientProtocol.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueClientProtocol.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueClientProtocol.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueClientProtocol.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueClientProtocol.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueClientProtocol~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Protocols/HueNetworkClientProtocol.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueNetworkClientProtocol.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueNetworkClientProtocol.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueNetworkClientProtocol.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueNetworkClientProtocol.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueNetworkClientProtocol.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueNetworkClientProtocol.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueNetworkClientProtocol.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueNetworkClientProtocol~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Services/FixturePersistence.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixturePersistence.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixturePersistence.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixturePersistence.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixturePersistence.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixturePersistence.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixturePersistence.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixturePersistence.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixturePersistence~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Services/LocalSyncActor.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/LocalSyncActor.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/LocalSyncActor.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/LocalSyncActor.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/LocalSyncActor.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/LocalSyncActor.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/LocalSyncActor.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/LocalSyncActor.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/LocalSyncActor~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Services/ObjectAnchorPersistenceService.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ObjectAnchorPersistenceService.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ObjectAnchorPersistenceService.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ObjectAnchorPersistenceService.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ObjectAnchorPersistenceService.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ObjectAnchorPersistenceService.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ObjectAnchorPersistenceService.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ObjectAnchorPersistenceService.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ObjectAnchorPersistenceService~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Services/RelocalizationGuide.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/RelocalizationGuide.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/RelocalizationGuide.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/RelocalizationGuide.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/RelocalizationGuide.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/RelocalizationGuide.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/RelocalizationGuide.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/RelocalizationGuide.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/RelocalizationGuide~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Services/RelocalizationMonitoringService.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/RelocalizationMonitoringService.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/RelocalizationMonitoringService.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/RelocalizationMonitoringService.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/RelocalizationMonitoringService.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/RelocalizationMonitoringService.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/RelocalizationMonitoringService.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/RelocalizationMonitoringService.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/RelocalizationMonitoringService~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Services/SpatialDataPurgeService.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialDataPurgeService.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialDataPurgeService.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialDataPurgeService.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialDataPurgeService.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialDataPurgeService.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialDataPurgeService.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialDataPurgeService.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialDataPurgeService~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Services/SpatialSyncService.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialSyncService.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialSyncService.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialSyncService.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialSyncService.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialSyncService.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialSyncService.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialSyncService.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialSyncService~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Utilities/CameraConfigurationProvider.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/CameraConfigurationProvider.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/CameraConfigurationProvider.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/CameraConfigurationProvider.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/CameraConfigurationProvider.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/CameraConfigurationProvider.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/CameraConfigurationProvider.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/CameraConfigurationProvider.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/CameraConfigurationProvider~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Utilities/Constants.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/Constants.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/Constants.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/Constants.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/Constants.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/Constants.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/Constants.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/Constants.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/Constants~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Utilities/ECDSASignatureValidator.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ECDSASignatureValidator.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ECDSASignatureValidator.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ECDSASignatureValidator.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ECDSASignatureValidator.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ECDSASignatureValidator.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ECDSASignatureValidator.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ECDSASignatureValidator.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ECDSASignatureValidator~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Utilities/Extensions.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/Extensions.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/Extensions.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/Extensions.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/Extensions.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/Extensions.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/Extensions.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/Extensions.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/Extensions~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Utilities/KeychainManager.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/KeychainManager.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/KeychainManager.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/KeychainManager.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/KeychainManager.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/KeychainManager.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/KeychainManager.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/KeychainManager.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/KeychainManager~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Utilities/MetricKitTelemetryService.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MetricKitTelemetryService.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MetricKitTelemetryService.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MetricKitTelemetryService.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MetricKitTelemetryService.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MetricKitTelemetryService.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MetricKitTelemetryService.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MetricKitTelemetryService.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/MetricKitTelemetryService~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Utilities/QuaternionAttributeTransformer.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/QuaternionAttributeTransformer.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/QuaternionAttributeTransformer.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/QuaternionAttributeTransformer.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/QuaternionAttributeTransformer.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/QuaternionAttributeTransformer.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/QuaternionAttributeTransformer.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/QuaternionAttributeTransformer.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/QuaternionAttributeTransformer~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Utilities/SpatialMath.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialMath.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialMath.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialMath.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialMath.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialMath.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialMath.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialMath.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SpatialMath~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Utilities/ViewAttachmentComponents.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ViewAttachmentComponents.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ViewAttachmentComponents.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ViewAttachmentComponents.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ViewAttachmentComponents.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ViewAttachmentComponents.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ViewAttachmentComponents.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ViewAttachmentComponents.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ViewAttachmentComponents~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Views/ARViewContainer.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ARViewContainer.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ARViewContainer.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ARViewContainer.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ARViewContainer.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ARViewContainer.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ARViewContainer.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ARViewContainer.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ARViewContainer~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Views/BridgeDiscoveryView.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/BridgeDiscoveryView.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/BridgeDiscoveryView.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/BridgeDiscoveryView.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/BridgeDiscoveryView.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/BridgeDiscoveryView.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/BridgeDiscoveryView.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/BridgeDiscoveryView.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/BridgeDiscoveryView~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Views/ClusterReticle.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ClusterReticle.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ClusterReticle.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ClusterReticle.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ClusterReticle.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ClusterReticle.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ClusterReticle.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ClusterReticle.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ClusterReticle~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Views/ContentView.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ContentView.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ContentView.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ContentView.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ContentView.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ContentView.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ContentView.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ContentView.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ContentView~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Views/FixtureReticle.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureReticle.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureReticle.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureReticle.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureReticle.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureReticle.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureReticle.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureReticle.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/FixtureReticle~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Views/HUDOverlay.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HUDOverlay.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HUDOverlay.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HUDOverlay.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HUDOverlay.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HUDOverlay.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HUDOverlay.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HUDOverlay.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HUDOverlay~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Views/HueControlPanel.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueControlPanel.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueControlPanel.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueControlPanel.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueControlPanel.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueControlPanel.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueControlPanel.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueControlPanel.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/HueControlPanel~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Views/LiquidGlassHUD.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/LiquidGlassHUD.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/LiquidGlassHUD.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/LiquidGlassHUD.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/LiquidGlassHUD.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/LiquidGlassHUD.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/LiquidGlassHUD.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/LiquidGlassHUD.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/LiquidGlassHUD~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Views/ManualPlacementView.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ManualPlacementView.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ManualPlacementView.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ManualPlacementView.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ManualPlacementView.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ManualPlacementView.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ManualPlacementView.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ManualPlacementView.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ManualPlacementView~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Views/ScenePickerView.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ScenePickerView.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ScenePickerView.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ScenePickerView.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ScenePickerView.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ScenePickerView.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ScenePickerView.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ScenePickerView.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/ScenePickerView~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/Views/SceneRecallButton.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SceneRecallButton.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SceneRecallButton.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SceneRecallButton.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SceneRecallButton.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SceneRecallButton.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SceneRecallButton.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SceneRecallButton.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/SceneRecallButton~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/VisionLinkHue/VisionLinkHueApp.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/VisionLinkHueApp.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/VisionLinkHueApp.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/VisionLinkHueApp.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/VisionLinkHueApp.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/VisionLinkHueApp.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/VisionLinkHueApp.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/VisionLinkHueApp.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/VisionLinkHueApp~partial.swiftmodule"
+  },
+  "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/DerivedSources/GeneratedAssetSymbols.swift" : {
+    "const-values" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/GeneratedAssetSymbols.swiftconstvalues",
+    "dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/GeneratedAssetSymbols.d",
+    "diagnostics" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/GeneratedAssetSymbols.dia",
+    "index-unit-output-path" : "/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/GeneratedAssetSymbols.o",
+    "llvm-bc" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/GeneratedAssetSymbols.bc",
+    "object" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/GeneratedAssetSymbols.o",
+    "swift-dependencies" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/GeneratedAssetSymbols.swiftdeps",
+    "swiftmodule" : "/Users/tom/Documents/apps/Vision-Link-Hue/build/VisionLinkHue.build/Debug-iphoneos/VisionLinkHue.build/Objects-normal/arm64/GeneratedAssetSymbols~partial.swiftmodule"
+  }
+}

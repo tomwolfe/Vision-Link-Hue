@@ -484,13 +484,7 @@ final class HueStateStream {
         }
     }
     
-    /// Mark a fixture mapping as synced to the Hue Bridge.
-    func markFixtureSynced(_ fixtureId: UUID) {
-        Task {
-            persistence.markSynced(fixtureId)
-        }
-    }
-    
+
     /// Clear all persisted fixture mappings.
     func clearPersistedState() {
         Task {
