@@ -18,6 +18,9 @@ final class HueDiscoveryService {
     /// Active network browser for mDNS discovery.
     private var browser: NWBrowser?
     
+    /// Holds the active mDNS delegate to prevent deallocation.
+    private var activeMDNSDelegate: MDNSDelegate?
+    
     /// Discover Hue bridges on the local network using mDNS.
     /// Uses an adaptive timeout that extends if services are still being
     /// discovered, accommodating congested Wi-Fi 7 / Thread environments
@@ -40,6 +43,7 @@ final class HueDiscoveryService {
             },
             onFinished: { semaphore.signal() }
         )
+        self.activeMDNSDelegate = mdnsDelegate
         serviceBrowser.delegate = mdnsDelegate
         
         serviceBrowser.searchForServices(ofType: "_hue._tcp.", inDomain: "local.")
@@ -81,6 +85,7 @@ final class HueDiscoveryService {
         }
         
         serviceBrowser.stop()
+        self.activeMDNSDelegate = nil
         
         if discoveredBridges.isEmpty {
             await stateStream?.reportError(HueError.noBridgeConfigured, severity: .warning, source: "HueDiscoveryService.discover")
@@ -115,8 +120,8 @@ private final class MDNSDelegate: NSObject, NetServiceBrowserDelegate {
 }
 
 extension MDNSDelegate: NetServiceDelegate {
-    func netService(_ service: NetService, didResolve address: NetService) {
-        if let addresses = service.addresses, !addresses.isEmpty {
+    func netServiceDidResolveAddress(_ sender: NetService) {
+        if let addresses = sender.addresses, !addresses.isEmpty {
             let addrData = addresses[0]
             var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
             
@@ -134,7 +139,7 @@ extension MDNSDelegate: NetServiceDelegate {
                     )
                     
                     let ip = result == 0 ? String(cString: hostname) : "unknown"
-                    onFound(service.name, ip, service.port)
+                    onFound(sender.name, ip, sender.port)
                 }
             }
         }

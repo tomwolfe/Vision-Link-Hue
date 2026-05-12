@@ -22,9 +22,9 @@
 	<string>Vision-Link Hue uses your camera to detect lighting fixtures in your environment via on-device AI and anchor AR controls to them.</string>
 	<key>NSBonjourServices</key>
 	<array>
-		<string>_hue._tcp</string>
-		<string>_matter._tcp</string>
-		<string>_meshcop._udp</string>	</array>
+		<string>_hue._tcp.</string>
+		<string>_matter._tcp.</string>
+		<string>_meshcop._udp.</string>	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Vision-Link Hue discovers your Philips Hue bridge on your local network to control lights.</string>
 	<key>NSHomeKitUsageDescription</key>

@@ -495,6 +495,26 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
         logger.info("Connecting to bridge: \(bridge.name) at \(bridge.ip):\(bridge.port)")
         
         setupURLSession()
+        
+        do {
+            try await verifyBridgeReachable()
+            stateStream?.setIsConnected(true)
+        } catch {
+            await stateStream?.reportError(error, severity: .error, source: "HueClient.connect")
+        }
+    }
+    
+    private func verifyBridgeReachable() async throws {
+        guard let ip = bridgeIP,
+              let url = URL(string: "https://\(ip)/clip/v2/resource/bridge") else {
+            throw HueError.noBridgeConfigured
+        }
+        var request = URLRequest(url: url, timeoutInterval: 5)
+        request.httpMethod = "GET"
+        let (_, response) = try await (urlSession ?? URLSession.shared).data(for: request)
+        guard (response as? HTTPURLResponse)?.statusCode != nil else {
+            throw HueError.invalidResponse
+        }
     }
     
     /// Disconnect from the bridge.
