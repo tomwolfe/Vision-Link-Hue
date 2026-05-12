@@ -12,6 +12,9 @@ struct BridgeDiscoveryView: View {
     @State private var bridges: [BridgeInfo] = []
     @State private var isDiscovering: Bool = false
     @State private var isLoading: Bool = false
+    @State private var showManualEntry: Bool = false
+    @State private var manualIP: String = ""
+    @State private var manualPort: String = "443"
     
     var body: some View {
         NavigationStack {
@@ -40,6 +43,16 @@ struct BridgeDiscoveryView: View {
                         .tint(.blue)
                         .accessibilityLabel(Text("Try bridge discovery again"))
                         .accessibilityHint(Text("Search for Hue bridges on the network again"))
+                        
+                        Button("Enter IP Manually") {
+                            withAnimation(.smooth) {
+                                showManualEntry = true
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.blue)
+                        .accessibilityLabel(Text("Enter bridge IP manually"))
+                        .accessibilityHint(Text("Manually specify the bridge network address"))
                     }
                     .padding()
                 } else {
@@ -76,6 +89,33 @@ struct BridgeDiscoveryView: View {
                         .font(.caption)
                         .foregroundStyle(.red)
                         .padding(.horizontal)
+                }
+                
+                if showManualEntry {
+                    HStack(spacing: 8) {
+                        TextField("Bridge IP (e.g., 192.168.1.1)", text: $manualIP)
+                            .keyboardType(.URL)
+                            .autocapitalization(.none)
+                        
+                        TextField("Port", text: $manualPort)
+                            .keyboardType(.numberPad)
+                    }
+                    .textFieldStyle(.roundedBorder)
+                    .padding(.horizontal)
+                    
+                    Button("Connect") {
+                        Task {
+                            let port = Int(manualPort) ?? 443
+                            let bridge = BridgeInfo(
+                                name: "Hue Bridge (manual)",
+                                ip: manualIP,
+                                port: port
+                            )
+                            await hueClient.connect(to: bridge)
+                            dismiss()
+                        }
+                    }
+                    .padding(.horizontal)
                 }
             }
             .navigationTitle("Hue Bridge")
