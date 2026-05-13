@@ -47,6 +47,9 @@ struct ARViewRepresentable: UIViewRepresentable {
         context.coordinator.stateStream = stateStream
         context.coordinator.spatialProjector = spatialProjector
         context.coordinator.arView = arView
+        context.coordinator.sessionManager = sessionManager
+        
+        Task { @MainActor in await sessionManager.configureAndStart(in: arView) }
         
         return arView
     }
@@ -75,19 +78,12 @@ struct ARViewRepresentable: UIViewRepresentable {
         var stateStream: HueStateStream?
         var spatialProjector: SpatialProjector?
         var arView: ARView?
+        var sessionManager: ARSessionManager?
         
         func session(_ session: ARSession, didUpdate frame: ARFrame) {
-            guard let detectionEngine else { return }
-            DispatchQueue.main.async {
-                detectionEngine.start()
-                Task {
-                    do {
-                        _ = try await detectionEngine.processFrame(frame.capturedImage, timestamp: frame.timestamp)
-                    } catch {
-                        Logger(subsystem: "com.tomwolfe.visionlinkhue", category: "ARViewContainer")
-                            .warning("Failed to process frame: \(error.localizedDescription)")
-                    }
-                }
+            guard let sessionManager else { return }
+            Task {
+                await sessionManager.didUpdateFrame(frame)
             }
         }
     }
