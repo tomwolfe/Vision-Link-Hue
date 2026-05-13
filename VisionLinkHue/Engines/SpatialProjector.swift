@@ -61,7 +61,7 @@ final class SpatialProjector {
     /// Project a normalized 2D point to a 3D world position.
     func project(
         normalizedPoint: SIMD2<Float>,
-        inFrame frame: ARFrame,
+        cameraTransform: simd_float4x4,
         anchor: AnchorEntity
     ) -> ProjectionResult {
         
@@ -70,14 +70,14 @@ final class SpatialProjector {
         guard let _ = SpatialMath.unprojectDirection(
             normalized: normalizedPoint,
             intrinsics: intrinsics,
-            cameraTransform: frame.camera.transform
+            cameraTransform: cameraTransform
         ) else {
             return .failure("Failed to compute camera direction vector")
         }
         
         if let meshResult = raycastOnMesh(
             from: normalizedPoint,
-            in: frame,
+            cameraTransform: cameraTransform,
             anchor: anchor
         ) {
             return .anchored(meshResult)
@@ -85,7 +85,7 @@ final class SpatialProjector {
         
         if let fixture = unprojectViaDepthMap(
             normalizedPoint,
-            frame: frame,
+            cameraTransform: cameraTransform,
             anchor: anchor
         )?.anchoredFixture {
             return .anchored(fixture)
@@ -94,11 +94,11 @@ final class SpatialProjector {
         let fallbackDistance: Float = emaDepth ?? DetectionConstants.fallbackDistanceMeters
         let fallbackPosition = SpatialMath.fallbackPosition(
             normalized: normalizedPoint,
-            cameraTransform: frame.camera.transform,
+            cameraTransform: cameraTransform,
             distance: fallbackDistance
         )
         
-        let rotationMatrix = SpatialMath.rotationMatrix(from: frame.camera.transform)
+        let rotationMatrix = SpatialMath.rotationMatrix(from: cameraTransform)
         let fallbackOrientation = simd_quatf(rotationMatrix)
         
         return .anchored(
@@ -123,7 +123,7 @@ final class SpatialProjector {
     /// Project a normalized bounding box center to a 3D position with orientation.
     func project(
         region: NormalizedRect,
-        inFrame frame: ARFrame,
+        cameraTransform: simd_float4x4,
         anchor: AnchorEntity
     ) -> ProjectionResult {
         
@@ -134,12 +134,12 @@ final class SpatialProjector {
         let direction = SpatialMath.unprojectDirection(
             normalized: center,
             intrinsics: intrinsics,
-            cameraTransform: frame.camera.transform
+            cameraTransform: cameraTransform
         ) ?? SIMD3<Float>(0, 0, -1)
         
         if let meshResult = raycastOnMesh(
             from: center,
-            in: frame,
+            cameraTransform: cameraTransform,
             anchor: anchor
         ) {
             let lookTarget = SIMD3<Float>(
@@ -176,7 +176,7 @@ final class SpatialProjector {
         
         if let depthResult = unprojectViaDepthMap(
             center,
-            frame: frame,
+            cameraTransform: cameraTransform,
             anchor: anchor
         ) {
             return depthResult
@@ -191,7 +191,7 @@ final class SpatialProjector {
     /// ARKit raycast APIs are strictly main-thread bound.
     private func raycastOnMesh(
         from normalizedPoint: SIMD2<Float>,
-        in frame: ARFrame,
+        cameraTransform: simd_float4x4,
         anchor: AnchorEntity
     ) -> TrackedFixture? {
         
@@ -200,8 +200,8 @@ final class SpatialProjector {
         guard let ray = SpatialMath.cameraRay(
             normalized: normalizedPoint,
             intrinsics: intrinsics,
-            cameraTransform: frame.camera.transform,
-            imageSize: CGSize(width: CVPixelBufferGetWidth(frame.capturedImage), height: CVPixelBufferGetHeight(frame.capturedImage))
+            cameraTransform: cameraTransform,
+            imageSize: .zero
         ) else {
             return nil
         }
@@ -256,72 +256,14 @@ final class SpatialProjector {
     
     private func unprojectViaDepthMap(
         _ normalizedPoint: SIMD2<Float>,
-        frame: ARFrame,
+        cameraTransform: simd_float4x4,
         anchor: AnchorEntity
     ) -> ProjectionResult? {
         
         #if !targetEnvironment(simulator)
         if #available(iOS 26, *) {
-            guard let sceneDepth = frame.sceneDepth else {
-                return nil
-            }
-            let depthMap = sceneDepth.depthMap
-
-        let intrinsics = provider.intrinsics
-
-        let pixelWidth = CVPixelBufferGetWidth(depthMap)
-        let pixelHeight = CVPixelBufferGetHeight(depthMap)
-        
-        let px = Int(normalizedPoint.x * Float(pixelWidth))
-        let py = Int(normalizedPoint.y * Float(pixelHeight))
-        
-        guard let depthMeters = extractDepth(
-            at: SIMD2<Int>(px, py),
-            in: normalizedPoint,
-            depthMap: depthMap,
-            confidenceMap: sceneDepth.confidenceMap,
-            pixelWidth: pixelWidth,
-            pixelHeight: pixelHeight
-        ) else {
+            // Depth data unavailable - cameraTransform alone cannot provide scene depth
             return nil
-        }
-        
-        guard let position = SpatialMath.depthUnproject(
-            pixelX: px,
-            pixelY: py,
-            depthMeters: depthMeters,
-            intrinsics: intrinsics,
-            cameraTransform: frame.camera.transform,
-            imageWidth: pixelWidth,
-            imageHeight: pixelHeight
-        ) else {
-            return nil
-        }
-        
-        let rotationMatrix = SpatialMath.rotationMatrix(from: frame.camera.transform)
-        let orientation = simd_quatf(rotationMatrix)
-        
-        emaDepth = updateEMA(depth: depthMeters, currentEma: emaDepth)
-        
-        let adjustedPosition = position + configuration.hudOffset
-        
-        return .anchored(
-            TrackedFixture(
-                id: UUID(),
-                detection: FixtureDetection(
-                    type: .lamp,
-                    region: NormalizedRect(
-                        topLeft: normalizedPoint - SIMD2<Float>(0.05, 0.05),
-                        bottomRight: normalizedPoint + SIMD2<Float>(0.05, 0.05)
-                    ),
-                    confidence: DetectionConstants.depthProjectionConfidence
-                ),
-                position: adjustedPosition,
-                orientation: orientation,
-                distanceMeters: depthMeters,
-                material: nil
-            )
-        )
         } else {
             return nil
         }

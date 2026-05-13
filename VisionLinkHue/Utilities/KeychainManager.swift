@@ -33,6 +33,10 @@ final class KeychainManager: @unchecked Sendable {
     
     static let shared = KeychainManager()
     
+    #if targetEnvironment(simulator)
+    private var simStorage: [String: Data] = [:]
+    #endif
+    
     private let queue = DispatchQueue(label: "com.tomwolfe.visionlinkhue.keychain")
     
     /// Save a certificate pin hash to the Keychain.
@@ -41,6 +45,9 @@ final class KeychainManager: @unchecked Sendable {
     ///   - hash: The SHA-256 hash of the certificate's public key.
     /// - Throws: `KeychainError.addFailed` if the operation fails.
     func saveCertPin(to keychainKey: String, hash: Data) async throws {
+        #if targetEnvironment(simulator)
+        simStorage[keychainKey] = hash
+        #else
         try queue.sync {
             let query: [String: Any] = [
                 kSecClass as String: kSecClassKey,
@@ -54,12 +61,16 @@ final class KeychainManager: @unchecked Sendable {
                 throw KeychainError.addFailed
             }
         }
+        #endif
     }
     
     /// Load a certificate pin hash from the Keychain.
     /// - Parameter keychainKey: The account key for this bridge's pin.
     /// - Returns: The stored hash, or `nil` if not found.
     func loadCertPin(from keychainKey: String) async throws -> Data? {
+        #if targetEnvironment(simulator)
+        return simStorage[keychainKey]
+        #else
         try await queue.sync {
             let query: [String: Any] = [
                 kSecClass as String: kSecClassKey,
@@ -74,11 +85,15 @@ final class KeychainManager: @unchecked Sendable {
             }
             return result as? Data
         }
+        #endif
     }
     
     /// Delete a certificate pin hash from the Keychain.
     /// - Parameter keychainKey: The account key for this bridge's pin.
     func deleteCertPin(from keychainKey: String) async {
+        #if targetEnvironment(simulator)
+        simStorage.removeValue(forKey: keychainKey)
+        #else
         queue.sync {
             let query: [String: Any] = [
                 kSecClass as String: kSecClassKey,
@@ -87,6 +102,7 @@ final class KeychainManager: @unchecked Sendable {
             ]
             SecItemDelete(query as CFDictionary)
         }
+        #endif
     }
     
     // MARK: - ECDSA Keychain Operations
@@ -96,6 +112,9 @@ final class KeychainManager: @unchecked Sendable {
     ///   - publicKeyData: The raw public key bytes.
     ///   - keyID: The account key for this ECDSA key.
     func saveECDSAPublicKey(_ publicKeyData: Data, forKey keyID: String) throws {
+        #if targetEnvironment(simulator)
+        simStorage["ecdsa_\(keyID)"] = publicKeyData
+        #else
         let query: [String: Any] = [
             kSecClass as String: kSecClassKey,
             kSecAttrService as String: KeychainKeys.service,
@@ -108,12 +127,16 @@ final class KeychainManager: @unchecked Sendable {
         guard SecItemAdd(query as CFDictionary, nil) == errSecSuccess else {
             throw KeychainError.addFailed
         }
+        #endif
     }
     
     /// Load an ECDSA public key from the Keychain.
     /// - Parameter keyID: The account key for this ECDSA key.
     /// - Returns: The stored public key bytes, or `nil` if not found.
     func loadECDSAPublicKey(forKey keyID: String) throws -> Data? {
+        #if targetEnvironment(simulator)
+        return simStorage["ecdsa_\(keyID)"]
+        #else
         let query: [String: Any] = [
             kSecClass as String: kSecClassKey,
             kSecAttrService as String: KeychainKeys.service,
@@ -126,17 +149,22 @@ final class KeychainManager: @unchecked Sendable {
             return nil
         }
         return result as? Data
+        #endif
     }
     
     /// Delete an ECDSA public key from the Keychain.
     /// - Parameter keyID: The account key for this ECDSA key.
     func deleteECDSAPublicKey(forKey keyID: String) {
+        #if targetEnvironment(simulator)
+        simStorage.removeValue(forKey: "ecdsa_\(keyID)")
+        #else
         let query: [String: Any] = [
             kSecClass as String: kSecClassKey,
             kSecAttrService as String: KeychainKeys.service,
             kSecAttrAccount as String: keyID,
         ]
         SecItemDelete(query as CFDictionary)
+        #endif
     }
     
     // MARK: - Generic Keychain Operations
@@ -147,6 +175,9 @@ final class KeychainManager: @unchecked Sendable {
     ///   - forKey: The account key for this item.
     /// - Throws: `KeychainError.addFailed` if the operation fails.
     func setItem(_ data: Data, forKey key: String) async throws {
+        #if targetEnvironment(simulator)
+        simStorage[key] = data
+        #else
         try queue.sync {
             let query: [String: Any] = [
                 kSecClass as String: kSecClassKey,
@@ -160,6 +191,7 @@ final class KeychainManager: @unchecked Sendable {
                 throw KeychainError.addFailed
             }
         }
+        #endif
     }
     
     /// Load an arbitrary Data item from the Keychain.
@@ -167,6 +199,9 @@ final class KeychainManager: @unchecked Sendable {
     /// - Returns: The stored Data, or `nil` if not found.
     /// - Throws: `KeychainError.queryFailed` if the query fails unexpectedly.
     func getItem(forKey key: String) async throws -> Data? {
+        #if targetEnvironment(simulator)
+        return simStorage[key]
+        #else
         try queue.sync {
             let query: [String: Any] = [
                 kSecClass as String: kSecClassKey,
@@ -181,11 +216,15 @@ final class KeychainManager: @unchecked Sendable {
             }
             return result as? Data
         }
+        #endif
     }
     
     /// Delete an arbitrary Data item from the Keychain.
     /// - Parameter key: The account key for this item.
     func removeItem(forKey key: String) async {
+        #if targetEnvironment(simulator)
+        simStorage.removeValue(forKey: key)
+        #else
         queue.sync {
             let query: [String: Any] = [
                 kSecClass as String: kSecClassKey,
@@ -194,5 +233,6 @@ final class KeychainManager: @unchecked Sendable {
             ]
             SecItemDelete(query as CFDictionary)
         }
+        #endif
     }
 }

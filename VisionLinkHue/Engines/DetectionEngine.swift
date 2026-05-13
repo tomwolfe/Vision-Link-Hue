@@ -18,7 +18,7 @@ protocol DetectionProvider: Sendable {
     /// Process a single AR frame and return detections.
     func processFrame(_ pixelBuffer: CVPixelBuffer, timestamp: TimeInterval, displayTransform: CGAffineTransform?) async throws -> [FixtureDetection]
     /// Classify fixture material using neural surface synthesis.
-    func classifyMaterial(from frame: ARFrame, at region: NormalizedRect?) -> String?
+    func classifyMaterial(from intrinsics: CameraIntrinsics, at region: NormalizedRect?) -> String?
 }
 
 /// Engine that performs on-device lighting fixture detection using
@@ -808,7 +808,7 @@ final class DetectionEngine: DetectionProvider {
     ///
     /// Returns `nil` immediately when Battery Saver mode is enabled to avoid
     /// the computational cost of Neural Surface Synthesis material classification.
-    func classifyMaterial(from frame: ARFrame, at region: NormalizedRect? = nil) -> String? {
+    func classifyMaterial(from intrinsics: CameraIntrinsics, at region: NormalizedRect? = nil) -> String? {
         guard !isBatterySaverMode else {
             return nil
         }

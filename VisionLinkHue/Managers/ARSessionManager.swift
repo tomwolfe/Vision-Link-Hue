@@ -470,8 +470,21 @@ final class ARSessionManager {
     
     /// Called from ARView's session delegate when a new frame is available.
     func didUpdateFrame(_ frame: ARFrame) async {
+        // Extract only what we need BEFORE async work to release ARFrame reference immediately
+        let imageBuffer = frame.imageBuffer
+        let timestamp = frame.timestamp
+        let displayTransform = frame.displayTransform(
+            for: .portrait,
+            viewportSize: CGSize(
+                width: CGFloat(CVPixelBufferGetWidth(frame.imageBuffer)),
+                height: CGFloat(CVPixelBufferGetHeight(frame.imageBuffer))
+            )
+        )
+        let cameraTransform = frame.camera.transform
+        let intrinsics = provider.intrinsics
+        
         await MainActor.run {
-            self.frameTimestamp = frame.timestamp
+            self.frameTimestamp = timestamp
             #if !targetEnvironment(simulator)
             self.worldMapAvailable = false
             let cameraTrackingState = frame.camera.trackingState
@@ -510,24 +523,35 @@ final class ARSessionManager {
         // Cancel any in-progress frame processing to prevent task queue buildup.
         // This ensures only the latest frame is processed, dropping stale frames.
         processingTask?.cancel()
-        processingTask = Task { await self.processFrameSafely(frame) }
+        processingTask = Task {
+            await self.processFrameSafely(
+                imageBuffer: imageBuffer,
+                timestamp: timestamp,
+                displayTransform: displayTransform,
+                cameraTransform: cameraTransform,
+                intrinsics: intrinsics
+            )
+        }
     }
     
-    /// Process a single AR frame with bounded concurrency.
-    /// Cancels on task cancellation to prevent resource waste.
-    private func processFrameSafely(_ frame: ARFrame) async {
+    /// Process a single frame with extracted values only.
+    /// The ARFrame reference is released immediately after extraction above.
+    private func processFrameSafely(
+        imageBuffer: CVPixelBuffer,
+        timestamp: TimeInterval,
+        displayTransform: CGAffineTransform,
+        cameraTransform: simd_float4x4,
+        intrinsics: CameraIntrinsics
+    ) async {
         guard !Task.isCancelled else { return }
         
         let anchor = self.anchorEntity
         
         do {
             let detections = try await detectionEngine.processFrame(
-                frame.imageBuffer,
-                timestamp: frame.timestamp,
-                displayTransform: frame.displayTransform(for: .portrait, viewportSize: CGSize(
-                    width: CGFloat(CVPixelBufferGetWidth(frame.imageBuffer)),
-                    height: CGFloat(CVPixelBufferGetHeight(frame.imageBuffer))
-                ))
+                imageBuffer,
+                timestamp: timestamp,
+                displayTransform: displayTransform
             )
             
             var newFixtures: [TrackedFixture] = []
@@ -536,9 +560,9 @@ final class ARSessionManager {
                 guard !Task.isCancelled else { return }
                 
                 if let anchor {
-                    let material = detectionEngine.classifyMaterial(from: frame, at: detection.region)
+                    let material = detectionEngine.classifyMaterial(from: intrinsics, at: detection.region)
                     
-                    let fixture = await processDetectionOffMain(detection, in: frame, anchor: anchor, material: material)
+                    let fixture = await processDetectionOffMain(detection, cameraTransform: cameraTransform, anchor: anchor, material: material)
                     
                     if let fixture {
                         newFixtures.append(fixture)
@@ -569,7 +593,7 @@ final class ARSessionManager {
     
     func processDetectionOffMain(
         _ detection: FixtureDetection,
-        in frame: ARFrame,
+        cameraTransform: simd_float4x4,
         anchor: AnchorEntity,
         material: String?
     ) async -> TrackedFixture? {
@@ -586,7 +610,7 @@ final class ARSessionManager {
         guard !Task.isCancelled else { return nil }
         let result = spatialProjector.project(
             region: detection.region,
-            inFrame: frame,
+            cameraTransform: cameraTransform,
             anchor: anchor
         )
         
@@ -610,11 +634,11 @@ final class ARSessionManager {
     @MainActor
     func processDetection(
         _ detection: FixtureDetection,
-        in frame: ARFrame
+        cameraTransform: simd_float4x4
     ) async {
         guard let anchor = anchorEntity else { return }
         
-        let fixture = await processDetectionOffMain(detection, in: frame, anchor: anchor, material: nil)
+        let fixture = await processDetectionOffMain(detection, cameraTransform: cameraTransform, anchor: anchor, material: nil)
         
         guard let trackedFixture = fixture else { return }
         
