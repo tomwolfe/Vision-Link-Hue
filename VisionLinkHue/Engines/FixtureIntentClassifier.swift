@@ -98,7 +98,7 @@ final class CoreMLIntentClassifier: @unchecked Sendable, FixtureIntentClassifier
             }
             coreMLRequest.imageCropAndScaleOption = .scaleFill
 
-            try await handler.perform([coreMLRequest])
+            try handler.perform([coreMLRequest])
 
             guard let results = coreMLRequest.results as? [VNRecognizedObjectObservation],
                   let topObservation = results.first,

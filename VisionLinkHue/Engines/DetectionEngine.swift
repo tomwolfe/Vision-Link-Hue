@@ -592,7 +592,7 @@ final class DetectionEngine: DetectionProvider {
         pixelBuffer: CVPixelBuffer,
         displayTransform: CGAffineTransform
     ) async throws -> [FixtureDetection] {
-        guard let objectDetectionModel, objectDetectionModel != nil else { return [] }
+        guard objectDetectionModel != nil else { return [] }
         guard let coreMLRequest = objectDetectionRequest else { return [] }
         
         let priority: TaskPriority = .userInitiated
@@ -645,7 +645,7 @@ final class DetectionEngine: DetectionProvider {
             }
             func run() throws -> [ObservationData] {
                 try handler.perform([request])
-                guard let results = request.results as? [VNRectangleObservation] else {
+                guard let results = request.results else {
                     return [ObservationData]()
                 }
                 return results.map { ObservationData(boundingBox: $0.boundingBox, worldSpaceHeightMeters: nil) }

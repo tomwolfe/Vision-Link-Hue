@@ -319,7 +319,7 @@ extension MatterDiscoveryService: NetServiceDelegate {
         logger.debug("mDNS service stopped: \(sender.name)")
     }
     
-    func netService(_ sender: NetService, didNotResolve _: NetService) {
+    func netService(_ sender: NetService, didNotResolve _: NetService, userInfo: [String: NSNumber]) {
         logger.debug("Failed to resolve mDNS service: \(sender.name)")
     }
 }
@@ -345,7 +345,7 @@ extension MatterDiscoveryService {
         let threadNetworkName: String? = nil
         let areaMetadata: MatterAreaMetadata? = nil
         
-        let hostname = convertToHostname(firstAddress)
+        let _ = convertToHostname(firstAddress)
         
         let info = RouterInfo(
             name: name,
@@ -377,6 +377,7 @@ extension MatterDiscoveryService {
             return 0
         }
         guard result == 0 else { return nil }
-        return String(cString: hostname)
+        let nullTerminated = hostname.prefix(hostname.firstIndex(of: 0) ?? hostname.endIndex)
+        return String(decoding: nullTerminated.map(UInt8.init), as: UTF8.self)
     }
 }

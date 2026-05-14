@@ -309,8 +309,8 @@ final class SpatialProjector {
         let px = pixel.x
         let py = pixel.y
         
-        let depthIndex = py * pixelWidth + px
-        
+        let _ = py * pixelWidth + px
+
         CVPixelBufferLockBaseAddress(depthMap, .readOnly)
         let baseAddress = CVPixelBufferGetBaseAddress(depthMap)!
         let bytesPerRow = CVPixelBufferGetBytesPerRow(depthMap)

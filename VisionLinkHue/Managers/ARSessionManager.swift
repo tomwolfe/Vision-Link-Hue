@@ -298,7 +298,7 @@ final class ARSessionManager: Sendable {
         
         // Apply the configuration to trigger relocalization
         if let config = self.arView?.session.configuration {
-            await session.run(config, options: [.removeExistingAnchors])
+            session.run(config, options: [.removeExistingAnchors])
         }
         
         // Wait for relocalization to complete

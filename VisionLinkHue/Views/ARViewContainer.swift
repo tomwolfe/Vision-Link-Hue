@@ -80,9 +80,12 @@ struct ARViewRepresentable: UIViewRepresentable, Sendable {
         var arView: ARView?
         var sessionManager: ARSessionManager?
         private var processingTask: Task<Void, Never>?
-        
-        @MainActor
-        func session(_ session: ARSession, didUpdate frame: ARFrame) async {
+    }
+}
+
+extension ARViewRepresentable.Coordinator {
+    @MainActor
+    func session(_ session: ARSession, didUpdate frame: ARFrame) async {
             guard let sessionManager else { return }
             processingTask?.cancel()
             
@@ -100,7 +103,7 @@ struct ARViewRepresentable: UIViewRepresentable, Sendable {
             let cameraTransform = frame.camera.transform
             
             processingTask = Task {
-                await sessionManager.didUpdateFrame(
+                sessionManager.didUpdateFrame(
                     imageBuffer: imageData,
                     timestamp: timestamp,
                     displayTransform: displayTransform,
@@ -109,4 +112,3 @@ struct ARViewRepresentable: UIViewRepresentable, Sendable {
             }
         }
     }
-}

@@ -155,7 +155,7 @@ struct SettingsView: View {
                             do {
                                 _ = try await hueClient.createApiKey()
                             } catch {
-                                await stateStream.reportError(error, severity: .error, source: "SettingsView.createApiKey")
+                                stateStream.reportError(error, severity: .error, source: "SettingsView.createApiKey")
                             }
                         }
                     }
