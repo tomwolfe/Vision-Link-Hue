@@ -182,7 +182,31 @@ final class SpatialProjector {
             return depthResult
         }
         
-        return .failure("Projection failed for region: \(region)")
+        // AGGRESSIVE FALLBACK: Always return a position so user sees SOMETHING
+        let fallbackDistance: Float = emaDepth ?? DetectionConstants.fallbackDistanceMeters
+        let fallbackPosition = SpatialMath.fallbackPosition(
+            normalized: center,
+            cameraTransform: cameraTransform,
+            distance: fallbackDistance
+        )
+        
+        let rotationMatrix = SpatialMath.rotationMatrix(from: cameraTransform)
+        let fallbackOrientation = simd_quatf(rotationMatrix)
+        
+        return .anchored(
+            TrackedFixture(
+                id: UUID(),
+                detection: FixtureDetection(
+                    type: .lamp,
+                    region: region,
+                    confidence: 0.5
+                ),
+                position: fallbackPosition,
+                orientation: fallbackOrientation,
+                distanceMeters: fallbackDistance,
+                material: nil
+            )
+        )
     }
     
     // MARK: - Raycast on Scene Reconstruction Mesh

@@ -72,7 +72,7 @@ enum LookDirection: Sendable, Equatable {
 /// the RealityKit scene and DetectionEngine.
 @MainActor
 @Observable
-final class ARSessionManager {
+final class ARSessionManager: Sendable {
     
     var isSessionActive: Bool = false
     var anchorCount: Int = 0
@@ -469,8 +469,31 @@ final class ARSessionManager {
     // MARK: - Frame Processing
     
     /// Called from ARView's session delegate when a new frame is available.
-    func didUpdateFrame(_ frame: ARFrame) async {
-        // Extract only what we need BEFORE async work to release ARFrame reference immediately
+    /// Accepts pre-extracted data to avoid retaining the ARFrame reference.
+    func didUpdateFrame(
+        imageBuffer: CVPixelBuffer,
+        timestamp: TimeInterval,
+        displayTransform: CGAffineTransform,
+        cameraTransform: simd_float4x4
+    ) {
+        processFrameAsync(
+            imageBuffer: imageBuffer,
+            timestamp: timestamp,
+            displayTransform: displayTransform,
+            cameraTransform: cameraTransform
+        )
+    }
+    
+    /// Extract all data needed from an ARFrame for async processing.
+    private func extractFrameData(_ frame: ARFrame) -> (
+        imageBuffer: CVPixelBuffer,
+        timestamp: TimeInterval,
+        displayTransform: CGAffineTransform,
+        cameraTransform: simd_float4x4,
+        intrinsics: CameraIntrinsics,
+        cameraTrackingState: ARCamera.TrackingState,
+        depthMap: CVPixelBuffer?
+    ) {
         let imageBuffer = frame.imageBuffer
         let timestamp = frame.timestamp
         let displayTransform = frame.displayTransform(
@@ -482,66 +505,53 @@ final class ARSessionManager {
         )
         let cameraTransform = frame.camera.transform
         let intrinsics = provider.intrinsics
+        let cameraTrackingState = frame.camera.trackingState
+        let depthMap = frame.sceneDepth?.depthMap
         
-        await MainActor.run {
-            self.frameTimestamp = timestamp
-            #if !targetEnvironment(simulator)
-            self.worldMapAvailable = false
-            let cameraTrackingState = frame.camera.trackingState
-            if cameraTrackingState == .normal {
+        return (imageBuffer, timestamp, displayTransform, cameraTransform, intrinsics, cameraTrackingState, depthMap)
+    }
+    
+    /// Process frame data asynchronously.
+    private func processFrameAsync(
+        imageBuffer: CVPixelBuffer,
+        timestamp: TimeInterval,
+        displayTransform: CGAffineTransform,
+        cameraTransform: simd_float4x4
+    ) {
+        // Spawn a task so that any frame-related references go out of scope
+        // as soon as this synchronous function returns.
+        Task {
+            await MainActor.run {
+                self.frameTimestamp = timestamp
+                #if !targetEnvironment(simulator)
                 self.trackingState = .tracking
-            } else {
-                self.trackingState = .limited
+                #else
+                self.worldMapAvailable = false
+                self.trackingState = .notAvailable
+                #endif
             }
             
-            // Update relocalization state based on frame tracking state
-            if self.isRelocalizing {
-                if cameraTrackingState == .normal {
-                    self.isRelocalizing = false
-                    self.relocalizationState = .relocalized
-                    self.relocalizationProgress = 1.0
-                    self.worldMapCaptureTask?.cancel()
-                    self.worldMapCaptureTask = nil
-                    self.relocalizationGuide.reset()
-                    logger.info("Relocalization completed from frame tracking")
-                } else {
-                    // Update feature density for trend analysis during relocalization.
-                    if #available(iOS 26, *) {
-                        if let depthMap = frame.sceneDepth?.depthMap {
-                            let density = self.computeFeatureDensity(depthMap)
-                            self.relocalizationGuide.updateFeatureDensity(density)
-                        }
-                    }
-                }
+            // Cancel any in-progress frame processing to prevent task queue buildup.
+            // This ensures only the latest frame is processed, dropping stale frames.
+            processingTask?.cancel()
+            processingTask = Task {
+                await self.processFrameSafely(
+                    imageBuffer: imageBuffer,
+                    timestamp: timestamp,
+                    displayTransform: displayTransform,
+                    cameraTransform: cameraTransform
+                )
             }
-            #else
-            self.worldMapAvailable = false
-            self.trackingState = .notAvailable
-            #endif
-        }
-        
-        // Cancel any in-progress frame processing to prevent task queue buildup.
-        // This ensures only the latest frame is processed, dropping stale frames.
-        processingTask?.cancel()
-        processingTask = Task {
-            await self.processFrameSafely(
-                imageBuffer: imageBuffer,
-                timestamp: timestamp,
-                displayTransform: displayTransform,
-                cameraTransform: cameraTransform,
-                intrinsics: intrinsics
-            )
         }
     }
     
     /// Process a single frame with extracted values only.
-    /// The ARFrame reference is released immediately after extraction above.
+    /// Called from the async closure in `didUpdateFrame` where `frame` goes out of scope.
     private func processFrameSafely(
         imageBuffer: CVPixelBuffer,
         timestamp: TimeInterval,
         displayTransform: CGAffineTransform,
-        cameraTransform: simd_float4x4,
-        intrinsics: CameraIntrinsics
+        cameraTransform: simd_float4x4
     ) async {
         guard !Task.isCancelled else { return }
         
@@ -554,13 +564,18 @@ final class ARSessionManager {
                 displayTransform: displayTransform
             )
             
+            logger.debug("Frame processing returned \(detections.count) detection(s)")
+            
             var newFixtures: [TrackedFixture] = []
             
             for detection in detections {
                 guard !Task.isCancelled else { return }
                 
                 if let anchor {
-                    let material = detectionEngine.classifyMaterial(from: intrinsics, at: detection.region)
+                    let material = detectionEngine.classifyMaterial(
+                        from: provider.intrinsics,
+                        at: detection.region
+                    )
                     
                     let fixture = await processDetectionOffMain(detection, cameraTransform: cameraTransform, anchor: anchor, material: material)
                     

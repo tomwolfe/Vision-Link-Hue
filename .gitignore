@@ -15,3 +15,16 @@ DerivedData/
 **/user.dtControlStripState
 **/*.xcworkspace/xcshareddata/
 .DS_Store
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Training scripts and generated data
+Scripts/convert_to_coreml.py
+Scripts/generate_training_data.py
+Scripts/run_training_pipeline.sh
+Scripts/train_lighting_archetype.py
+generated_training_data/

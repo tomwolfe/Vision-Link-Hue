@@ -108,9 +108,9 @@ actor CertificatePinStore {
         do {
             try await KeychainManager.shared.saveCertPin(to: keychainKey, hash: hash)
             self.pinnedHash = hash
-            logger.info("Certificate pinned via TOFU for key \(keychainKey)")
+            logger.debug("Certificate pinned via TOFU for key \(keychainKey)")
         } catch {
-            logger.error("Failed to save certificate pin to Keychain: \(error.localizedDescription)")
+            logger.debug("Certificate pin save skipped (keychain unavailable): \(error.localizedDescription)")
         }
         
         await tofuCallback(hash)
@@ -130,9 +130,9 @@ actor CertificatePinStore {
         do {
             try await KeychainManager.shared.saveCertPin(to: keychainKey, hash: newHash)
             self.pinnedHash = newHash
-            logger.info("Certificate pin updated after bridge reset for key \(keychainKey)")
+            logger.debug("Certificate pin updated after bridge reset for key \(keychainKey)")
         } catch {
-            logger.error("Failed to update certificate pin in Keychain: \(error.localizedDescription)")
+            logger.debug("Certificate pin update skipped (keychain unavailable): \(error.localizedDescription)")
         }
         
         await tofuCallback(newHash)

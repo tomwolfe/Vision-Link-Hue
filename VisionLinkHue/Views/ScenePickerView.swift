@@ -24,7 +24,7 @@ struct ScenePickerView: View {
                     Text("No scenes available")
                         .foregroundStyle(.secondary)
                 } else {
-                    ForEach(scenes) { scene in
+                    ForEach(scenes, id: \.id) { scene in
                         Button {
                             Task {
                                 do {

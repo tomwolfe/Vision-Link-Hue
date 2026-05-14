@@ -12,13 +12,13 @@ enum DetectionConstants {
     // MARK: - Vision Detection
     
     /// Minimum confidence for VNRectangleObservation results.
-    public static let rectangleMinimumConfidence: Float = 0.2
+    public static let rectangleMinimumConfidence: Float = 0.15
     
     /// Maximum normalized Y position for valid detections (filters out bottom-of-frame).
-    public static let maxDetectionY: Double = 0.8
+    public static let maxDetectionY: Double = 0.95
     
     /// Minimum bounding box width/height as fraction of frame (filters tiny detections).
-    public static let minBoundingBoxSize: Double = 0.05
+    public static let minBoundingBoxSize: Double = 0.02
     
     /// IoU threshold for non-maximum suppression.
     public static let nmsIoUThreshold: Float = 0.3

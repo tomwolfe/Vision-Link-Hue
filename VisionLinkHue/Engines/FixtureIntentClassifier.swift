@@ -37,14 +37,15 @@ protocol FixtureIntentClassifier: Sendable {
 /// churn and CPU overhead during rapid frame analysis.
 final class CoreMLIntentClassifier: @unchecked Sendable, FixtureIntentClassifier {
     /// Mapping from CoreML model labels to `FixtureType` enum cases.
+    /// Labels match the training dataset class names (underscore-separated).
     static let labelToFixtureType: [String: FixtureType] = [
         "Chandelier": .chandelier,
         "Sconce": .sconce,
-        "Desk Lamp": .deskLamp,
+        "Desk_Lamp": .deskLamp,
         "Pendant": .pendant,
-        "Ceiling Light": .ceiling,
-        "Recessed Light": .recessed,
-        "Strip Light": .strip,
+        "Ceiling_Light": .ceiling,
+        "Recessed_Light": .recessed,
+        "Strip_Light": .strip,
         "Lamp": .lamp
     ]
 
@@ -63,7 +64,7 @@ final class CoreMLIntentClassifier: @unchecked Sendable, FixtureIntentClassifier
     /// Load the bundled LightingArchetype CoreML model asynchronously.
     /// Falls back to an unloaded state if the model is not found.
     func loadModel() async throws {
-        guard let modelURL = Bundle.main.url(forResource: "LightingArchetype", withExtension: "mlmodel") else {
+        guard let modelURL = Bundle.main.url(forResource: "LightingArchetype", withExtension: "mlpackage") else {
             return
         }
 

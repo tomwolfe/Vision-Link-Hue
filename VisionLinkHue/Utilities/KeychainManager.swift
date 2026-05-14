@@ -56,7 +56,11 @@ final class KeychainManager: @unchecked Sendable {
                 kSecValueData as String: hash,
                 kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
             ]
-            SecItemDelete(query as CFDictionary)
+            // Delete existing item first (errSecItemNotFound is acceptable)
+            let deleteStatus = SecItemDelete(query as CFDictionary)
+            guard deleteStatus == errSecSuccess || deleteStatus == errSecItemNotFound else {
+                throw KeychainError.addFailed
+            }
             guard SecItemAdd(query as CFDictionary, nil) == errSecSuccess else {
                 throw KeychainError.addFailed
             }

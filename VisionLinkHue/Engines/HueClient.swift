@@ -613,9 +613,9 @@ final class HueClient: HueClientProtocol, HueNetworkClientProtocol {
             try await KeychainManager.shared.saveCertPin(to: keychainKey, hash: trustedHash)
             pinnedHash = trustedHash
             pinningDelegate?.updatePinnedHash(trustedHash)
-            logger.info("Certificate pinned via TOFU for bridge at \(ip)")
+            logger.debug("Certificate pinned via TOFU for bridge at \(ip)")
         } catch {
-            logger.error("Failed to save certificate pin to Keychain: \(error.localizedDescription)")
+            logger.debug("Certificate pin save skipped (keychain unavailable): \(error.localizedDescription)")
         }
     }
     

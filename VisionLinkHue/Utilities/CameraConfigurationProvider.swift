@@ -42,6 +42,10 @@ final class DefaultCameraConfigurationProvider: CameraConfigurationProvider {
 extension ARWorldTrackingConfiguration {
     func configuredWithEnvironment() -> ARWorldTrackingConfiguration {
         self.planeDetection = [.horizontal, .vertical]
+        
+        // Enable scene reconstruction for raycasting against the mesh (when available)
+        // Scene reconstruction requires LiDAR-capable devices; omitted for compatibility
+        
         return self
     }
 }

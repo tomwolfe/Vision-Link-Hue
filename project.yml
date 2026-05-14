@@ -33,6 +33,8 @@ targets:
     resources:
       - VisionLinkHue/Config/classification_rules.json
       - VisionLinkHue/Shaders
+      - VisionLinkHue/Resources/LightingArchetype.mlpackage
+      - VisionLinkHue/Resources/LightingArchetype_quantized.mlpackage
     dependencies:
       - package: SwiftCrypto
         product: Crypto

@@ -29,7 +29,7 @@ struct ARViewContainer: View {
 /// UIViewRepresentable wrapper for ARKit's ARView.
 /// Manages the AR session lifecycle and provides frame callbacks
 /// through the coordinator pattern.
-struct ARViewRepresentable: UIViewRepresentable {
+struct ARViewRepresentable: UIViewRepresentable, Sendable {
     
     @Bindable var sessionManager: ARSessionManager
     let detectionEngine: DetectionEngine
@@ -79,11 +79,33 @@ struct ARViewRepresentable: UIViewRepresentable {
         var spatialProjector: SpatialProjector?
         var arView: ARView?
         var sessionManager: ARSessionManager?
+        private var processingTask: Task<Void, Never>?
         
-        func session(_ session: ARSession, didUpdate frame: ARFrame) {
+        @MainActor
+        func session(_ session: ARSession, didUpdate frame: ARFrame) async {
             guard let sessionManager else { return }
-            Task {
-                await sessionManager.didUpdateFrame(frame)
+            processingTask?.cancel()
+            
+            // Extract all data synchronously to release the frame reference promptly.
+            // The frame itself is released as soon as this method returns.
+            let imageData = frame.imageBuffer
+            let timestamp = frame.timestamp
+            let displayTransform = frame.displayTransform(
+                for: .portrait,
+                viewportSize: CGSize(
+                    width: CGFloat(CVPixelBufferGetWidth(frame.imageBuffer)),
+                    height: CGFloat(CVPixelBufferGetHeight(frame.imageBuffer))
+                )
+            )
+            let cameraTransform = frame.camera.transform
+            
+            processingTask = Task {
+                await sessionManager.didUpdateFrame(
+                    imageBuffer: imageData,
+                    timestamp: timestamp,
+                    displayTransform: displayTransform,
+                    cameraTransform: cameraTransform
+                )
             }
         }
     }

@@ -283,6 +283,8 @@ final class DetectionEngine: DetectionProvider {
         
         let filtered = detections.filter { $0.confidence >= minConfidence }
         
+        logger.debug("Pre-filter: \(detections.count) detections, post-filter: \(filtered.count)")
+        
         await MainActor.run {
             self.lastDetections = filtered
         }
@@ -315,9 +317,9 @@ final class DetectionEngine: DetectionProvider {
     /// Asynchronously loads the model with progress reporting to avoid blocking the main thread.
     ///
     /// Model loading cascade (optimized for memory-constrained devices):
-    /// 1. Pre-compiled 4-bit quantized `.mlmodelc` bundle (primary, lowest memory)
-    /// 2. Runtime 4-bit quantization of `.mlmodel` (fallback, requires NPU support)
-    /// 3. Full-precision `.mlmodel` (last resort, requires >8GB RAM to avoid Jetsam)
+    /// 1. Pre-compiled FLOAT16 quantized `.mlpackage` bundle (primary, ~50% size reduction)
+    /// 2. Standard `.mlpackage` with runtime quantization (fallback)
+    /// 3. Full-precision `.mlpackage` (last resort, requires >8GB RAM to avoid Jetsam)
     /// 4. Rectangle detection only (safe fallback for memory-constrained devices)
     private func loadObjectDetectionModel() async {
         guard !isModelLoading else {
@@ -329,13 +331,13 @@ final class DetectionEngine: DetectionProvider {
         modelLoadingProgress = 0.0
         onModelLoadingProgress?(0.0)
 
-        // Phase 1: Try to load a pre-compiled 4-bit quantized model bundle.
+        // Phase 1: Try to load a pre-compiled FLOAT16 quantized model bundle.
         // This is the preferred artifact for production deployment, as it:
         // - Avoids runtime compilation delays (no on-device Neural Engine compilation)
-        // - Uses 4x less memory than the full-precision model (prevents Jetsam)
+        // - Uses ~50% less memory than the full-precision model (prevents Jetsam)
         // - Provides optimal inference speed on A17+ and M-series chips
-        // Ship this as the primary artifact using `coremltools` quantization pipeline.
-        let quantizedModelURL = Bundle.main.url(forResource: "LightingArchetype_quantized", withExtension: "mlmodelc")
+        // Ship this as the primary artifact using `coremltools` FLOAT16 quantization.
+        let quantizedModelURL = Bundle.main.url(forResource: "LightingArchetype_quantized", withExtension: "mlpackage")
 
         if let quantizedURL = quantizedModelURL,
            let quantizedModel = try? MLModel(contentsOf: quantizedURL, configuration: MLModelConfiguration()) {
@@ -343,7 +345,7 @@ final class DetectionEngine: DetectionProvider {
             isCoreMLAvailable = true
             isObjectModelLoaded = true
             isModelQuantized = true
-            logger.info("Loaded pre-compiled 4-bit quantized LightingArchetype model (optimal deployment)")
+            logger.info("Loaded pre-compiled FLOAT16 quantized LightingArchetype model (optimal deployment)")
 
             // Pre-create VNCoreMLRequest for the quantized model
             do {
@@ -366,8 +368,8 @@ final class DetectionEngine: DetectionProvider {
             return
         }
 
-        // Phase 2: Fall back to the standard .mlmodel with runtime quantization.
-        guard let modelURL = Bundle.main.url(forResource: "LightingArchetype", withExtension: "mlmodel") else {
+        // Phase 2: Fall back to the standard .mlpackage model.
+        guard let modelURL = Bundle.main.url(forResource: "LightingArchetype", withExtension: "mlpackage") else {
             logger.warning("CoreML lighting archetype model not found, falling back to rectangle detection")
             isCoreMLAvailable = false
             isObjectModelLoaded = false
@@ -416,7 +418,7 @@ final class DetectionEngine: DetectionProvider {
                             domain: "DetectionEngine",
                             code: 2,
                             userInfo: [
-                                NSLocalizedDescriptionKey: "4-bit quantization unavailable, falling back to full precision model. This will increase inference latency and may impact the predictive thermal model baseline."
+                                NSLocalizedDescriptionKey: "FLOAT16 quantized model unavailable, falling back to full precision model. This will increase inference latency and may impact the predictive thermal model baseline."
                             ]
                         )
                         stateStream.reportError(fallbackError, severity: .warning, source: "DetectionEngine.quantization_fallback")
@@ -469,7 +471,7 @@ final class DetectionEngine: DetectionProvider {
                 isModelQuantized = quantizationApplied
 
                 if quantizationApplied {
-                    logger.info("CoreML lighting archetype model loaded with 4-bit weight quantization")
+                    logger.info("CoreML lighting archetype model loaded with FLOAT16 weight quantization")
                 } else {
                     logger.info("CoreML lighting archetype model loaded (quantization unavailable, using full precision)")
                 }
@@ -655,7 +657,12 @@ final class DetectionEngine: DetectionProvider {
             try box.run()
         }).value
         
-        return classifyFixtures(from: observations, displayTransform: displayTransform)
+        logger.debug("Rectangle detection found \(observations.count) candidate(s)")
+        
+        let result = classifyFixtures(from: observations, displayTransform: displayTransform)
+        logger.debug("After filtering: \(result.count) fixture(s) passed confidence threshold")
+        
+        return result
     }
     
     /// Merge CoreML object detections with rectangle detections.
